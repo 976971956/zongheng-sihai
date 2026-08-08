@@ -84,7 +84,7 @@ func _init():
 
 	state.arrive_from_2d("black_sail_1")
 	_claim(state, "black_sail_clue")
-	_win_times(state, "corsair_deckhand", 2)
+	_win_times(state, "corsair_deckhand", 1)
 	var deckhand_reward = _claim(state, "clear_deckhands")
 	_check(deckhand_reward.reward_item == "corsair_cutlass" and state.equip_item("corsair_cutlass").ok, "黑帆外围必须奖励并可装备黑帆弯刀")
 	_check(state.move_to("black_sail_2").ok, "击败黑帆水手后必须开放火药仓")
@@ -99,7 +99,29 @@ func _init():
 	_win_times(state, "corsair_captain", 1)
 	var captain_reward = _claim(state, "captain_ledger")
 	_check(captain_reward.reward_item == "black_sail_charm" and state.equip_item("black_sail_charm").ok, "黑帆船长必须奖励传说航路仪")
+	state.player.location = "venice_tavern"
+	_check(bool(state.talk_to("tavern_keeper").get("quest_completed", false)), "击败黑帆船长后必须回酒馆交付海图")
+	_claim(state, "return_chart")
+	state.player.location = "alisa_hut"
+	_check(bool(state.talk_to("alisa").get("quest_completed", false)), "黑帆海图必须引导玩家回到艾丽莎小屋")
+	var story_reward = _claim(state, "alisa_truth")
+	_check(story_reward.reward_item == "tide_seal" and state.equip_item("tide_seal").ok, "第一卷结局必须奖励潮汐银章并可装备")
 	_check(state.get_current_quest().is_empty() and int(state.player.level) == GameData.MAX_LEVEL, "完整主线必须支持角色成长至Lv.15")
+	_check(str(state.player.title) == "潮汐追迹者", "第一卷结局必须授予剧情称号")
+
+	state.inventory["ghost_card"] = 1
+	var defense_before_card = int(state.get_stats().defense)
+	_check(state.equip_card("ghost_card").ok and int(state.get_stats().defense) == defense_before_card + 3, "怪物卡必须可启用并提供真实属性加成")
+	var discovery = state.claim_discovery("alisa_shell")
+	_check(discovery.ok and not state.claim_discovery("alisa_shell").ok, "地图发现物必须可领取且不能重复获取")
+
+	var bounty_state = TestState.new()
+	bounty_state.player.level = 8
+	bounty_state.player.location = "residential_quarter"
+	_win_times(bounty_state, "sewer_rat", 3)
+	_check(bounty_state.bounty_can_claim(), "击败指定怪物必须完成当前循环悬赏")
+	var bounty_reward = bounty_state.claim_bounty()
+	_check(bounty_reward.ok and bounty_state.get_bounty().id == "mine_patrol", "领取后必须自动轮换到下一个悬赏")
 
 	state.inventory["unknown_equipment"] = 1
 	var silver_before = int(state.player.silver)

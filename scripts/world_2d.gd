@@ -35,6 +35,13 @@ const ENEMY_SPAWNS = {
 	,"corsair_captain": {"region": "black_sail", "name": "船长雷蒙", "position": Vector2(360, 225), "color": Color("263d57"), "accent": Color("e3bd5b"), "location": "black_sail_4"}
 }
 
+const DISCOVERY_SPAWNS = {
+	"alisa_shell": {"region": "city", "location": "alisa_hut", "position": Vector2(76, 430)},
+	"field_cache": {"region": "field", "location": "residential_quarter", "position": Vector2(305, 860)},
+	"trial_relic": {"region": "dungeon", "location": "training_dungeon_2", "position": Vector2(250, 680)},
+	"corsair_manifest": {"region": "black_sail", "location": "black_sail_3", "position": Vector2(485, 455)}
+}
+
 var state = GameState.new()
 var world_layer
 var map_node
@@ -53,6 +60,7 @@ var battle_stage
 var battle_log_label
 var battle_action_button
 var battle_auto_button
+var battle_skill_button
 var battle_round_label
 var battle_player_info_label
 var battle_enemy_info_label
@@ -245,12 +253,25 @@ func _spawn_world_actors():
 	else:
 		_spawn_next_dungeon_enemy(["corsair_deckhand", "corsair_raider", "corsair_guard", "corsair_captain"])
 		_add_actor("travel", "city", "返回港口", Vector2(215, 1080), Color("4e7781"), GOLD, "venice_dock")
+	for discovery_id in DISCOVERY_SPAWNS:
+		_spawn_discovery_if_available(discovery_id)
 
 func _spawn_next_dungeon_enemy(enemy_ids):
 	for enemy_id in enemy_ids:
 		if not bool(state.dungeon_cleared.get(enemy_id, false)):
 			_spawn_enemy_if_ready(enemy_id)
 			return
+
+func _spawn_discovery_if_available(discovery_id):
+	if bool(state.discoveries.get(discovery_id, false)) or not DISCOVERY_SPAWNS.has(discovery_id):
+		return
+	var spawn = DISCOVERY_SPAWNS[discovery_id]
+	if str(spawn.region) != current_region:
+		return
+	if current_region in ["dungeon", "black_sail"] and _dungeon_floor_lock(str(spawn.location)) != "":
+		return
+	var data = GameData.DISCOVERIES[discovery_id]
+	_add_actor("discovery", discovery_id, data.name, spawn.position, Color("735a2f"), GOLD, spawn.location)
 
 func _spawn_enemy_if_ready(enemy_id):
 	if not ENEMY_SPAWNS.has(enemy_id):
@@ -560,6 +581,8 @@ func _update_nearest_actor():
 		action_button.disabled = false
 		if nearest_actor.kind == "travel":
 			action_button.text = "进入 · %s" % nearest_actor.name
+		elif nearest_actor.kind == "discovery":
+			action_button.text = "调查 · %s" % nearest_actor.name
 		elif nearest_actor.id == "ship_owner" and state.is_trade_unlocked():
 			action_button.text = "港口贸易 · 船老板"
 		else:
@@ -613,7 +636,8 @@ func _refresh_hud():
 	stats_label.text = "Lv.%d  ♥%d  ◈%d" % [int(state.player.level), int(state.player.hp), int(state.player.silver)]
 	var quest = state.get_current_quest()
 	if quest.is_empty():
-		quest_label.text = "自由航程｜港口贸易已解锁"
+		var bounty = state.get_bounty()
+		quest_label.text = "悬赏「%s」  %d/%d" % [bounty.title, state.bounty_progress, int(bounty.need)]
 	else:
 		quest_label.text = "主线「%s」  %d/%d" % [quest.title, state.quest_progress, int(quest.objective.need)]
 	if is_instance_valid(waypoint_label):
@@ -626,7 +650,7 @@ func _interact():
 		_switch_region(str(nearest_actor.id), str(nearest_actor.location))
 		return
 	var actor_location = str(nearest_actor.get("location", ""))
-	if current_region == "dungeon":
+	if current_region in ["dungeon", "black_sail"]:
 		var floor_lock = _dungeon_floor_lock(actor_location)
 		if floor_lock != "":
 			_show_message("道路尚未开放", floor_lock)
@@ -636,6 +660,15 @@ func _interact():
 		if arrival.ok:
 			current_zone = actor_location
 			_refresh_hud()
+	if nearest_actor.kind == "discovery":
+		var discovery_result = state.claim_discovery(str(nearest_actor.id))
+		_spawn_world_actors()
+		_refresh_hud()
+		if bool(discovery_result.get("ok", false)):
+			_show_message("发现·%s" % str(discovery_result.get("name", "隐藏线索")), "%s\n\n获得：%s" % [str(discovery_result.get("lore", "")), str(discovery_result.get("reward_text", ""))])
+		else:
+			_show_message("无法调查", str(discovery_result.get("message", "这里什么也没有。")))
+		return
 	if nearest_actor.kind == "npc":
 		if nearest_actor.id == "ship_owner" and state.is_trade_unlocked():
 			_open_trade_2d()
@@ -671,7 +704,7 @@ func _switch_region(region_id, entrance_location):
 	elif current_region == "black_sail" and _dungeon_floor_lock(target_location) != "":
 		target_location = "black_sail_1"
 	var arrival = state.arrive_from_2d(target_location)
-	map_node.set_region("dungeon" if current_region in dungeon_regions else current_region)
+	map_node.set_region(current_region)
 	_spawn_world_actors()
 	player_actor.position = _spawn_for_location(target_location)
 	_update_camera(0.0, true)
@@ -739,7 +772,7 @@ func _claim_quest_2d():
 	content.add_child(_label(str(result.reward_text), 18, TEAL))
 	var next_quest = state.get_current_quest()
 	if next_quest.is_empty():
-		content.add_child(_label("威尼斯篇章完成！港口货物贸易现已开放。", 17, INK))
+		content.add_child(_label("第一卷·黑帆之谜完成！你找回了自己的名字，但亚历山大灯塔下的真相仍在等待。", 17, INK))
 	else:
 		content.add_child(_label("下一个任务｜%s" % next_quest.title, 20, GOLD))
 		var story = _label(next_quest.story, 16, MUTED)
@@ -827,6 +860,10 @@ func _open_battle(view):
 	battle_auto_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	battle_auto_button.pressed.connect(_battle_auto)
 	actions.add_child(battle_auto_button)
+	battle_skill_button = _button("破浪斩 0/3", "ghost")
+	battle_skill_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	battle_skill_button.pressed.connect(_battle_skill)
+	actions.add_child(battle_skill_button)
 	_open_overlay(content, false, Vector2(686, 1080))
 
 func _refresh_battle_info(view):
@@ -846,6 +883,10 @@ func _refresh_battle_info(view):
 	battle_enemy_info_label.text = "%s Lv.%d · %s\n体力 %d / %d" % [enemy_name, enemy_level, enemy_rank, int(view.get("enemy_hp", 0)), int(view.get("enemy_max_hp", enemy.get("hp", 1)))]
 	if is_instance_valid(battle_intent_label):
 		battle_intent_label.text = "敌方意图｜%s" % str(view.get("enemy_intent", "战斗已经结束")) if not bool(view.get("battle_over", false)) else "战斗已经结束"
+	if is_instance_valid(battle_skill_button):
+		var focus = int(view.get("focus", state.battle_focus()))
+		battle_skill_button.text = "破浪斩 %d/3" % focus
+		battle_skill_button.disabled = focus < 3 or bool(view.get("battle_over", false)) or auto_battle_running
 
 func _set_battle_stance_2d(stance_id):
 	if auto_battle_running or not battle_result.is_empty():
@@ -896,6 +937,20 @@ func _battle_attack():
 	battle_stage.set_battle_values(result)
 	_update_battle_result(result)
 
+func _battle_skill():
+	if auto_battle_running or not battle_result.is_empty():
+		return
+	var player_hp_before = int(state.player.hp)
+	var result = state.skill_attack()
+	if not bool(result.get("ok", false)):
+		battle_log_label.text = str(result.get("message", "潮势不足。"))
+		return
+	battle_stage.animate_attack(true)
+	if int(result.get("player_hp", player_hp_before)) < player_hp_before:
+		battle_stage.animate_attack(false)
+	battle_stage.set_battle_values(result)
+	_update_battle_result(result)
+
 func _battle_auto():
 	if auto_battle_running:
 		return
@@ -915,7 +970,8 @@ func _battle_auto():
 			_refresh_battle_info(state.get_battle_view())
 			await get_tree().create_timer(AUTO_BATTLE_READ_DELAY).timeout
 		var player_hp_before = int(state.player.hp)
-		var result = state.attack_once()
+		var should_counter = state.battle_focus() >= 3 and str(state.get_enemy_intent()).begins_with("⚠")
+		var result = state.skill_attack() if should_counter else state.attack_once()
 		if not bool(result.get("ok", false)):
 			battle_log_label.text = str(result.get("message", "自动战斗中断。"))
 			break
@@ -947,7 +1003,12 @@ func _update_battle_result(result):
 	if bool(result.get("battle_over", false)):
 		battle_result = result
 		if bool(result.get("won", false)):
-			battle_action_button.text = "返回地图" if not bool(result.get("quest_completed", false)) else "返回并领取任务奖励"
+			if bool(result.get("quest_completed", false)):
+				battle_action_button.text = "返回并领取主线奖励"
+			elif bool(result.get("bounty_completed", false)):
+				battle_action_button.text = "返回并领取悬赏"
+			else:
+				battle_action_button.text = "返回地图"
 		elif bool(result.get("fled", false)):
 			battle_action_button.text = "返回地图"
 		else:
@@ -956,6 +1017,8 @@ func _update_battle_result(result):
 		if is_instance_valid(battle_auto_button):
 			battle_auto_button.text = "战斗结束"
 			battle_auto_button.disabled = true
+		if is_instance_valid(battle_skill_button):
+			battle_skill_button.disabled = true
 		battle_log_label.add_theme_color_override("font_color", GOLD if bool(result.get("won", false)) else RED)
 	_refresh_hud()
 	if bool(result.get("battle_over", false)) and bool(result.get("won", false)):
@@ -963,6 +1026,7 @@ func _update_battle_result(result):
 
 func _finish_battle_overlay():
 	var should_claim = bool(battle_result.get("quest_completed", false))
+	var should_claim_bounty = bool(battle_result.get("bounty_completed", false))
 	var lost = bool(battle_result.get("battle_over", false)) and not bool(battle_result.get("won", false)) and not bool(battle_result.get("fled", false))
 	var enemy_name = str(battle_result.get("enemy_name", "敌人"))
 	_close_overlay()
@@ -970,6 +1034,32 @@ func _finish_battle_overlay():
 		_return_to_tavern_after_defeat(enemy_name)
 	elif should_claim:
 		call_deferred("_show_quest_claim")
+	elif should_claim_bounty:
+		call_deferred("_show_bounty_claim")
+
+func _show_bounty_claim():
+	if not state.bounty_can_claim():
+		return
+	var bounty = state.get_bounty()
+	var content = VBoxContainer.new()
+	content.add_theme_constant_override("separation", 16)
+	content.add_child(_label("悬赏完成", 28, GOLD))
+	content.add_child(_label("「%s」" % bounty.title, 21, INK))
+	content.add_child(_label("目标已清理  %d/%d" % [state.bounty_progress, int(bounty.need)], 16, TEAL))
+	var claim = _button("领取悬赏奖励", "gold")
+	claim.pressed.connect(_claim_bounty_2d)
+	content.add_child(claim)
+	_open_overlay(content, false)
+
+func _claim_bounty_2d():
+	var result = state.claim_bounty()
+	_close_overlay()
+	_refresh_hud()
+	if not bool(result.get("ok", false)):
+		_show_message("领取失败", str(result.get("message", "悬赏尚未完成。")))
+		return
+	var next_bounty = state.get_bounty()
+	_show_message("悬赏奖励已领取", "%s\n\n新悬赏｜%s\n%s" % [str(result.message), str(next_bounty.title), str(next_bounty.description)])
 
 func _return_to_tavern_after_defeat(enemy_name):
 	_switch_region("city", "venice_tavern")
@@ -991,6 +1081,10 @@ func _open_inventory():
 	var equipped_line = _label(equipped_text, 14, MUTED)
 	equipped_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.add_child(equipped_line)
+	var card_name = "未启用"
+	if state.active_card != "" and GameData.ITEMS.has(state.active_card):
+		card_name = str(GameData.ITEMS[state.active_card].name)
+	content.add_child(_label("当前怪物卡：%s｜同时只能启用1张" % card_name, 14, TEAL))
 	if inventory_notice != "":
 		var notice = _label(inventory_notice, 14, GOLD)
 		notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -1081,6 +1175,10 @@ func _inventory_item_card_2d(item_id, item, count):
 		"mystery":
 			action.text = "鉴定" if str(state.player.location) == "venice_market" else "去市场"
 			action.pressed.connect(_identify_item_2d)
+		"card":
+			action.text = "已启用" if str(state.active_card) == str(item_id) else "启用"
+			action.disabled = str(state.active_card) == str(item_id)
+			action.pressed.connect(_equip_card_2d.bind(item_id))
 		_:
 			action.disabled = true
 	row.add_child(action)
@@ -1108,6 +1206,13 @@ func _use_item_2d(item_id):
 	_close_overlay()
 	call_deferred("_open_inventory")
 
+func _equip_card_2d(item_id):
+	var result = state.equip_card(item_id)
+	inventory_notice = ("✓ " if bool(result.ok) else "！") + str(result.message)
+	_refresh_hud()
+	_close_overlay()
+	call_deferred("_open_inventory")
+
 func _identify_item_2d():
 	if str(state.player.location) != "venice_market":
 		_close_overlay()
@@ -1126,7 +1231,10 @@ func _open_quest():
 	content.add_child(_label("航海任务", 26, GOLD))
 	var quest = state.get_current_quest()
 	if quest.is_empty():
-		content.add_child(_label("威尼斯篇章已完成。港口贸易与四层副本可以自由游玩。", 17, TEAL))
+		content.add_child(_label("第一卷·黑帆之谜已完成", 22, GOLD))
+		var epilogue = _label("你取回了失去的名字——卡西安。海图指向亚历山大，而威尼斯的悬赏、贸易与副本仍会继续记录你的传奇。\n\n当前称号：%s" % str(state.player.title), 16, TEAL)
+		epilogue.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		content.add_child(epilogue)
 	else:
 		content.add_child(_label(quest.title, 22, INK))
 		var story = _label(quest.story, 17, MUTED)
@@ -1138,6 +1246,16 @@ func _open_quest():
 			var claim = _button("领取任务奖励", "gold")
 			claim.pressed.connect(_claim_quest_2d)
 			content.add_child(claim)
+	if state.quest_index >= 3:
+		var bounty = state.get_bounty()
+		content.add_child(_label("城市悬赏｜%s" % bounty.title, 19, GOLD))
+		var bounty_copy = _label("%s\n进度 %d/%d｜奖励 %d银币、%d经验" % [bounty.description, state.bounty_progress, int(bounty.need), int(bounty.silver) + state.bounty_cycles * 8, int(bounty.exp)], 15, MUTED)
+		bounty_copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		content.add_child(bounty_copy)
+		if state.bounty_can_claim():
+			var bounty_claim = _button("领取悬赏奖励", "gold")
+			bounty_claim.pressed.connect(_claim_bounty_2d)
+			content.add_child(bounty_claim)
 	var close = _button("返回地图", "primary")
 	close.pressed.connect(_close_overlay)
 	content.add_child(close)
@@ -1146,7 +1264,18 @@ func _open_quest():
 func _quest_navigation_target():
 	var quest = state.get_current_quest()
 	if quest.is_empty():
-		return {"region": "city", "location": "venice_dock", "actor_id": "ship_owner", "name": "威尼斯码头"}
+		var bounty = state.get_bounty()
+		var bounty_location = "venice_square"
+		for location_id in GameData.LOCATIONS:
+			if str(bounty.target) in GameData.LOCATIONS[location_id].enemies:
+				bounty_location = str(location_id)
+				break
+		return {
+			"region": str(region_by_location.get(bounty_location, "city")),
+			"location": bounty_location,
+			"actor_id": str(bounty.target),
+			"name": "悬赏·%s" % GameData.ENEMIES[str(bounty.target)].name
+		}
 	var objective = quest.objective
 	var target_location = ""
 	if objective.type == "visit":
@@ -1317,12 +1446,22 @@ func _open_trade_2d():
 	event_copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	event_copy.add_theme_stylebox_override("normal", _style(Color(0.18, 0.12, 0.03, 0.92), 10, Color(GOLD, 0.55), 1, 10))
 	list.add_child(event_copy)
+	var opportunity = state.best_trade_opportunity()
+	if not opportunity.is_empty():
+		var good = GameData.TRADE_GOODS[str(opportunity.good_id)]
+		var destination = GameData.TRADE_PORTS[str(opportunity.destination)]
+		var forecast = _label("商会推荐｜%s → %s\n按满货舱%d件估算，%d日后净利约%d银币（行情会随日期波动）" % [good.name, destination.name, int(opportunity.units), int(opportunity.days), int(opportunity.total_profit)], 13, TEAL)
+		forecast.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		forecast.add_theme_stylebox_override("normal", _style(Color(0.03, 0.17, 0.15, 0.92), 10, Color(TEAL, 0.5), 1, 10))
+		list.add_child(forecast)
 	var contract = HBoxContainer.new()
 	contract.add_theme_constant_override("separation", 8)
-	var contract_info = _label("商会委托｜贸易净利润达到120\n进度 %d/120 · 奖励90银币与未知道具" % state.trade_contract_progress(), 13, INK)
+	var contract_target = state.trade_contract_target()
+	var contract_reward = 90 + state.trade_contract_count * 35
+	var contract_info = _label("商会委托·第%d轮｜贸易净利润达到%d\n进度 %d/%d · 奖励%d银币与未知道具" % [state.trade_contract_count + 1, contract_target, state.trade_contract_progress(), contract_target, contract_reward], 13, INK)
 	contract_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	contract.add_child(contract_info)
-	var contract_claim = _button("已领取" if state.trade_contract_claimed else "领取", "gold")
+	var contract_claim = _button("领取", "gold")
 	contract_claim.disabled = not state.trade_contract_can_claim()
 	contract_claim.pressed.connect(_claim_trade_contract_2d)
 	contract.add_child(contract_claim)
@@ -1352,7 +1491,8 @@ func _open_trade_2d():
 			continue
 		var route = GameData.trade_route(port_id, destination)
 		var days = max(1, int(route.days) - (int(state.ship.speed) - 1))
-		var risk = max(4, int(route.get("risk", 15)) - int(state.ship.get("armor", 0)) * 6)
+		var card_risk_bonus = 4 if state.active_card == "corsair_card" else 0
+		var risk = max(4, int(route.get("risk", 15)) - int(state.ship.get("armor", 0)) * 6 - card_risk_bonus)
 		var sail = _button("启航前往%s · %d日 · %d银币 · 风险%d%%" % [GameData.TRADE_PORTS[destination].name, days, int(route.fee), risk], "gold")
 		sail.disabled = int(state.player.silver) < int(route.fee)
 		sail.pressed.connect(_trade_sail_2d.bind(destination))

@@ -28,6 +28,12 @@ var auto_heal_threshold = 35
 var auto_cure_status = true
 var equipment_upgrades = {}
 var trade_contract_claimed = false
+var trade_contract_count = 0
+var active_card = ""
+var discoveries = {}
+var bounty_index = 0
+var bounty_progress = 0
+var bounty_cycles = 0
 
 func _init():
 	rng.randomize()
@@ -35,7 +41,7 @@ func _init():
 
 func new_game():
 	player = {
-		"name": "失忆的航者", "level": 1, "xp": 0, "hp": 94,
+		"name": "失忆的航者", "title": "海边苏醒者", "level": 1, "xp": 0, "hp": 94,
 		"silver": 72, "location": "alisa_hut", "battles": 0, "victories": 0
 	}
 	inventory = {"small_milk": 3, "sea_salt_bread": 2, "universal_medicine": 1}
@@ -59,6 +65,12 @@ func new_game():
 	auto_cure_status = true
 	equipment_upgrades = {}
 	trade_contract_claimed = false
+	trade_contract_count = 0
+	active_card = ""
+	discoveries = {}
+	bounty_index = 0
+	bounty_progress = 0
+	bounty_cycles = 0
 	message_history = ["你从海边小屋醒来，已经不记得自己的名字。"]
 	player.hp = get_stats().max_hp
 
@@ -94,6 +106,13 @@ func get_stats():
 		stats.drop_bonus += 0.08
 	if warrior_count >= 4:
 		stats.drop_bonus += 0.12
+
+	# One monster card can be active at a time, creating a readable build choice.
+	match active_card:
+		"ghost_card": stats.defense += 3
+		"bear_card": stats.max_hp = int(round(float(stats.max_hp) * 1.08))
+		"tide_card": stats.speed += 4
+		"corsair_card": stats.attack += 4
 
 	# One online teammate grants 5% attack/defense in the original rules.
 	var team_bonus = min(0.20, float(party_members.size()) * 0.05)
@@ -169,11 +188,13 @@ func talk_to(npc_id):
 	if not npc_id in location.npcs or not GameData.NPCS.has(npc_id):
 		return {"ok": false, "message": "对方不在这里。"}
 	var npc = GameData.NPCS[npc_id]
+	var current_quest = get_current_quest()
+	var quest_id = str(current_quest.get("id", ""))
 	var quest_completed = _advance_quest("talk", npc_id)
 	message_history.push_front("与%s交谈。" % npc.name)
 	_trim_history()
 	save_game()
-	return {"ok": true, "message": npc.dialogue, "npc_name": npc.name, "quest_completed": quest_completed}
+	return {"ok": true, "message": GameData.quest_dialogue(quest_id, npc_id), "npc_name": npc.name, "quest_completed": quest_completed}
 
 func rest():
 	if not active_battle.is_empty():
@@ -263,6 +284,72 @@ func equip_item(item_id):
 	save_game()
 	return {"ok": true, "message": "已装备 %s" % item.name}
 
+func equip_card(item_id):
+	if int(inventory.get(item_id, 0)) <= 0:
+		return {"ok": false, "message": "你还没有这张怪物卡。"}
+	var item = GameData.ITEMS.get(item_id, {})
+	if str(item.get("type", "")) != "card":
+		return {"ok": false, "message": "这不是可启用的怪物卡。"}
+	active_card = str(item_id)
+	player.hp = min(int(player.hp), int(get_stats().max_hp))
+	message_history.push_front("启用%s，获得专属加成。" % item.name)
+	_trim_history()
+	save_game()
+	return {"ok": true, "message": "已启用%s：%s" % [item.name, item.description]}
+
+func claim_discovery(discovery_id):
+	if not GameData.DISCOVERIES.has(discovery_id):
+		return {"ok": false, "message": "这里没有可调查的线索。"}
+	if bool(discoveries.get(discovery_id, false)):
+		return {"ok": false, "message": "这条线索已经调查过了。"}
+	var data = GameData.DISCOVERIES[discovery_id]
+	discoveries[discovery_id] = true
+	player.silver += int(data.get("silver", 0))
+	var item_id = str(data.get("item", ""))
+	if item_id != "" and GameData.ITEMS.has(item_id):
+		_add_item(item_id, 1)
+	var reward_text = "%d银币" % int(data.get("silver", 0))
+	if item_id != "":
+		reward_text += "、%s×1" % GameData.ITEMS[item_id].name
+	message_history.push_front("发现%s，获得%s。" % [data.name, reward_text])
+	_trim_history()
+	save_game()
+	return {"ok": true, "name": data.name, "lore": data.lore, "reward_text": reward_text}
+
+func get_bounty():
+	if GameData.BOUNTIES.is_empty():
+		return {}
+	return GameData.BOUNTIES[bounty_index % GameData.BOUNTIES.size()]
+
+func bounty_can_claim():
+	var bounty = get_bounty()
+	return not bounty.is_empty() and bounty_progress >= int(bounty.need)
+
+func claim_bounty():
+	var bounty = get_bounty()
+	if bounty.is_empty() or not bounty_can_claim():
+		return {"ok": false, "message": "当前悬赏目标尚未完成。"}
+	var silver_reward = int(bounty.silver) + bounty_cycles * 8
+	player.silver += silver_reward
+	var leveled = _add_xp(int(bounty.exp))
+	if bounty_cycles % 2 == 1:
+		_add_item("unknown_equipment", 1)
+	var completed_title = str(bounty.title)
+	bounty_index = (bounty_index + 1) % GameData.BOUNTIES.size()
+	bounty_cycles += 1
+	bounty_progress = 0
+	message_history.push_front("完成悬赏「%s」，获得%d银币。" % [completed_title, silver_reward])
+	_trim_history()
+	save_game()
+	return {"ok": true, "message": "悬赏完成：%d银币、%d经验" % [silver_reward, int(bounty.exp)], "leveled": leveled}
+
+func _advance_bounty(enemy_id):
+	var bounty = get_bounty()
+	if bounty.is_empty() or str(bounty.target) != str(enemy_id) or bounty_can_claim():
+		return false
+	bounty_progress = min(int(bounty.need), bounty_progress + 1)
+	return bounty_can_claim()
+
 func recruit_companion():
 	if not companion_unlocked:
 		return {"ok": false, "message": "完成「失窃的矿石」后，才有人愿意加入你的队伍。"}
@@ -294,7 +381,7 @@ func start_battle(enemy_id):
 	var enemy = GameData.ENEMIES[enemy_id]
 	active_battle = {
 		"enemy_id": enemy_id, "enemy_hp": int(enemy.hp), "enemy_max_hp": int(enemy.hp),
-		"round": 1, "log": [enemy.intro]
+		"round": 1, "focus": 0, "skill_prepared": false, "log": [enemy.intro]
 	}
 	player.battles += 1
 	save_game()
@@ -313,8 +400,20 @@ func get_battle_view():
 		"player_level": int(player.level), "player_hp": int(player.hp), "player_max_hp": int(get_stats().max_hp),
 		"round": int(active_battle.round), "statuses": statuses.duplicate(), "logs": [],
 		"battle_stance": battle_stance, "enemy_intent": get_enemy_intent(),
-		"auto_heal_threshold": auto_heal_threshold, "auto_cure_status": auto_cure_status
+		"auto_heal_threshold": auto_heal_threshold, "auto_cure_status": auto_cure_status,
+		"focus": battle_focus(), "focus_max": 3
 	}
+
+func battle_focus():
+	return clamp(int(active_battle.get("focus", 0)), 0, 3) if not active_battle.is_empty() else 0
+
+func skill_attack():
+	if active_battle.is_empty():
+		return {"ok": false, "message": "当前没有战斗。"}
+	if battle_focus() < 3:
+		return {"ok": false, "message": "潮势不足，普通攻击或坚守可积蓄潮势。"}
+	active_battle.skill_prepared = true
+	return attack_once()
 
 func set_battle_stance(value):
 	if not str(value) in ["assault", "balanced", "guard", "plunder"]:
@@ -362,10 +461,18 @@ func attack_once():
 	var logs = []
 	var player_attack = int(stats.attack)
 	var player_speed = int(stats.speed)
+	var uses_skill = bool(active_battle.get("skill_prepared", false)) and battle_focus() >= 3
+	var special = enemy.get("special", {})
+	var special_every = int(special.get("every", 0))
+	var counters_special = uses_skill and special_every > 0 and int(active_battle.round) % special_every == 0
 	match battle_stance:
 		"assault": player_attack = max(1, int(round(float(player_attack) * 1.18)))
 		"guard": player_attack = max(1, int(round(float(player_attack) * 0.86)))
 		"plunder": player_attack = max(1, int(round(float(player_attack) * 0.92)))
+	if uses_skill:
+		player_attack = max(1, int(round(float(player_attack) * 1.75)))
+		active_battle.focus = battle_focus() - 3
+		active_battle.skill_prepared = false
 	if statuses.has("虚弱"):
 		player_attack = max(1, int(round(player_attack * 0.75)))
 	if statuses.has("缓慢"):
@@ -374,17 +481,22 @@ func attack_once():
 	var round_number = int(active_battle.round)
 
 	if player_first:
-		_player_strike(enemy, player_attack, round_number, logs)
+		_player_strike(enemy, player_attack, round_number, logs, uses_skill)
 		if int(active_battle.enemy_hp) > 0:
 			_pet_strike(enemy, round_number, logs)
 		if int(active_battle.enemy_hp) > 0:
-			_enemy_strike(enemy, stats, round_number, logs)
+			_enemy_strike(enemy, stats, round_number, logs, counters_special)
 	else:
-		_enemy_strike(enemy, stats, round_number, logs)
+		_enemy_strike(enemy, stats, round_number, logs, counters_special)
 		if int(player.hp) > 0:
-			_player_strike(enemy, player_attack, round_number, logs)
+			_player_strike(enemy, player_attack, round_number, logs, uses_skill)
 			if int(active_battle.enemy_hp) > 0:
 				_pet_strike(enemy, round_number, logs)
+	if not uses_skill and int(player.hp) > 0:
+		var focus_gain = 2 if battle_stance == "guard" else 1
+		active_battle.focus = min(3, battle_focus() + focus_gain)
+		if int(active_battle.focus) >= 3:
+			logs.append("潮势已满｜可发动破浪斩，若敌人正在蓄力可削弱其技能。")
 
 	_apply_status_tick(logs)
 	_tick_statuses()
@@ -409,7 +521,8 @@ func auto_attack():
 	var all_logs = ["已开启自动攻击。"]
 	var last_result = {}
 	for _step in range(40):
-		last_result = attack_once()
+		var should_counter = battle_focus() >= 3 and str(get_enemy_intent()).begins_with("⚠")
+		last_result = skill_attack() if should_counter else attack_once()
 		if not last_result.get("ok", false):
 			return last_result
 		all_logs.append_array(last_result.get("logs", []))
@@ -431,11 +544,15 @@ func flee_battle():
 	result.logs.push_front("撤退失败，%s追了上来！" % enemy.name)
 	return result
 
-func _player_strike(enemy, player_attack, round_number, logs):
+func _player_strike(enemy, player_attack, round_number, logs, uses_skill = false):
 	var result = _roll_attack(player_attack, enemy.defense, int(player.level), int(enemy.level))
 	active_battle.enemy_hp = max(0, int(active_battle.enemy_hp) - int(result.damage))
-	if result.miss:
+	if result.miss and uses_skill:
+		logs.append("第%d回合｜你发动破浪斩，刀锋擦过%s。" % [round_number, enemy.name])
+	elif result.miss:
 		logs.append("第%d回合｜你的攻击被%s避开。" % [round_number, enemy.name])
+	elif uses_skill:
+		logs.append("第%d回合｜破浪斩！潮光贯穿%s，体力-%d！" % [round_number, enemy.name, result.damage])
 	elif result.crit:
 		logs.append("第%d回合｜气贯全身，致命一击！%s体力-%d。" % [round_number, enemy.name, result.damage])
 	else:
@@ -448,7 +565,7 @@ func _pet_strike(enemy, round_number, logs):
 	active_battle.enemy_hp = max(0, int(active_battle.enemy_hp) - damage)
 	logs.append("第%d回合｜宠物%s扑向敌人，追加%d点伤害。" % [round_number, pet.name, damage])
 
-func _enemy_strike(enemy, stats, round_number, logs):
+func _enemy_strike(enemy, stats, round_number, logs, special_weakened = false):
 	var effective_defense = int(stats.defense)
 	if battle_stance == "assault":
 		effective_defense = max(0, int(round(float(effective_defense) * 0.90)))
@@ -462,17 +579,27 @@ func _enemy_strike(enemy, stats, round_number, logs):
 	var uses_special = special_every > 0 and round_number % special_every == 0
 	if uses_special:
 		enemy_attack = int(round(float(enemy_attack) * float(special.get("damage_multiplier", 1.0))))
+		if special_weakened:
+			enemy_attack = max(1, int(round(float(enemy_attack) * 0.55)))
 	var result = _roll_attack(enemy_attack, effective_defense, int(enemy.level), int(player.level))
 	player.hp = max(0, int(player.hp) - int(result.damage))
 	if result.miss:
 		logs.append("第%d回合｜你避开了%s的攻击。" % [round_number, enemy.name])
+	elif uses_special and special_weakened:
+		logs.append("第%d回合｜破浪斩打乱了%s的%s，你的体力仅-%d。" % [round_number, enemy.name, str(special.get("name", "强力攻击")), result.damage])
 	elif uses_special:
 		logs.append("第%d回合｜%s施放%s，你的体力-%d！" % [round_number, enemy.name, str(special.get("name", "强力攻击")), result.damage])
 	elif result.crit:
 		logs.append("第%d回合｜%s发动猛击，你的体力-%d！" % [round_number, enemy.name, result.damage])
 	else:
 		logs.append("第%d回合｜%s向你发起攻击，体力-%d。" % [round_number, enemy.name, result.damage])
-	if int(result.damage) > 0 and enemy.has("effect") and rng.randf() <= float(enemy.effect.chance):
+	var effect_chance = float(enemy.get("effect", {}).get("chance", 0.0))
+	var incoming_effect = str(enemy.get("effect", {}).get("name", ""))
+	if active_card == "ghost_card" and incoming_effect == "诅咒":
+		effect_chance *= 0.50
+	elif active_card == "tide_card" and incoming_effect == "缓慢":
+		effect_chance *= 0.50
+	if int(result.damage) > 0 and enemy.has("effect") and rng.randf() <= effect_chance:
 		var effect_name = enemy.effect.name
 		statuses[effect_name] = max(int(statuses.get(effect_name, 0)), int(enemy.effect.rounds))
 		logs.append("状态变化｜你陷入%s（%d回合）。" % [effect_name, int(enemy.effect.rounds)])
@@ -504,6 +631,7 @@ func _finish_battle_win(enemy_id, round_logs):
 	if enemy_id in ["dungeon_guard", "stone_puppet", "tide_beast", "vermilion_phantom", "corsair_deckhand", "corsair_raider", "corsair_guard", "corsair_captain"]:
 		dungeon_cleared[enemy_id] = true
 	var quest_completed = _advance_quest("kill", enemy_id)
+	var bounty_completed = _advance_bounty(enemy_id)
 	var drop_id = ""
 	var stats = get_stats()
 	var stance_drop_bonus = 0.14 if finishing_stance == "plunder" else 0.0
@@ -525,7 +653,7 @@ func _finish_battle_win(enemy_id, round_logs):
 		"enemy_hp": 0, "enemy_max_hp": int(enemy.hp), "player_level": int(player.level), "player_hp": int(player.hp), "player_max_hp": int(get_stats().max_hp),
 		"round": 0, "statuses": {}, "logs": round_logs,
 		"exp": int(enemy.exp), "silver": silver, "drop": drop_id, "leveled": leveled, "new_level": int(player.level),
-		"quest_completed": quest_completed, "battle_stance": finishing_stance
+		"quest_completed": quest_completed, "bounty_completed": bounty_completed, "battle_stance": finishing_stance
 	}
 
 func _finish_battle_loss(enemy_id, round_logs):
@@ -604,6 +732,8 @@ func claim_quest():
 	if reward.has("pet") and GameData.PETS.has(reward.pet):
 		pet = GameData.PETS[reward.pet].duplicate(true)
 		pet.id = reward.pet
+	if reward.has("title"):
+		player.title = str(reward.title)
 	var old_title = quest.title
 	quest_index += 1
 	quest_progress = 0
@@ -617,6 +747,8 @@ func claim_quest():
 		reward_text += "、%s" % item_name
 	if reward.has("pet"):
 		reward_text += "、宠物%s" % GameData.PETS[reward.pet].name
+	if reward.has("title"):
+		reward_text += "、称号「%s」" % str(reward.title)
 	return {
 		"ok": true, "message": "任务完成！获得%s" % reward_text, "reward_text": reward_text,
 		"completed_title": old_title, "leveled": leveled, "reward_item": reward.get("item", ""),
@@ -666,23 +798,50 @@ func upgrade_equipped(slot):
 	return {"ok": true, "message": "%s强化成功：+%d（-%d银币）" % [GameData.ITEMS[item_id].name, level + 1, cost], "level": level + 1, "cost": cost, "quest_completed": quest_completed}
 
 func trade_contract_progress():
-	return clamp(max(0, int(trade_profit)), 0, 120)
+	return clamp(max(0, int(trade_profit)), 0, trade_contract_target())
+
+func trade_contract_target():
+	return 120 + trade_contract_count * 60
 
 func trade_contract_can_claim():
-	return is_trade_unlocked() and not trade_contract_claimed and trade_contract_progress() >= 120
+	return is_trade_unlocked() and trade_contract_progress() >= trade_contract_target()
 
 func claim_trade_contract():
-	if trade_contract_claimed:
-		return {"ok": false, "message": "本轮商会委托已经领取。"}
 	if not trade_contract_can_claim():
-		return {"ok": false, "message": "贸易净利润达到120银币后才能领取。"}
+		return {"ok": false, "message": "本轮贸易净利润达到%d银币后才能领取。" % trade_contract_target()}
+	var completed_round = trade_contract_count + 1
+	var silver_reward = 90 + trade_contract_count * 35
 	trade_contract_claimed = true
-	player.silver += 90
+	player.silver += silver_reward
 	_add_item("unknown_equipment", 1)
-	message_history.push_front("完成威尼斯商会委托，获得90银币和未知道具。")
+	trade_contract_count += 1
+	trade_profit = 0
+	message_history.push_front("完成第%d轮商会委托，获得%d银币和未知道具。" % [completed_round, silver_reward])
 	_trim_history()
 	save_game()
-	return {"ok": true, "message": "商会奖励：90银币、未知道具×1"}
+	return {"ok": true, "message": "第%d轮商会奖励：%d银币、未知道具×1\n新一轮委托已开启。" % [completed_round, silver_reward]}
+
+func best_trade_opportunity():
+	if not GameData.TRADE_PORTS.has(player.location):
+		return {}
+	var best = {}
+	for destination in GameData.TRADE_PORTS:
+		if str(destination) == str(player.location):
+			continue
+		var route = GameData.trade_route(str(player.location), str(destination))
+		if route.is_empty():
+			continue
+		var days = max(1, int(route.days) - (int(ship.get("speed", 1)) - 1))
+		for good_id in GameData.TRADE_GOODS:
+			var good = GameData.TRADE_GOODS[good_id]
+			var buy_price = trade_buy_price(good_id)
+			var arrival_buy = GameData.trade_market_price(str(destination), str(good_id), trade_day + days)
+			var sell_price = int(floor(float(arrival_buy) * 0.90))
+			var units = max(1, int(floor(float(cargo_capacity()) / float(good.space))))
+			var total_profit = (sell_price - buy_price) * units - int(route.fee)
+			if best.is_empty() or total_profit > int(best.total_profit):
+				best = {"good_id": str(good_id), "destination": str(destination), "days": days, "units": units, "buy": buy_price, "sell": sell_price, "total_profit": total_profit}
+	return best
 
 func cargo_used():
 	var used = 0
@@ -761,7 +920,8 @@ func sail_to(port_id):
 	trade_day += days
 	player.location = port_id
 	var quest_completed = _advance_quest("visit", str(port_id))
-	var risk = max(4, int(route.get("risk", 15)) - int(ship.get("armor", 0)) * 6)
+	var card_risk_bonus = 4 if active_card == "corsair_card" else 0
+	var risk = max(4, int(route.get("risk", 15)) - int(ship.get("armor", 0)) * 6 - card_risk_bonus)
 	var event_message = "航程平安。"
 	var event_roll = rng.randi_range(1, 100)
 	if event_roll <= risk:
@@ -853,7 +1013,9 @@ func save_game():
 		"dungeon_cleared": dungeon_cleared, "cargo": cargo, "ship": ship,
 		"trade_day": trade_day, "trade_profit": trade_profit, "trade_volume": trade_volume,
 		"battle_stance": battle_stance, "auto_heal_threshold": auto_heal_threshold, "auto_cure_status": auto_cure_status,
-		"equipment_upgrades": equipment_upgrades, "trade_contract_claimed": trade_contract_claimed
+		"equipment_upgrades": equipment_upgrades, "trade_contract_claimed": trade_contract_claimed,
+		"trade_contract_count": trade_contract_count, "active_card": active_card, "discoveries": discoveries,
+		"bounty_index": bounty_index, "bounty_progress": bounty_progress, "bounty_cycles": bounty_cycles
 	}
 	var file = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file:
@@ -883,6 +1045,8 @@ func load_game():
 		save_game()
 		return true
 	player = parsed.get("player", player)
+	if not player.has("title"):
+		player.title = "海边苏醒者"
 	inventory = parsed.get("inventory", inventory)
 	equipment = parsed.get("equipment", equipment)
 	for slot in GameData.SLOT_NAMES:
@@ -912,6 +1076,14 @@ func load_game():
 	auto_cure_status = bool(parsed.get("auto_cure_status", true))
 	equipment_upgrades = parsed.get("equipment_upgrades", {})
 	trade_contract_claimed = bool(parsed.get("trade_contract_claimed", false))
+	trade_contract_count = max(0, int(parsed.get("trade_contract_count", 1 if trade_contract_claimed else 0)))
+	active_card = str(parsed.get("active_card", ""))
+	discoveries = parsed.get("discoveries", {})
+	bounty_index = clamp(int(parsed.get("bounty_index", 0)), 0, max(0, GameData.BOUNTIES.size() - 1))
+	bounty_progress = max(0, int(parsed.get("bounty_progress", 0)))
+	bounty_cycles = max(0, int(parsed.get("bounty_cycles", 0)))
+	if active_card != "" and (not GameData.ITEMS.has(active_card) or int(inventory.get(active_card, 0)) <= 0):
+		active_card = ""
 	if not ship.has("name"):
 		ship.name = "海燕号"
 	ship.capacity = clamp(int(ship.get("capacity", 12)), 12, 30)

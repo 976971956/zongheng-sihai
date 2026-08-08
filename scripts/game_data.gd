@@ -240,14 +240,14 @@ const ENEMIES = {
 	"drunk_sailor": {"name": "喝醉的水手", "level": 1, "rank": "普通", "hp": 42, "attack": 8, "defense": 2, "speed": 4, "exp": 22, "silver": [6, 11], "drops": ["unknown_equipment", "small_milk"], "intro": "醉醺醺的水手举起酒瓶，摇晃着向你冲来。"},
 	"sewer_rat": {"name": "灰毛巨鼠", "level": 1, "rank": "普通", "hp": 34, "attack": 7, "defense": 1, "speed": 7, "exp": 18, "silver": [4, 8], "drops": ["unknown_equipment", "sea_salt_bread"], "effect": {"name": "中毒", "chance": 0.12, "rounds": 3}, "intro": "巨鼠从废水渠里钻出，牙齿上泛着绿色液光。"},
 	"mine_thief": {"name": "偷矿者", "level": 2, "rank": "普通", "hp": 66, "attack": 12, "defense": 4, "speed": 7, "exp": 34, "silver": [10, 17], "drops": ["unknown_equipment", "spider_knife", "small_milk"], "effect": {"name": "缓慢", "chance": 0.14, "rounds": 2}, "intro": "偷矿者丢下矿袋，挥舞铁镐挡住去路。"},
-	"giant_bear": {"name": "后山巨熊", "level": 3, "rank": "首领", "hp": 128, "attack": 17, "defense": 7, "speed": 5, "exp": 72, "silver": [28, 41], "drops": ["warrior_blade", "warrior_coat", "warrior_belt"], "effect": {"name": "虚弱", "chance": 0.28, "rounds": 3}, "special": {"name": "裂地重击", "every": 3, "damage_multiplier": 1.45}, "intro": "巨熊人立而起，沉重的吼声让你感到四肢发软。"},
+	"giant_bear": {"name": "后山巨熊", "level": 3, "rank": "首领", "hp": 128, "attack": 17, "defense": 7, "speed": 5, "exp": 72, "silver": [28, 41], "drops": ["warrior_blade", "warrior_coat", "warrior_belt", "bear_card"], "effect": {"name": "虚弱", "chance": 0.28, "rounds": 3}, "special": {"name": "裂地重击", "every": 3, "damage_multiplier": 1.45}, "intro": "巨熊人立而起，沉重的吼声让你感到四肢发软。"},
 	"wildwood_ghost": {"name": "荒林幽灵", "level": 3, "rank": "精英", "hp": 104, "attack": 16, "defense": 6, "speed": 11, "exp": 58, "silver": [20, 32], "drops": ["ghost_card", "unknown_equipment", "universal_medicine"], "effect": {"name": "诅咒", "chance": 0.22, "rounds": 3}, "intro": "雾气凝成人影，冰冷的低语直接钻进你的脑海。"},
 	"dungeon_guard": {"name": "一层训练卫兵", "level": 3, "rank": "副本", "hp": 92, "attack": 14, "defense": 6, "speed": 7, "exp": 48, "silver": [16, 24], "drops": ["unknown_equipment", "small_milk"], "intro": "卫兵幻影举起长矛，试炼开始。"},
 	"stone_puppet": {"name": "二层石傀儡", "level": 3, "rank": "副本", "hp": 126, "attack": 15, "defense": 10, "speed": 3, "exp": 61, "silver": [19, 28], "drops": ["warrior_belt", "unknown_equipment"], "intro": "石傀儡胸前的符文依次亮起。"},
-	"tide_beast": {"name": "三层潮汐兽", "level": 4, "rank": "副本精英", "hp": 158, "attack": 20, "defense": 9, "speed": 10, "exp": 82, "silver": [27, 39], "drops": ["warrior_circlet", "warrior_boots", "stamina_tonic"], "effect": {"name": "缓慢", "chance": 0.20, "rounds": 2}, "special": {"name": "潮汐突袭", "every": 3, "damage_multiplier": 1.35}, "intro": "潮汐兽跃出积水，鳞片像刀刃般张开。"},
+	"tide_beast": {"name": "三层潮汐兽", "level": 4, "rank": "副本精英", "hp": 158, "attack": 20, "defense": 9, "speed": 10, "exp": 82, "silver": [27, 39], "drops": ["warrior_circlet", "warrior_boots", "stamina_tonic", "tide_card"], "effect": {"name": "缓慢", "chance": 0.20, "rounds": 2}, "special": {"name": "潮汐突袭", "every": 3, "damage_multiplier": 1.35}, "intro": "潮汐兽跃出积水，鳞片像刀刃般张开。"},
 	"vermilion_phantom": {"name": "朱雀幻影", "level": 4, "rank": "副本 Boss", "hp": 218, "attack": 22, "defense": 11, "speed": 12, "exp": 150, "silver": [58, 82], "drops": ["warrior_blade", "warrior_coat", "warrior_circlet", "warrior_belt", "warrior_boots"], "effect": {"name": "中毒", "chance": 0.18, "rounds": 3}, "special": {"name": "赤焰风暴", "every": 3, "damage_multiplier": 1.55}, "intro": "赤色双翼遮住穹顶，朱雀幻影发出清越长鸣。"}
 	,"corsair_deckhand": {"name": "黑帆水手", "level": 6, "rank": "副本", "hp": 190, "attack": 25, "defense": 12, "speed": 11, "exp": 150, "silver": [42, 58], "drops": ["unknown_equipment", "small_milk", "corsair_cutlass"], "intro": "黑帆水手踢开货箱，拔出弯刀封住码头。"}
-	,"corsair_raider": {"name": "黑帆袭击者", "level": 8, "rank": "副本精英", "hp": 260, "attack": 31, "defense": 16, "speed": 16, "exp": 230, "silver": [58, 78], "drops": ["corsair_cutlass", "gunner_coat", "universal_medicine"], "effect": {"name": "中毒", "chance": 0.16, "rounds": 3}, "intro": "袭击者在火药桶之间疾行，淬毒短刃闪着冷光。"}
+	,"corsair_raider": {"name": "黑帆袭击者", "level": 8, "rank": "副本精英", "hp": 260, "attack": 31, "defense": 16, "speed": 16, "exp": 230, "silver": [58, 78], "drops": ["corsair_cutlass", "gunner_coat", "universal_medicine", "corsair_card"], "effect": {"name": "中毒", "chance": 0.16, "rounds": 3}, "intro": "袭击者在火药桶之间疾行，淬毒短刃闪着冷光。"}
 	,"corsair_guard": {"name": "黑帆重卫", "level": 10, "rank": "副本精英", "hp": 380, "attack": 38, "defense": 24, "speed": 12, "exp": 340, "silver": [78, 108], "drops": ["gunner_coat", "captain_hat", "stamina_tonic"], "special": {"name": "破阵冲锋", "every": 3, "damage_multiplier": 1.40}, "intro": "重卫架起盾牌，沉重脚步震落洞顶的细沙。"}
 	,"corsair_captain": {"name": "黑帆船长雷蒙", "level": 12, "rank": "副本 Boss", "hp": 620, "attack": 48, "defense": 29, "speed": 18, "exp": 620, "silver": [150, 210], "drops": ["corsair_cutlass", "gunner_coat", "captain_hat", "black_sail_charm"], "effect": {"name": "诅咒", "chance": 0.20, "rounds": 3}, "special": {"name": "黑潮连斩", "every": 3, "damage_multiplier": 1.60}, "intro": "雷蒙展开黑帆海图，拔剑宣告这里将是你的终点。"}
 }
@@ -265,7 +265,10 @@ const ITEMS = {
 	"warrior_belt": {"name": "武士绑腿", "type": "equipment", "slot": "waist", "rarity": "珍稀", "set": "warrior", "description": "便于长途跋涉的轻便护具。", "stats": {"max_hp": 12, "defense": 3}, "drop_bonus": 0.04, "price": 150},
 	"warrior_boots": {"name": "武士战靴", "type": "equipment", "slot": "boots", "rarity": "珍稀", "set": "warrior", "description": "落步几乎无声。", "stats": {"defense": 3, "speed": 5}, "drop_bonus": 0.04, "price": 150},
 	"lion_charm": {"name": "翼狮之誓", "type": "equipment", "slot": "charm", "rarity": "史诗", "description": "完成威尼斯试炼的证明。", "stats": {"max_hp": 28, "attack": 5, "defense": 3}, "price": 320},
-	"ghost_card": {"name": "普通·幽灵卡片", "type": "card", "rarity": "珍稀", "description": "可附魔到装备，提供抗诅咒能力。试玩版作为收藏品。", "price": 120},
+	"ghost_card": {"name": "普通·幽灵卡片", "type": "card", "rarity": "珍稀", "description": "启用后抗诅咒几率提高50%，并提高3点防御。", "card_effect": "ghost", "price": 120},
+	"bear_card": {"name": "精英·巨熊卡片", "type": "card", "rarity": "史诗", "description": "启用后最大体力提高8%，适合坚守与Boss战。", "card_effect": "bear", "price": 220},
+	"tide_card": {"name": "精英·潮汐兽卡片", "type": "card", "rarity": "史诗", "description": "启用后速度+4，抗缓慢几率提高50%。", "card_effect": "tide", "price": 260},
+	"corsair_card": {"name": "精英·黑帆卡片", "type": "card", "rarity": "史诗", "description": "启用后攻击+4，航行风险降低4%。", "card_effect": "corsair", "price": 320},
 	"unknown_equipment": {"name": "未知道具", "type": "mystery", "rarity": "未知", "description": "回海风市场花费 5 银币鉴定，可能发现一件装备。", "price": 0},
 	"small_milk": {"name": "小奶瓶", "type": "consumable", "rarity": "补给", "description": "恢复 45 点体力，可在战斗中使用。", "heal": 45, "price": 18},
 	"sea_salt_bread": {"name": "肉夹馍", "type": "consumable", "rarity": "补给", "description": "恢复 24 点体力。", "heal": 24, "price": 9},
@@ -275,12 +278,34 @@ const ITEMS = {
 	,"gunner_coat": {"name": "炮手皮甲", "type": "equipment", "slot": "body", "rarity": "史诗", "description": "内衬缝有防止火星灼伤的厚皮。", "stats": {"max_hp": 48, "defense": 12}, "price": 390}
 	,"captain_hat": {"name": "黑帆船长帽", "type": "equipment", "slot": "head", "rarity": "史诗", "description": "帽檐下藏着一枚被刮去图案的徽章。", "stats": {"max_hp": 26, "defense": 7, "speed": 4}, "price": 420}
 	,"black_sail_charm": {"name": "黑帆航路仪", "type": "equipment", "slot": "charm", "rarity": "传说", "description": "记录神秘鳞片航路的精密仪器。", "stats": {"max_hp": 55, "attack": 9, "defense": 7, "speed": 5}, "price": 680}
+	,"tide_seal": {"name": "潮纹银章", "type": "equipment", "slot": "charm", "rarity": "传说", "description": "艾丽莎父亲留下的银章，背面刻着你失去的名字。", "stats": {"max_hp": 70, "attack": 12, "defense": 8, "speed": 6}, "price": 880}
 }
 
 const IDENTIFY_POOL = ["linen_cap", "traveler_boots", "bronze_charm", "guard_belt", "spider_knife"]
 
 const PETS = {
 	"moon_tiger": {"name": "月虎", "level": 1, "description": "攻防均衡的原始宠物。每回合会在主人攻击后自动协战。"}
+}
+
+const QUEST_DIALOGUES = {
+	"scale_memory|alisa": "你终于醒了。父亲在沙滩上发现你时，你手里紧紧攅着这片发光的鳞。去问问老海鸥酒馆的老板吧，他见过的船比我们见过的人还多。",
+	"tavern_clue|tavern_keeper": "这不是普通的鱼鳞。二十年前，一支没有旗帜的船队带着同样的光经过威尼斯。想追上它，先证明你能在北门活下来。",
+	"return_chart|tavern_keeper": "雷蒙只是替人守着这张图。你看，黑帆航线的终点不在走私洞，而在亚历山大灯塔之下。先回去见艾丽莎。她一直有件事没告诉你。",
+	"alisa_truth|alisa": "对不起。父亲救起你后就带着另一片鳞出海，再也没有回来。他留下这枚银章，说只有拿回黑帆海图的人才能看见背面的字。现在它亮了——卡西安。那是你的名字。"
+}
+
+const BOUNTIES = [
+	{"id": "rat_cleanup", "title": "水渠清理", "target": "sewer_rat", "need": 3, "silver": 55, "exp": 45, "description": "威尼斯居民请你清理住宅区水渠的巨鼠。"},
+	{"id": "mine_patrol", "title": "矿山巡查", "target": "mine_thief", "need": 2, "silver": 78, "exp": 70, "description": "商会希望废矿山的运输线保持畅通。"},
+	{"id": "bear_hunt", "title": "巨熊踪迹", "target": "giant_bear", "need": 1, "silver": 105, "exp": 95, "description": "后山再次出现巨大熊掌印，酒馆发出紧急悬赏。"},
+	{"id": "ghost_watch", "title": "荒林守夜", "target": "wildwood_ghost", "need": 1, "silver": 118, "exp": 110, "description": "守夜人听到荒树林中再次传来诅咒低语。"}
+]
+
+const DISCOVERIES = {
+	"alisa_shell": {"name": "潮声贝壳", "region": "city", "location": "alisa_hut", "silver": 18, "item": "sea_salt_bread", "lore": "贝壳里传出一段断续歌声：‘潮来时忘记名字，潮退时寻回航路。’"},
+	"field_cache": {"name": "废弃补给箱", "region": "field", "location": "residential_quarter", "silver": 32, "item": "small_milk", "lore": "箱底压着黑色帆布的一角，上面绘着被刀痕划掉的灯塔。"},
+	"trial_relic": {"name": "翼狮训练徽章", "region": "dungeon", "location": "training_dungeon_2", "silver": 45, "item": "universal_medicine", "lore": "徽章背面刻着：‘真正的试炼不是胜利，而是知道何时坚守。’"},
+	"corsair_manifest": {"name": "黑帆货运清单", "region": "black_sail", "location": "black_sail_3", "silver": 90, "item": "unknown_equipment", "lore": "清单上的真正雇主被写成‘灯塔下的人’，雷蒙似乎也只是棋子。"}
 }
 
 const QUESTS = [
@@ -297,10 +322,12 @@ const QUESTS = [
 	,{"id": "forge_for_sea", "title": "远洋武装", "story": "使用贸易赚得的银币，将手持武器强化一次。", "objective": {"type": "upgrade_equipment", "target": "weapon", "need": 1}, "reward": {"exp": 800, "silver": 180, "item": "universal_medicine"}}
 	,{"id": "armor_the_swallow", "title": "加固海燕号", "story": "升级一次船体护甲，为危险航线做好准备。", "objective": {"type": "upgrade_ship", "target": "armor", "need": 1}, "reward": {"exp": 1000, "silver": 220}}
 	,{"id": "black_sail_clue", "title": "黑帆密令", "story": "根据商会提供的线索，进入黑帆据点外围码头。", "objective": {"type": "visit", "target": "black_sail_1", "need": 1}, "reward": {"exp": 1200, "silver": 160, "item": "small_milk"}}
-	,{"id": "clear_deckhands", "title": "夺回货箱", "story": "击败两名黑帆水手，夺回被劫的商会货箱。", "objective": {"type": "kill", "target": "corsair_deckhand", "need": 2}, "reward": {"exp": 1600, "silver": 240, "item": "corsair_cutlass"}}
+	,{"id": "clear_deckhands", "title": "夺回货箱", "story": "击败看守货箱的黑帆水手长，夺回被劫的商会货物。", "objective": {"type": "kill", "target": "corsair_deckhand", "need": 1}, "reward": {"exp": 1600, "silver": 240, "item": "corsair_cutlass"}}
 	,{"id": "powder_store", "title": "潜入火药仓", "story": "深入据点并击败黑帆袭击者。", "objective": {"type": "kill", "target": "corsair_raider", "need": 1}, "reward": {"exp": 2100, "silver": 300, "item": "gunner_coat"}}
 	,{"id": "cave_battery", "title": "夺取洞窟炮台", "story": "击败守卫炮台的黑帆重卫。", "objective": {"type": "kill", "target": "corsair_guard", "need": 1}, "reward": {"exp": 2800, "silver": 380, "item": "captain_hat"}}
 	,{"id": "captain_ledger", "title": "黑帆船长雷蒙", "story": "登上船长厅，击败雷蒙并夺取记录发光鳞片航线的海图。", "objective": {"type": "kill", "target": "corsair_captain", "need": 1}, "reward": {"exp": 5200, "silver": 600, "item": "black_sail_charm"}}
+	,{"id": "return_chart", "title": "黑帆海图", "story": "将从雷蒙手中夺回的黑帆海图带给老海鸥酒馆老板。", "objective": {"type": "talk", "target": "tavern_keeper", "need": 1}, "reward": {"exp": 0, "silver": 260, "item": "stamina_tonic"}}
+	,{"id": "alisa_truth", "title": "潮汐中的名字", "story": "回到海边小屋见艾丽莎，听她说出一直隐瞒的真相。", "objective": {"type": "talk", "target": "alisa", "need": 1}, "reward": {"exp": 0, "silver": 320, "item": "tide_seal", "title": "潮汐追迹者"}}
 ]
 
 const SLOT_NAMES = {"weapon": "手持", "head": "头戴", "body": "身穿", "waist": "腰部", "boots": "脚穿", "charm": "配饰"}
@@ -323,6 +350,12 @@ static func objective_name(objective):
 		"upgrade_equipment": return "强化%s" % SLOT_NAMES[objective.target]
 		"upgrade_ship": return "升级船体护甲"
 		_: return str(objective.target)
+
+static func quest_dialogue(quest_id, npc_id):
+	var key = "%s|%s" % [str(quest_id), str(npc_id)]
+	if QUEST_DIALOGUES.has(key):
+		return str(QUEST_DIALOGUES[key])
+	return str(NPCS.get(str(npc_id), {}).get("dialogue", "没有更多消息。"))
 
 static func trade_route(from_port, to_port):
 	var ports = [str(from_port), str(to_port)]

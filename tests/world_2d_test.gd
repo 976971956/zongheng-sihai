@@ -77,6 +77,13 @@ func _run():
 	await process_frame
 	_check(int(scene.state.player.hp) > max_hp - 50 and int(scene.state.inventory.get("small_milk", 0)) == item_count_before - 1, "点击使用药品必须恢复体力并消耗一件物品")
 	scene._close_overlay()
+	scene.state.inventory["ghost_card"] = 1
+	scene._open_inventory()
+	_check(_has_button_text(scene.overlay, "启用"), "2D背包必须允许启用怪物卡")
+	scene._equip_card_2d("ghost_card")
+	await process_frame
+	_check(scene.state.active_card == "ghost_card" and _has_button_text(scene.overlay, "已启用"), "怪物卡启用后必须更新实际状态和背包显示")
+	scene._close_overlay()
 
 	# Every mid/late-game objective must exist in a reachable 2D region.
 	scene.state.quest_index = 4
@@ -195,6 +202,8 @@ func _run():
 	var unknown_before = int(scene.state.inventory.get("unknown_equipment", 0))
 	var contract_result = scene.state.claim_trade_contract()
 	_check(bool(contract_result.get("ok", false)) and int(scene.state.inventory.get("unknown_equipment", 0)) == unknown_before + 1, "贸易利润必须推进商会委托并可以领取成长奖励")
+	_check(scene.state.trade_contract_count == 1 and scene.state.trade_contract_target() == 180 and scene.state.trade_contract_progress() == 0, "商会委托领取后必须自动开启更高目标的下一轮")
+	_check(not scene.state.best_trade_opportunity().is_empty(), "港口必须能计算一条可见的动态商路推荐")
 
 	var boss_state = TestState.new()
 	boss_state.player.level = 5
@@ -203,6 +212,15 @@ func _run():
 	boss_state.start_battle("vermilion_phantom")
 	boss_state.active_battle.round = 3
 	_check("赤焰风暴" in boss_state.get_enemy_intent(), "Boss特殊技能必须在发动前显示蓄力预警")
+	boss_state.active_battle.focus = 3
+	var skill_result = boss_state.skill_attack()
+	_check(bool(skill_result.get("ok", false)) and int(skill_result.get("focus", -1)) == 0 and "破浪斩" in "".join(skill_result.get("logs", [])), "蓄力满后必须可释放破浪斩并消耗全部专注")
+
+	scene.state.quest_index = GameData.QUESTS.size()
+	scene.state.bounty_index = 0
+	scene.state.bounty_progress = 3
+	scene._open_quest()
+	_check(_has_label_text(scene.overlay, "第一卷") and _has_button_text(scene.overlay, "领取悬赏奖励"), "主线结束后任务页必须显示结局和可持续领取的悬赏")
 
 	if failures.is_empty():
 		print("WORLD_2D_OK: 移动、背包、任务、副本、逐回合自动战斗、战败回酒馆、怪物刷新与贸易全部通过")

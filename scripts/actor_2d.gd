@@ -98,6 +98,8 @@ func _draw():
 	if not ATLAS_CELLS.has(display_id):
 		if actor_kind == "travel":
 			_draw_travel_marker()
+		elif actor_kind == "discovery":
+			_draw_discovery_marker()
 		elif display_id in ["sewer_rat", "giant_bear", "wildwood_ghost", "stone_puppet", "tide_beast", "vermilion_phantom"]:
 			_draw_monster()
 		else:
@@ -111,6 +113,15 @@ func _draw_travel_marker():
 	draw_arc(Vector2.ZERO, 18, -PI * 0.25, PI * 1.25, 22, Color(body_color, 0.95), 5)
 	_polygon([Vector2(0, -22), Vector2(10, -4), Vector2(0, 2), Vector2(-10, -4)], accent_color, Color("23353b"), 2)
 	draw_circle(Vector2.ZERO, 5, Color("e6ffff"))
+
+func _draw_discovery_marker():
+	var pulse = 0.72 + (sin(bob_time * 3.2) + 1.0) * 0.12
+	draw_circle(Vector2(0, 2), 30, Color(accent_color, 0.12 * pulse))
+	_round_rect(Rect2(-25, -15, 50, 34), Color("6e4a28"), Color("2c2118"), 7)
+	_round_rect(Rect2(-20, -11, 40, 11), Color("9a6935"), Color("3a2819"), 5)
+	draw_line(Vector2(-24, 1), Vector2(24, 1), Color("d4a953"), 3, true)
+	_round_rect(Rect2(-6, -2, 12, 15), Color("e0b85d"), Color("4c3820"), 3)
+	draw_circle(Vector2(0, -30), 5, Color("fff1ad", pulse))
 
 func _draw_person():
 	var coat = body_color

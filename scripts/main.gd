@@ -1274,6 +1274,10 @@ func _open_inventory():
 	content.add_theme_constant_override("separation", 10)
 	var stats_line = _label("装备、使用、鉴定与收藏分门别类；所有变化都会自动保存。", 12, MUTED)
 	content.add_child(stats_line)
+	var card_name = "未启用"
+	if state.active_card != "" and GameData.ITEMS.has(state.active_card):
+		card_name = str(GameData.ITEMS[state.active_card].name)
+	content.add_child(_label("当前怪物卡：%s｜同时只能启用1张" % card_name, 11, TEAL))
 
 	var scroll = ScrollContainer.new()
 	scroll.custom_minimum_size.y = 400
@@ -1328,6 +1332,8 @@ func _inventory_row(item_id, count):
 		action_text = "使用"
 	elif item.type == "mystery":
 		action_text = "鉴定"
+	elif item.type == "card":
+		action_text = "已启用" if str(state.active_card) == str(item_id) else "启用"
 	var action = _button(action_text, "primary" if item.type != "card" else "ghost")
 	action.custom_minimum_size.x = 80
 	if item.type == "equipment":
@@ -1336,6 +1342,9 @@ func _inventory_row(item_id, count):
 		action.pressed.connect(_use_from_inventory.bind(item_id))
 	elif item.type == "mystery":
 		action.pressed.connect(_identify_from_inventory)
+	elif item.type == "card":
+		action.disabled = str(state.active_card) == str(item_id)
+		action.pressed.connect(_equip_card_from_inventory.bind(item_id))
 	else:
 		action.disabled = true
 	row.add_child(action)
@@ -1350,6 +1359,13 @@ func _equip_from_inventory(item_id):
 
 func _use_from_inventory(item_id):
 	var result = state.use_item(item_id)
+	_close_modal()
+	refresh_ui()
+	_show_toast(result.message, result.ok)
+	call_deferred("_open_inventory")
+
+func _equip_card_from_inventory(item_id):
+	var result = state.equip_card(item_id)
 	_close_modal()
 	refresh_ui()
 	_show_toast(result.message, result.ok)
@@ -1463,14 +1479,21 @@ func _open_quest_detail():
 	content.add_theme_constant_override("separation", 12)
 	var quest = state.get_current_quest()
 	if quest.is_empty():
-		content.add_child(_empty_state("当前试玩章节已经完成。四层经验副本仍有武士套部件等待发现。"))
+		content.add_child(_empty_state("第一卷·黑帆之谜已完成。你找回了名字“卡西安”，海图的下一站指向亚历山大灯塔。"))
 	else:
 		content.add_child(_label(quest.title, 20, GOLD))
 		content.add_child(_label(quest.story, 13, Color("b7cfd5")))
 		var objective = quest.objective
 		content.add_child(_label("当前%s  %d / %d" % [_objective_text(objective), state.quest_progress, int(objective.need)], 13, TEAL))
 		var reward = quest.reward
-		content.add_child(_label("任务奖励｜%d 经验 · %d 银币 · %s" % [reward.exp, reward.silver, GameData.ITEMS[reward.item].name], 12, MUTED))
+		var reward_parts = ["%d 经验" % int(reward.get("exp", 0)), "%d 银币" % int(reward.get("silver", 0))]
+		if reward.has("item") and GameData.ITEMS.has(reward.item):
+			reward_parts.append(str(GameData.ITEMS[reward.item].name))
+		if reward.has("pet") and GameData.PETS.has(reward.pet):
+			reward_parts.append("宠物%s" % GameData.PETS[reward.pet].name)
+		if reward.has("title"):
+			reward_parts.append("称号「%s」" % str(reward.title))
+		content.add_child(_label("任务奖励｜%s" % " · ".join(reward_parts), 12, MUTED))
 		var route = _quest_route_hint(state.quest_index)
 		var route_label = _label("推荐路线\n%s" % route, 12, Color("8ecbd0"))
 		route_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -1483,19 +1506,49 @@ func _open_quest_detail():
 				_on_claim_quest()
 			)
 			content.add_child(claim)
-	_open_modal("任务日志", content, Vector2(660, 430))
+	if state.quest_index >= 3:
+		var bounty = state.get_bounty()
+		content.add_child(_label("城市悬赏｜%s  %d/%d" % [bounty.title, state.bounty_progress, int(bounty.need)], 15, GOLD))
+		content.add_child(_label(str(bounty.description), 11, MUTED))
+		if state.bounty_can_claim():
+			var bounty_claim = _button("领取悬赏奖励", "gold")
+			bounty_claim.pressed.connect(_claim_bounty_from_journal)
+			content.add_child(bounty_claim)
+	_open_modal("任务日志", content, Vector2(660, 520))
+
+func _claim_bounty_from_journal():
+	var result = state.claim_bounty()
+	_close_modal()
+	refresh_ui()
+	_show_toast(result.message, result.ok)
+	call_deferred("_open_quest_detail")
 
 func _quest_route_hint(index):
-	var routes = [
-		"海边小屋 → 与艾丽莎交谈",
-		"海边小屋 → 东 → 威尼斯酒馆",
-		"威尼斯酒馆 → 与酒馆老板交谈",
-		"酒馆 → 东 → 城市广场 → 北 → 北城门",
-		"北城门 → 北 → 住宅区 → 东 → 废矿山",
-		"住宅区 → 西 → 后山",
-		"北城门 → 东 → 经验副本一层 → 北行至四层"
-	]
-	return routes[clamp(index, 0, routes.size() - 1)]
+	if index < 0 or index >= GameData.QUESTS.size():
+		return "打开2D世界的任务导航寻找当前目标。"
+	var quest_id = str(GameData.QUESTS[index].id)
+	var routes = {
+		"scale_memory": "海边小屋 → 与艾丽莎交谈",
+		"to_tavern": "海边小屋 → 威尼斯酒馆",
+		"tavern_clue": "威尼斯酒馆 → 与酒馆老板交谈",
+		"north_gate": "城市广场 → 北城门",
+		"stolen_ore": "北城门 → 住宅区 → 废矿山",
+		"back_hill_bear": "住宅区 → 后山",
+		"four_floor_trial": "北城门 → 经验副本，逐层击败守卫",
+		"first_cargo": "威尼斯码头 → 购买2箱威尼斯玻璃",
+		"sail_ragusa": "威尼斯码头 → 启航前往拉古萨",
+		"sell_glass": "拉古萨码头 → 卖出2箱威尼斯玻璃",
+		"forge_for_sea": "背包 → 将已装备的手持武器强化1次",
+		"armor_the_swallow": "港口贸易 → 船只改造 → 加固船体",
+		"black_sail_clue": "世界地图 → 黑帆据点外围",
+		"clear_deckhands": "黑帆据点一层 → 击败黑帆水手长",
+		"powder_store": "黑帆据点二层 → 击败黑帆袭击者",
+		"cave_battery": "黑帆据点三层 → 夺取洞窟炮台",
+		"captain_ledger": "黑帆据点四层 → 击败船长雷蒙",
+		"return_chart": "回威尼斯酒馆 → 交付黑帆海图",
+		"alisa_truth": "回海边小屋 → 与艾丽莎交谈"
+	}
+	return str(routes.get(quest_id, "打开2D世界的任务导航寻找当前目标。"))
 
 func _objective_text(objective):
 	var target_name = GameData.objective_name(objective)
@@ -1595,6 +1648,20 @@ func _open_harbor():
 	market.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	market.add_theme_constant_override("separation", 9)
 	scroll.add_child(market)
+	var opportunity = state.best_trade_opportunity()
+	if not opportunity.is_empty():
+		market.add_child(_label("商会推荐｜%s → %s｜%d日后满舱估算净利 %+d" % [GameData.TRADE_GOODS[str(opportunity.good_id)].name, GameData.TRADE_PORTS[str(opportunity.destination)].name, int(opportunity.days), int(opportunity.total_profit)], 11, TEAL))
+	var contract = HBoxContainer.new()
+	contract.add_theme_constant_override("separation", 8)
+	var contract_target = state.trade_contract_target()
+	var contract_info = _label("商会委托·第%d轮｜净利 %d/%d" % [state.trade_contract_count + 1, state.trade_contract_progress(), contract_target], 11, GOLD)
+	contract_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	contract.add_child(contract_info)
+	var contract_claim = _button("领取", "gold")
+	contract_claim.disabled = not state.trade_contract_can_claim()
+	contract_claim.pressed.connect(_claim_trade_contract_from_journal)
+	contract.add_child(contract_claim)
+	market.add_child(contract)
 	market.add_child(_small_caption("本日货物行情"))
 	for good_id in GameData.TRADE_GOODS:
 		var good = GameData.TRADE_GOODS[good_id]
@@ -1625,7 +1692,9 @@ func _open_harbor():
 			continue
 		var route = GameData.trade_route(port_id, destination)
 		var days = max(1, int(route.days) - (int(state.ship.speed) - 1))
-		var sail = _button("前往%s · %d日 · 航费%d" % [GameData.TRADE_PORTS[destination].name, days, int(route.fee)], "primary")
+		var card_risk_bonus = 4 if state.active_card == "corsair_card" else 0
+		var risk = max(4, int(route.get("risk", 15)) - int(state.ship.get("armor", 0)) * 6 - card_risk_bonus)
+		var sail = _button("前往%s · %d日 · 航费%d · 风险%d%%" % [GameData.TRADE_PORTS[destination].name, days, int(route.fee), risk], "primary")
 		sail.disabled = int(state.player.silver) < int(route.fee)
 		sail.pressed.connect(_trade_sail.bind(destination))
 		market.add_child(sail)
@@ -1643,6 +1712,11 @@ func _open_harbor():
 	speed.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	speed.pressed.connect(_trade_upgrade.bind("speed"))
 	upgrades.add_child(speed)
+	var armor = _button("加固船体 -6%风险", "ghost")
+	armor.disabled = int(state.ship.get("armor", 0)) >= 3
+	armor.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	armor.pressed.connect(_trade_upgrade.bind("armor"))
+	upgrades.add_child(armor)
 	market.add_child(upgrades)
 	market.add_child(_label("贸易净收支：%+d银币｜累计成交%d笔（已计买货与航费）" % [state.trade_profit, state.trade_volume], 11, MUTED))
 	_open_modal("货物贸易", content, Vector2(720, 1120) if mobile_mode else Vector2(760, 650))
@@ -1673,6 +1747,13 @@ func _trade_sail(destination):
 
 func _trade_upgrade(kind):
 	var result = state.upgrade_ship(kind)
+	_close_modal()
+	refresh_ui()
+	_show_toast(result.message, result.ok)
+	call_deferred("_open_harbor")
+
+func _claim_trade_contract_from_journal():
+	var result = state.claim_trade_contract()
 	_close_modal()
 	refresh_ui()
 	_show_toast(result.message, result.ok)

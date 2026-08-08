@@ -22,7 +22,7 @@ func _draw():
 	var texture = CITY_ART
 	if region_mode == "field":
 		texture = FIELD_ART
-	elif region_mode == "dungeon":
+	elif region_mode in ["dungeon", "black_sail"]:
 		texture = DUNGEON_ART
 	draw_texture_rect(texture, Rect2(Vector2.ZERO, WORLD_SIZE), false)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * WORLD_SCALE)
@@ -44,10 +44,31 @@ func _draw_art_overlays():
 		for index in range(5):
 			var drift = sin(wave_time * 0.55 + index) * 14.0
 			draw_circle(Vector2(535 + drift + index * 32, 700 + index * 24), 34, Color(0.42, 0.86, 0.82, 0.035))
-	else:
+	elif region_mode == "dungeon":
 		# Firelight pulse ties the four training chambers together.
 		var pulse = 0.025 + (sin(wave_time * 2.4) + 1.0) * 0.012
 		draw_circle(Vector2(360, 170), 118, Color(0.95, 0.25, 0.12, pulse))
+	else:
+		# The corsair stronghold reuses the stone layout but has its own ominous
+		# lighting, torn sails and crossed-cutlass insignia.
+		draw_rect(Rect2(0, 0, 720, 1280), Color(0.16, 0.015, 0.028, 0.26))
+		var pulse = 0.05 + (sin(wave_time * 2.0) + 1.0) * 0.02
+		draw_circle(Vector2(360, 170), 135, Color(0.72, 0.03, 0.08, pulse))
+		for side_x in [42.0, 618.0]:
+			for banner_y in [255.0, 655.0]:
+				draw_polygon(PackedVector2Array([
+					Vector2(side_x, banner_y), Vector2(side_x + 60, banner_y + 8),
+					Vector2(side_x + 52, banner_y + 105), Vector2(side_x + 30, banner_y + 88),
+					Vector2(side_x + 8, banner_y + 105)
+				]), PackedColorArray([Color(0.035, 0.025, 0.035, 0.88)]))
+			draw_line(Vector2(side_x + 16, 275), Vector2(side_x + 50, 315), Color(0.68, 0.09, 0.11, 0.8), 5)
+			draw_line(Vector2(side_x + 50, 275), Vector2(side_x + 16, 315), Color(0.68, 0.09, 0.11, 0.8), 5)
+		# A black sail crest crowns the captain's floor.
+		draw_polygon(PackedVector2Array([
+			Vector2(325, 82), Vector2(325, 172), Vector2(405, 154), Vector2(350, 118)
+		]), PackedColorArray([Color(0.02, 0.02, 0.028, 0.9)]))
+		draw_line(Vector2(325, 72), Vector2(325, 182), Color(0.62, 0.42, 0.26, 0.9), 5)
+		draw_circle(Vector2(351, 128), 9, Color(0.68, 0.08, 0.10, 0.9))
 
 func _draw_city():
 	# Land, canals and the open sea.
