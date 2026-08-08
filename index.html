@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#071522">
+  <meta name="description" content="纵横四海：潮汐纪事——手机竖屏 2D 航海 RPG">
+  <title>纵横四海：潮汐纪事</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    body {
+      background:
+        radial-gradient(circle at 50% 20%, #12374a 0, #071522 48%, #03090f 100%);
+      color: #e9f3f3;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    main {
+      width: 100%;
+      height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    }
+    .game-frame {
+      width: min(100vw, 56.25dvh);
+      height: min(100dvh, 177.7778vw);
+      overflow: hidden;
+      background: #071522;
+      box-shadow: 0 0 52px rgba(0, 0, 0, .72), 0 0 0 1px rgba(89, 200, 192, .24);
+    }
+    iframe {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #071522;
+    }
+    @media (max-aspect-ratio: 9/16) {
+      .game-frame { box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="game-frame">
+      <iframe src="game/index.html" title="纵横四海：潮汐纪事" allow="autoplay; fullscreen" allowfullscreen></iframe>
+    </div>
+  </main>
+</body>
+</html>
