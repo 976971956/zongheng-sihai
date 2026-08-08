@@ -1,0 +1,13 @@
+.DS_Store
+.godot/
+build/*
+!build/web/
+!build/web/**
+*.import
+*_preview.png
+preview.png
+battle_preview.png
+boss_guide_preview.png
+mobile_preview.png
+mobile_battle_preview.png
+character_atlas_v1_chroma.png
