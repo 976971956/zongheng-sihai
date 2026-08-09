@@ -1,6 +1,6 @@
 extends SceneTree
 
-const FONT_PATH = "res://assets/fonts/NotoSansCJKsc-Regular.otf"
+const FONT_PATH = "res://assets/fonts/NotoSansCJKsc-GameSubset.otf"
 const REQUIRED_TEXT = "纵横四海潮汐纪事人物地点任务背包战斗攻击撤退经验等级威尼斯艾丽莎装备宠物副本未知道具银币黑帆据点外围码头火药仓船长贸易合约舱容强化船甲拉古萨亚历山大猛攻坚守寻宝自动补给"
 
 func _init():
