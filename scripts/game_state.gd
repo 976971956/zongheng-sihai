@@ -1058,6 +1058,8 @@ func best_trade_opportunity():
 	if not GameData.TRADE_PORTS.has(player.location):
 		return {}
 	var best = {}
+	var specialty_good = str(GameData.TRADE_PORTS[str(player.location)].get("specialty_good", ""))
+	var recommendation_goods = [specialty_good] if GameData.TRADE_GOODS.has(specialty_good) else GameData.port_stock(str(player.location))
 	for destination in GameData.TRADE_PORTS:
 		if str(destination) == str(player.location):
 			continue
@@ -1065,7 +1067,7 @@ func best_trade_opportunity():
 		if route.is_empty():
 			continue
 		var days = max(1, int(route.days) - (int(ship.get("speed", 1)) - 1))
-		for good_id in GameData.TRADE_GOODS:
+		for good_id in recommendation_goods:
 			var good = GameData.TRADE_GOODS[good_id]
 			var buy_price = trade_buy_price(good_id)
 			var sell_price = trade_sell_price_at(str(destination), str(good_id), trade_day + days)
@@ -1108,6 +1110,8 @@ func cargo_unrealized_profit():
 func max_buyable_cargo(good_id):
 	if not GameData.TRADE_GOODS.has(good_id) or not GameData.TRADE_PORTS.has(player.location):
 		return 0
+	if not GameData.port_sells_good(str(player.location), str(good_id)):
+		return 0
 	var good = GameData.TRADE_GOODS[good_id]
 	var by_space = int(floor(float(cargo_capacity() - cargo_used()) / float(good.space)))
 	var price = trade_buy_price(good_id)
@@ -1135,6 +1139,10 @@ func buy_cargo(good_id, amount = 1):
 		return {"ok": false, "message": "完成威尼斯四层试炼后才会获得贸易船。"}
 	if not GameData.TRADE_PORTS.has(player.location) or not GameData.TRADE_GOODS.has(good_id):
 		return {"ok": false, "message": "这里不能购买这种货物。"}
+	if not GameData.port_sells_good(str(player.location), str(good_id)):
+		var origin_id = str(GameData.TRADE_GOODS[good_id].get("origin", ""))
+		var origin_name = str(GameData.TRADE_PORTS.get(origin_id, {"name": "其他港口"}).name)
+		return {"ok": false, "message": "%s不出售%s，请前往%s采购。" % [GameData.TRADE_PORTS[player.location].name, GameData.TRADE_GOODS[good_id].name, origin_name]}
 	var good = GameData.TRADE_GOODS[good_id]
 	var price = trade_buy_price(good_id)
 	var actual_amount = min(max(1, int(amount)), max_buyable_cargo(good_id))

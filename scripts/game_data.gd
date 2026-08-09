@@ -50,7 +50,7 @@ const LOCATIONS = {
 		"exits": [
 			{"to": "venice_square", "direction": "西", "label": "返回城市广场", "hint": "城内地图"}
 		],
-		"npcs": ["jeweler", "venice_quartermaster"], "enemies": [], "services": ["shop", "identify"]
+		"npcs": ["jeweler"], "enemies": [], "services": ["shop", "identify"]
 	},
 	"venice_dock": {
 		"name": "威尼斯 · 码头",
@@ -61,7 +61,7 @@ const LOCATIONS = {
 		"exits": [
 			{"to": "venice_square", "direction": "北", "label": "返回城市广场", "hint": "城内地图"}
 		],
-		"npcs": ["ship_owner", "venice_shipwright"], "enemies": [], "services": ["harbor"]
+		"npcs": ["ship_owner", "venice_quartermaster", "venice_shipwright"], "enemies": [], "services": ["harbor"]
 	},
 	"venice_north_gate": {
 		"name": "威尼斯 · 北城门",
@@ -190,12 +190,12 @@ const LOCATIONS = {
 	},
 	"quanzhou_dock": {
 		"name": "泉州 · 刺桐港", "tag": "远征港", "chapter": "第十三章 · 妖气东来",
-		"description": "蕃坊钟声与海船号子交叠。沈砚正在核对一批从长安逃出的封妖文书。", "flavor": "丝绸和茶叶从这里进入全球商路。",
+		"description": "蕃坊钟声与海船号子交叠。沈砚正在核对一批从长安逃出的封妖文书。", "flavor": "刺桐青瓷从这里进入全球商路，完整运抵西方能卖出高价。",
 		"exits": [], "npcs": ["quanzhou_scholar", "quanzhou_navigator", "quanzhou_merchant"], "enemies": [], "services": ["harbor"]
 	},
 	"athens_dock": {
 		"name": "雅典 · 银帆港", "tag": "远征港", "chapter": "第十六章 · 地魔宝藏",
-		"description": "古老石柱俯瞰海湾，祭司卡珊德拉把潮汐星盘嵌进一块裂开的地脉石。", "flavor": "葡萄酒与古卷是这里最受欢迎的货物。",
+		"description": "古老石柱俯瞰海湾，祭司卡珊德拉把潮汐星盘嵌进一块裂开的地脉石。", "flavor": "神庙橄榄园的油适合烹饪与长明灯，是稳定的远航货物。",
 		"exits": [], "npcs": ["athens_oracle", "athens_smith", "athens_innkeeper"], "enemies": [], "services": ["harbor"]
 	},
 	"yangzhou_dock": {
@@ -268,10 +268,10 @@ const NPCS = {
 	"ship_owner": {"name": "船老板", "role": "船只与航行", "service": "harbor", "dialogue": "完成威尼斯试炼后，我会把海燕号交给你。比较各港价格、控制货舱，再决定把银币压在哪批货上。"},
 	"ragusa_broker": {"name": "拉古萨经纪人", "role": "港口商人", "service": "harbor", "dialogue": "这里的羊毛和橄榄油便宜。若你从威尼斯带来玻璃，我能给出不错的价钱。"},
 	"alexandria_merchant": {"name": "香料商萨米尔", "role": "港口商人", "service": "harbor", "dialogue": "季风改变的不只是航期，也会改变香料的价格。低买高卖，但别忘了返航的费用。"},
-	"malta_keeper": {"name": "伊莎贝拉", "role": "白鲸号守钟人", "service": "harbor", "dialogue": "我守着这口船钟，也守着一份二十年没人敢读完的名册。若你真要寻找白鲸号，就先学会让同行的人平安吃上一顿饭。"},
+	"malta_keeper": {"name": "伊莎贝拉", "role": "守钟人与柑橘商会代表", "service": "harbor", "dialogue": "我守着这口船钟，也替岛上的果农经营柑橘货栈。若你真要寻找白鲸号，就先学会让同行的人平安吃上一顿饭。"},
 	"cape_keeper": {"name": "阿曼达", "role": "北河向导", "service": "harbor", "dialogue": "风暴角不相信传说，只相信能从北河活着回来的人。"},
 	"quanzhou_scholar": {"name": "沈砚", "role": "封妖录守卷人", "service": "harbor", "dialogue": "海上的妖气与长安旧案来自同一道裂隙，我一直在等星盘的持有者。"},
-	"athens_oracle": {"name": "卡珊德拉", "role": "地脉祭司", "service": "harbor", "dialogue": "石柱记得海水尚未到来之前的战争，蒂拉之剑也仍在等待主人。"},
+	"athens_oracle": {"name": "卡珊德拉", "role": "地脉祭司与橄榄商会代表", "service": "harbor", "dialogue": "石柱记得海水尚未来临前的战争，神庙橄榄园也仍沿用古老的榨油法。"},
 	"yangzhou_weaver": {"name": "苏绫", "role": "玉纱织师", "service": "harbor", "dialogue": "丝线会说谎，但断口不会。让我看看你从潮门带回的历史。"},
 	"amsterdam_cartographer": {"name": "范德海", "role": "七海制图师", "service": "harbor", "dialogue": "基德的藏宝图从来不是指向黄金，而是指向天魔舰队的补给航线。"}
 	,"venice_quartermaster": {"name": "蕾娜", "role": "码头仓库管理员", "service": "harbor", "dialogue": "货物要按占舱大小算，不要只看单件差价。真正的好商路，是返程也不空舱。"}
@@ -285,25 +285,25 @@ const NPCS = {
 	,"cape_shipwright": {"name": "姆贝基", "role": "风暴角船匠", "service": "shipyard", "dialogue": "两股洋流在这里打架。船体不够硬，满舱黄金也带不回家。"}
 	,"cape_quartermaster": {"name": "扎赫拉", "role": "北河补给官", "service": "harbor", "dialogue": "我负责远征补给，也收购东方香料。选中海图节点就能比较航期与风险。"}
 	,"quanzhou_navigator": {"name": "林海", "role": "季风领航员", "service": "harbor", "dialogue": "季风不是墙，是会移动的道路。顺风时泉州到扬州只需很短的航程。"}
-	,"quanzhou_merchant": {"name": "林香", "role": "蕃坊香料商", "service": "harbor", "dialogue": "香料在这里便宜，在北海却像金粉。货舱留一格，应付路上的漂流宝箱。"}
+	,"quanzhou_merchant": {"name": "林香", "role": "刺桐青瓷商", "service": "harbor", "dialogue": "青瓷怕风浪，却能在西方卖出数倍价钱。货舱留一格，应付路上的漂流宝箱。"}
 	,"athens_smith": {"name": "尼科斯", "role": "银帆锻造师", "service": "shipyard", "dialogue": "船甲与战甲一样，真正救命的往往是最不起眼的一块铆钉。"}
 	,"athens_innkeeper": {"name": "艾琳娜", "role": "橄榄枝旅店主人", "service": "rest", "dialogue": "祭司负责预言，我只负责让出海的人吃饱睡好。"}
 	,"yangzhou_pilot": {"name": "阿渔", "role": "运河领航员", "service": "harbor", "dialogue": "海船进运河要看潮位。海图上的亮线，就是今天还能走的水路。"}
-	,"yangzhou_merchant": {"name": "顾七", "role": "月港绸商", "service": "harbor", "dialogue": "北海爱羊毛，西海爱香料，东方港口最值钱的却是消息。"}
+	,"yangzhou_merchant": {"name": "顾七", "role": "月港玉纱商", "service": "harbor", "dialogue": "玉纱不占多少货舱，在北海却比同重黄金更抢手。真正值钱的，是知道该送去哪一座港。"}
 	,"amsterdam_auctioneer": {"name": "伊娃", "role": "七海拍卖师", "service": "harbor", "dialogue": "同一件货物，换一天、换一个港，价格就会讲完全不同的故事。"}
 	,"amsterdam_shipwright": {"name": "威廉", "role": "风车港船匠", "service": "shipyard", "dialogue": "北海的船要快，也要能挨浪。别让货舱扩建挤掉了船体加强筋。"}
 }
 
 const TRADE_PORTS = {
-	"venice_dock": {"name": "威尼斯", "specialty": "玻璃器皿", "note": "玻璃便宜，香料昂贵", "order_npc": "ship_owner"},
-	"ragusa_dock": {"name": "拉古萨", "specialty": "羊毛布", "note": "羊毛与橄榄油价格较低", "order_npc": "ragusa_harbormaster"},
-	"alexandria_dock": {"name": "亚历山大", "specialty": "东方香料", "note": "香料便宜，玻璃需求旺盛", "order_npc": "alex_lighthouse_keeper"},
-	"malta_dock": {"name": "马耳他", "specialty": "金岛柑橘", "note": "柑橘便宜，可在港口厨房制作远航餐食", "order_npc": "malta_keeper"},
-	"cape_town_dock": {"name": "开普敦", "specialty": "橄榄油", "note": "远洋补给需求旺盛", "npc": "cape_keeper", "order_npc": "cape_quartermaster"},
-	"quanzhou_dock": {"name": "泉州", "specialty": "东方香料", "note": "香料与柑橘适合向西远销", "npc": "quanzhou_scholar", "order_npc": "quanzhou_merchant"},
-	"athens_dock": {"name": "雅典", "specialty": "橄榄油", "note": "玻璃和羊毛价格稳定", "npc": "athens_oracle", "order_npc": "athens_smith"},
-	"yangzhou_dock": {"name": "扬州", "specialty": "羊毛布", "note": "远海货物在运河口溢价明显", "npc": "yangzhou_weaver", "order_npc": "yangzhou_merchant"},
-	"amsterdam_dock": {"name": "阿姆斯特丹", "specialty": "威尼斯玻璃", "note": "北海商会大量收购香料", "npc": "amsterdam_cartographer", "order_npc": "amsterdam_auctioneer"}
+	"venice_dock": {"name": "威尼斯", "specialty": "威尼斯玻璃", "specialty_good": "venetian_glass", "stock": ["venetian_glass"], "merchant_npc": "venice_quartermaster", "note": "蕾娜只出售本地玻璃；香料和东方货在此溢价", "order_npc": "ship_owner"},
+	"ragusa_dock": {"name": "拉古萨", "specialty": "石墙羊毛布", "specialty_good": "wool_cloth", "stock": ["wool_cloth", "olive_oil"], "merchant_npc": "ragusa_broker", "note": "经纪人主营羊毛布，也供应少量亚得里亚橄榄油", "order_npc": "ragusa_harbormaster"},
+	"alexandria_dock": {"name": "亚历山大", "specialty": "亚历山大香料", "specialty_good": "spices", "stock": ["spices", "olive_oil"], "merchant_npc": "alexandria_merchant", "note": "萨米尔的香料价格最低，玻璃和北海货需求旺盛", "order_npc": "alex_lighthouse_keeper"},
+	"malta_dock": {"name": "马耳他", "specialty": "金岛柑橘", "specialty_good": "citrus", "stock": ["citrus", "olive_oil", "spices"], "merchant_npc": "malta_keeper", "note": "柑橘是本地特产，厨房原料属于高价进口补给", "order_npc": "malta_keeper"},
+	"cape_town_dock": {"name": "开普敦", "specialty": "风暴角金砂", "specialty_good": "cape_gold_dust", "stock": ["cape_gold_dust"], "merchant_npc": "cape_quartermaster", "note": "北河金砂便宜，运往地中海与东方能卖出高价", "npc": "cape_keeper", "order_npc": "cape_quartermaster"},
+	"quanzhou_dock": {"name": "泉州", "specialty": "刺桐青瓷", "specialty_good": "quanzhou_porcelain", "stock": ["quanzhou_porcelain"], "merchant_npc": "quanzhou_merchant", "note": "海商林香专营青瓷，西方港口愿为完整瓷器支付高价", "npc": "quanzhou_scholar", "order_npc": "quanzhou_merchant"},
+	"athens_dock": {"name": "雅典", "specialty": "神庙橄榄油", "specialty_good": "olive_oil", "stock": ["olive_oil"], "merchant_npc": "athens_oracle", "note": "神庙橄榄园稳定出产优质灯油和食用油", "npc": "athens_oracle", "order_npc": "athens_smith"},
+	"yangzhou_dock": {"name": "扬州", "specialty": "运河玉纱", "specialty_good": "yangzhou_silk", "stock": ["yangzhou_silk"], "merchant_npc": "yangzhou_merchant", "note": "玉纱轻且昂贵，适合装满快船远销北海", "npc": "yangzhou_weaver", "order_npc": "yangzhou_merchant"},
+	"amsterdam_dock": {"name": "阿姆斯特丹", "specialty": "风车港航海仪", "specialty_good": "amsterdam_instruments", "stock": ["amsterdam_instruments"], "merchant_npc": "amsterdam_auctioneer", "note": "精密航海仪在东方稀缺，拍卖行也高价收购丝绸", "npc": "amsterdam_cartographer", "order_npc": "amsterdam_auctioneer"}
 }
 
 const PORT_UNLOCK_QUEST = {
@@ -313,11 +313,15 @@ const PORT_UNLOCK_QUEST = {
 }
 
 const TRADE_GOODS = {
-	"venetian_glass": {"name": "威尼斯玻璃", "unit": "箱", "space": 2, "prices": {"venice_dock": 24, "ragusa_dock": 46, "alexandria_dock": 61, "malta_dock": 52, "cape_town_dock": 74, "quanzhou_dock": 66, "athens_dock": 48, "yangzhou_dock": 71, "amsterdam_dock": 39}},
-	"wool_cloth": {"name": "羊毛布", "unit": "捆", "space": 1, "prices": {"venice_dock": 43, "ragusa_dock": 25, "alexandria_dock": 47, "malta_dock": 42, "cape_town_dock": 58, "quanzhou_dock": 55, "athens_dock": 38, "yangzhou_dock": 62, "amsterdam_dock": 28}},
-	"olive_oil": {"name": "橄榄油", "unit": "桶", "space": 2, "prices": {"venice_dock": 48, "ragusa_dock": 30, "alexandria_dock": 24, "malta_dock": 28, "cape_town_dock": 34, "quanzhou_dock": 63, "athens_dock": 22, "yangzhou_dock": 68, "amsterdam_dock": 54}},
-	"spices": {"name": "东方香料", "unit": "袋", "space": 1, "prices": {"venice_dock": 82, "ragusa_dock": 61, "alexandria_dock": 35, "malta_dock": 57, "cape_town_dock": 76, "quanzhou_dock": 31, "athens_dock": 69, "yangzhou_dock": 39, "amsterdam_dock": 91}},
-	"citrus": {"name": "金岛柑橘", "unit": "筐", "space": 1, "prices": {"venice_dock": 42, "ragusa_dock": 38, "alexandria_dock": 45, "malta_dock": 20, "cape_town_dock": 52, "quanzhou_dock": 37, "athens_dock": 44, "yangzhou_dock": 49, "amsterdam_dock": 58}}
+	"venetian_glass": {"name": "威尼斯玻璃", "unit": "箱", "space": 2, "origin": "venice_dock", "prices": {"venice_dock": 24, "ragusa_dock": 46, "alexandria_dock": 61, "malta_dock": 52, "cape_town_dock": 74, "quanzhou_dock": 66, "athens_dock": 48, "yangzhou_dock": 71, "amsterdam_dock": 86}},
+	"wool_cloth": {"name": "石墙羊毛布", "unit": "捆", "space": 1, "origin": "ragusa_dock", "prices": {"venice_dock": 43, "ragusa_dock": 25, "alexandria_dock": 47, "malta_dock": 42, "cape_town_dock": 58, "quanzhou_dock": 72, "athens_dock": 38, "yangzhou_dock": 78, "amsterdam_dock": 49}},
+	"olive_oil": {"name": "神庙橄榄油", "unit": "桶", "space": 2, "origin": "athens_dock", "prices": {"venice_dock": 48, "ragusa_dock": 30, "alexandria_dock": 24, "malta_dock": 36, "cape_town_dock": 54, "quanzhou_dock": 63, "athens_dock": 22, "yangzhou_dock": 68, "amsterdam_dock": 57}},
+	"spices": {"name": "亚历山大香料", "unit": "袋", "space": 1, "origin": "alexandria_dock", "prices": {"venice_dock": 82, "ragusa_dock": 61, "alexandria_dock": 32, "malta_dock": 57, "cape_town_dock": 76, "quanzhou_dock": 69, "athens_dock": 69, "yangzhou_dock": 84, "amsterdam_dock": 91}},
+	"citrus": {"name": "金岛柑橘", "unit": "筐", "space": 1, "origin": "malta_dock", "prices": {"venice_dock": 42, "ragusa_dock": 38, "alexandria_dock": 45, "malta_dock": 20, "cape_town_dock": 52, "quanzhou_dock": 61, "athens_dock": 44, "yangzhou_dock": 66, "amsterdam_dock": 58}},
+	"cape_gold_dust": {"name": "风暴角金砂", "unit": "袋", "space": 1, "origin": "cape_town_dock", "prices": {"venice_dock": 112, "ragusa_dock": 105, "alexandria_dock": 91, "malta_dock": 86, "cape_town_dock": 45, "quanzhou_dock": 118, "athens_dock": 98, "yangzhou_dock": 128, "amsterdam_dock": 120}},
+	"quanzhou_porcelain": {"name": "刺桐青瓷", "unit": "箱", "space": 2, "origin": "quanzhou_dock", "prices": {"venice_dock": 85, "ragusa_dock": 78, "alexandria_dock": 92, "malta_dock": 88, "cape_town_dock": 110, "quanzhou_dock": 38, "athens_dock": 82, "yangzhou_dock": 52, "amsterdam_dock": 96}},
+	"yangzhou_silk": {"name": "运河玉纱", "unit": "匹", "space": 1, "origin": "yangzhou_dock", "prices": {"venice_dock": 95, "ragusa_dock": 88, "alexandria_dock": 102, "malta_dock": 98, "cape_town_dock": 126, "quanzhou_dock": 58, "athens_dock": 90, "yangzhou_dock": 42, "amsterdam_dock": 110}},
+	"amsterdam_instruments": {"name": "风车港航海仪", "unit": "箱", "space": 2, "origin": "amsterdam_dock", "prices": {"venice_dock": 88, "ragusa_dock": 92, "alexandria_dock": 118, "malta_dock": 105, "cape_town_dock": 130, "quanzhou_dock": 142, "athens_dock": 96, "yangzhou_dock": 124, "amsterdam_dock": 55}}
 }
 
 const TRADE_ROUTES = {
@@ -347,7 +351,11 @@ const TRADE_EVENTS = [
 	{"name": "拉古萨纺织季", "description": "拉古萨羊毛集中上市，采购价下降。", "port": "ragusa_dock", "good": "wool_cloth", "multiplier": 0.78},
 	{"name": "亚历山大宫廷订单", "description": "亚历山大贵族高价征集威尼斯玻璃。", "port": "alexandria_dock", "good": "venetian_glass", "multiplier": 1.28},
 	{"name": "橄榄丰收", "description": "拉古萨橄榄油丰收，市场供应充足。", "port": "ragusa_dock", "good": "olive_oil", "multiplier": 0.76},
-	{"name": "金岛丰收祭", "description": "马耳他柑橘集中上市，适合采购远销。", "port": "malta_dock", "good": "citrus", "multiplier": 0.74}
+	{"name": "金岛丰收祭", "description": "马耳他柑橘集中上市，适合采购远销。", "port": "malta_dock", "good": "citrus", "multiplier": 0.74},
+	{"name": "北河淘金季", "description": "开普敦金砂集中上市，适合装船远销。", "port": "cape_town_dock", "good": "cape_gold_dust", "multiplier": 0.76},
+	{"name": "刺桐开窑", "description": "泉州新一批青瓷出窑，采购价下降。", "port": "quanzhou_dock", "good": "quanzhou_porcelain", "multiplier": 0.78},
+	{"name": "运河织造节", "description": "扬州玉纱集中交货，采购价下降。", "port": "yangzhou_dock", "good": "yangzhou_silk", "multiplier": 0.80},
+	{"name": "北海仪器展", "description": "阿姆斯特丹航海仪工坊开放批发。", "port": "amsterdam_dock", "good": "amsterdam_instruments", "multiplier": 0.80}
 ]
 
 const RECIPES = {
@@ -390,6 +398,11 @@ const TRADE_ORDERS = {
 	,"return_wards": {"title": "九港结界帆", "port": "quanzhou_dock", "good": "wool_cloth", "amount": 5, "bonus": 1120, "reputation": 3, "description": "九港共同缝制抵御天魔风暴的结界帆。"}
 	,"shears_alloy": {"title": "神剪淬光镜", "port": "athens_dock", "good": "venetian_glass", "amount": 4, "bonus": 1220, "reputation": 3, "description": "祭司要把潮光折入天工神剪的断刃。"}
 	,"seal_threads": {"title": "封印定神香", "port": "yangzhou_dock", "good": "spices", "amount": 5, "bonus": 1400, "reputation": 4, "description": "最终迷阵需要九港香火同时点燃，稳定所有守阵者的记忆。"}
+	,"cape_citrus_rations": {"title": "风暴角防坏血病补给", "port": "cape_town_dock", "good": "citrus", "amount": 5, "bonus": 460, "reputation": 3, "description": "远征队需要从马耳他运来的柑橘。"}
+	,"quanzhou_gold_leaf": {"title": "镇妖金箔", "port": "quanzhou_dock", "good": "cape_gold_dust", "amount": 3, "bonus": 560, "reputation": 3, "description": "封妖古镜需要风暴角金砂锤成的金箔。"}
+	,"athens_porcelain_archive": {"title": "神庙青瓷档案罐", "port": "athens_dock", "good": "quanzhou_porcelain", "amount": 2, "bonus": 680, "reputation": 3, "description": "祭司要用青瓷罐封存地脉档案。"}
+	,"yangzhou_olive_lamps": {"title": "运河长明灯", "port": "yangzhou_dock", "good": "olive_oil", "amount": 4, "bonus": 880, "reputation": 3, "description": "月港需要雅典橄榄油点亮守夜灯。"}
+	,"amsterdam_silk_auction": {"title": "北海玉纱拍卖", "port": "amsterdam_dock", "good": "yangzhou_silk", "amount": 4, "bonus": 980, "reputation": 3, "description": "拍卖行正在征集完整的扬州玉纱。"}
 }
 
 const PORT_ORDER_ROTATION = {
@@ -397,11 +410,11 @@ const PORT_ORDER_ROTATION = {
 	"ragusa_dock": ["ragusa_glass_banquet", "ragusa_spice_fair"],
 	"alexandria_dock": ["alexandria_wool_sails", "alexandria_palace_glass"],
 	"malta_dock": ["malta_citrus_fleet", "malta_glass_lanterns"]
-	,"cape_town_dock": ["basin_supplies"]
-	,"quanzhou_dock": ["changan_seals", "return_wards"]
-	,"athens_dock": ["earth_lamps", "shears_alloy"]
-	,"yangzhou_dock": ["demon_sails", "seal_threads"]
-	,"amsterdam_dock": ["jade_calendar"]
+	,"cape_town_dock": ["basin_supplies", "cape_citrus_rations"]
+	,"quanzhou_dock": ["changan_seals", "quanzhou_gold_leaf", "return_wards"]
+	,"athens_dock": ["earth_lamps", "athens_porcelain_archive", "shears_alloy"]
+	,"yangzhou_dock": ["demon_sails", "yangzhou_olive_lamps", "seal_threads"]
+	,"amsterdam_dock": ["jade_calendar", "amsterdam_silk_auction"]
 }
 
 const ENEMIES = {
@@ -741,6 +754,14 @@ static func trade_route(from_port, to_port):
 	var ports = [str(from_port), str(to_port)]
 	ports.sort()
 	return TRADE_ROUTES.get("%s|%s" % ports, {})
+
+static func port_stock(port_id):
+	if not TRADE_PORTS.has(str(port_id)):
+		return []
+	return Array(TRADE_PORTS[str(port_id)].get("stock", [])).duplicate()
+
+static func port_sells_good(port_id, good_id):
+	return str(good_id) in port_stock(str(port_id))
 
 static func trade_market_price(port_id, good_id, day):
 	if not TRADE_GOODS.has(good_id) or not TRADE_PORTS.has(port_id):

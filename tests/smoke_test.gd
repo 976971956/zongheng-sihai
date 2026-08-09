@@ -18,11 +18,29 @@ func _init():
 	port_lock_state.player.silver = 999
 	_check(not port_lock_state.sail_to("alexandria_dock").ok, "尚未发现的港口不能绕过海图锁定直接启航")
 	_check(GameData.NPCS.size() >= 31, "九港剧情与服务人物必须完整配置，不能只保留少量任务NPC")
+	var specialty_goods = {}
 	for port_id in GameData.TRADE_PORTS:
+		var port = GameData.TRADE_PORTS[port_id]
 		var order_npc = str(GameData.TRADE_PORTS[port_id].get("order_npc", ""))
 		_check(order_npc != "" and order_npc in GameData.LOCATIONS[port_id].npcs, "%s商会交付人物必须真实存在于港口地图" % GameData.TRADE_PORTS[port_id].name)
+		var merchant_npc = str(port.get("merchant_npc", ""))
+		var specialty_good = str(port.get("specialty_good", ""))
+		var stock = GameData.port_stock(str(port_id))
+		_check(merchant_npc != "" and merchant_npc in GameData.LOCATIONS[port_id].npcs and str(GameData.NPCS.get(merchant_npc, {}).get("service", "")) == "harbor", "%s必须有可在地图互动的专属贸易NPC" % port.name)
+		_check(specialty_good != "" and specialty_good in stock and str(GameData.TRADE_GOODS.get(specialty_good, {}).get("origin", "")) == str(port_id), "%s必须出售产地归属明确的本港特色商品" % port.name)
+		specialty_goods[specialty_good] = true
 		if port_id != "venice_dock":
 			_check(GameData.LOCATIONS[port_id].npcs.size() >= 3, "%s至少需要剧情、贸易和港口服务三名可互动人物" % GameData.TRADE_PORTS[port_id].name)
+	_check(specialty_goods.size() == GameData.TRADE_PORTS.size(), "九座城市必须各有不同的特色商品，不能重复套用同一批特产")
+	for good_id in GameData.TRADE_GOODS:
+		_check(GameData.TRADE_GOODS[good_id].prices.size() == GameData.TRADE_PORTS.size(), "%s必须在九港都有独立收购价" % GameData.TRADE_GOODS[good_id].name)
+	var route_market = TestState.new()
+	route_market.quest_index = GameData.QUESTS.size()
+	route_market.player.silver = 9999
+	for port_id in GameData.TRADE_PORTS:
+		route_market.player.location = str(port_id)
+		var opportunity = route_market.best_trade_opportunity()
+		_check(not opportunity.is_empty() and str(opportunity.good_id) == str(GameData.TRADE_PORTS[port_id].specialty_good) and int(opportunity.total_profit) > 0, "%s必须至少有一条从本地特产低买、沿直达航线高卖的盈利商路" % GameData.TRADE_PORTS[port_id].name)
 	var opening_story = state.story_progress()
 	_check(int(opening_story.total) == GameData.QUESTS.size() and str(opening_story.chapter) == "序章·失去的名字", "任务系统必须返回总进度与当前章节")
 	var gear_state = TestState.new()
@@ -80,6 +98,7 @@ func _init():
 	_check(bool(final_reward.get("trade_unlocked", false)) and state.is_trade_unlocked(), "威尼斯试炼领奖后必须解锁货物贸易")
 
 	state.player.location = "venice_dock"
+	_check(not state.buy_cargo("wool_cloth").ok and state.max_buyable_cargo("wool_cloth") == 0, "威尼斯货栈不能出售拉古萨特产，港口商品不能再全部混在一起")
 	var trade_silver_before = int(state.player.silver)
 	var batch_buy = state.buy_cargo("venetian_glass", 4)
 	_check(batch_buy.ok and int(batch_buy.amount) == 4, "威尼斯港应能批量买入玻璃")
@@ -236,10 +255,12 @@ func _init():
 			state.player.location = "venice_tavern"
 		state.talk_to(str(volume.npc))
 		_claim(state, str(volume.meet))
-		state.player.location = str(volume.port)
 		var order = GameData.TRADE_ORDERS[str(volume.order)]
+		var source_port = str(GameData.TRADE_GOODS[str(order.good)].origin)
+		state.player.location = source_port
 		var cargo_result = state.buy_cargo(str(order.good), int(order.amount))
-		_check(bool(cargo_result.ok), "主线订单%s必须能在当前港准备货物" % str(volume.order))
+		_check(bool(cargo_result.ok), "主线订单%s必须能从%s采购货物" % [str(volume.order), GameData.TRADE_PORTS[source_port].name])
+		state.player.location = str(volume.port)
 		_check(bool(state.claim_trade_order().ok), "主线订单%s必须能交付" % str(volume.order))
 		_claim(state, str(volume.order_quest))
 		state.arrive_from_2d(str(volume.location))

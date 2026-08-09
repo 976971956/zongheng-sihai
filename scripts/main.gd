@@ -1031,11 +1031,11 @@ func _show_next_quest_prompt():
 	var content = VBoxContainer.new()
 	content.add_theme_constant_override("separation", 13)
 	if quest.is_empty():
-		content.add_child(_label("威尼斯篇章完成", 21, GOLD))
-		var unlock = _label("新玩法已解锁：港口货物贸易", 16, TEAL)
+		content.add_child(_label("十三卷航海日志完成", 21, GOLD))
+		var unlock = _label("持续玩法：九港跑商与循环悬赏", 16, TEAL)
 		unlock.add_theme_stylebox_override("normal", _style(Color(0.04, 0.18, 0.18, 0.86), 11, Color(TEAL, 0.55), 1, 14))
 		content.add_child(unlock)
-		content.add_child(_label("船老板已将「海燕号」交给你。前往威尼斯码头，可买入玻璃、羊毛、橄榄油和香料，并航行到拉古萨、亚历山大低买高卖。", 13, Color("b7cfd5")))
+		content.add_child(_label("九座港口各有独立商人与特色货单。前往产地低价采购，再根据航期、风险与行情运往需求城市出售。", 13, Color("b7cfd5")))
 		var go_trade = _button("返回2D地图，步行前往码头", "gold")
 		go_trade.pressed.connect(_go_to_unlocked_trade)
 		content.add_child(go_trade)
@@ -1715,7 +1715,7 @@ func _open_harbor():
 	content.add_theme_constant_override("separation", 10)
 	if not state.is_trade_unlocked():
 		content.add_child(_label("港口贸易尚未解锁", 20, GOLD))
-		var locked = _label("完成主线「四层试炼」并领取奖励后，船老板会赠送贸易船「海燕号」。届时可在三个港口之间买卖货物。", 13, Color("b7cfd5"))
+		var locked = _label("完成主线「四层试炼」并领取奖励后，船老板会赠送贸易船「海燕号」。之后会随剧情逐步发现九座各具特产的港口。", 13, Color("b7cfd5"))
 		locked.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		locked.add_theme_stylebox_override("normal", _style(Color(0.18, 0.13, 0.04, 0.45), 11, Color(GOLD, 0.45), 1, 14))
 		content.add_child(locked)
@@ -1752,6 +1752,12 @@ func _open_harbor():
 	market.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	market.add_theme_constant_override("separation", 9)
 	scroll.add_child(market)
+	var merchant_id = str(port.get("merchant_npc", ""))
+	var merchant = GameData.NPCS.get(merchant_id, {"name": "港口商人", "role": "货栈经营者"})
+	var merchant_copy = _label("交易商人｜%s · %s\n本港特产｜%s\n%s" % [merchant.name, merchant.role, port.specialty, port.note], 12, TEAL)
+	merchant_copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	merchant_copy.add_theme_stylebox_override("normal", _style(Color(0.03, 0.17, 0.15, 0.92), 10, Color(TEAL, 0.5), 1, 11))
+	market.add_child(merchant_copy)
 	var opportunity = state.best_trade_opportunity()
 	if not opportunity.is_empty():
 		market.add_child(_label("商会推荐｜%s → %s｜%d日后满舱估算净利 %+d" % [GameData.TRADE_GOODS[str(opportunity.good_id)].name, GameData.TRADE_PORTS[str(opportunity.destination)].name, int(opportunity.days), int(opportunity.total_profit)], 11, TEAL))
@@ -1760,7 +1766,9 @@ func _open_harbor():
 		var order_row = HBoxContainer.new()
 		order_row.add_theme_constant_override("separation", 8)
 		var held_for_order = int(state.cargo.get(str(order.good), 0))
-		var order_info = _label("%s商会订单｜%s%s\n%s×%d · 货舱%d/%d · 奖金%d · 声望+%d" % [port.name, str(order.title), " · 主线" if bool(order.get("story", false)) else "", GameData.TRADE_GOODS[str(order.good)].name, int(order.amount), held_for_order, int(order.amount), int(order.bonus), int(order.reputation)], 11, GOLD)
+		var order_good = GameData.TRADE_GOODS[str(order.good)]
+		var order_source = GameData.TRADE_PORTS[str(order_good.origin)].name
+		var order_info = _label("%s商会订单｜%s%s\n%s×%d · 货舱%d/%d · 采购地%s · 奖金%d · 声望+%d" % [port.name, str(order.title), " · 主线" if bool(order.get("story", false)) else "", order_good.name, int(order.amount), held_for_order, int(order.amount), order_source, int(order.bonus), int(order.reputation)], 11, GOLD)
 		order_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		order_row.add_child(order_info)
 		var order_claim = _button("向商会交付", "gold")
@@ -1801,47 +1809,18 @@ func _open_harbor():
 	contract_claim.pressed.connect(_claim_trade_contract_from_journal)
 	contract.add_child(contract_claim)
 	market.add_child(contract)
-	market.add_child(_small_caption("本日货物行情"))
-	for good_id in GameData.TRADE_GOODS:
-		var good = GameData.TRADE_GOODS[good_id]
-		var card = _panel_container(PANEL_SOFT, 10, LINE, 1)
-		var card_margin = _inside_margin(11, 9)
-		card.add_child(card_margin)
-		var stack = VBoxContainer.new()
-		stack.add_theme_constant_override("separation", 7)
-		card_margin.add_child(stack)
-		var info = VBoxContainer.new()
-		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		info.add_child(_label("%s · %d格/%s" % [good.name, int(good.space), good.unit], 13, INK))
-		var held = int(state.cargo.get(good_id, 0))
-		var average = state.cargo_average_cost(good_id)
-		var estimate = state.trade_sell_price(good_id) - average if held > 0 else 0
-		info.add_child(_label("买%d / 卖%d · 持有%d%s · 均价%d · 单件预估%+d" % [state.trade_buy_price(good_id), state.trade_sell_price(good_id), held, good.unit, average, estimate], 11, GOLD))
-		stack.add_child(info)
-		var row = HBoxContainer.new()
-		row.add_theme_constant_override("separation", 8)
-		stack.add_child(row)
-		var buy = _button("买1", "primary")
-		buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		buy.disabled = state.max_buyable_cargo(good_id) <= 0
-		buy.pressed.connect(_trade_buy.bind(good_id))
-		row.add_child(buy)
-		var buy_max = _button("买满", "gold")
-		buy_max.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		buy_max.disabled = state.max_buyable_cargo(good_id) <= 0
-		buy_max.pressed.connect(_trade_buy.bind(good_id, true))
-		row.add_child(buy_max)
-		var sell = _button("卖1", "ghost")
-		sell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		sell.disabled = held <= 0
-		sell.pressed.connect(_trade_sell.bind(good_id))
-		row.add_child(sell)
-		var sell_all = _button("全卖", "ghost")
-		sell_all.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		sell_all.disabled = held <= 0
-		sell_all.pressed.connect(_trade_sell.bind(good_id, true))
-		row.add_child(sell_all)
-		market.add_child(card)
+	var local_stock = GameData.port_stock(port_id)
+	market.add_child(_small_caption("本港货栈 · 只可买入以下货物"))
+	for good_id in local_stock:
+		_add_journal_trade_good_card(market, str(good_id), true)
+	var foreign_cargo = []
+	for good_id in state.cargo:
+		if int(state.cargo.get(good_id, 0)) > 0 and GameData.TRADE_GOODS.has(good_id) and str(good_id) not in local_stock:
+			foreign_cargo.append(str(good_id))
+	if not foreign_cargo.is_empty():
+		market.add_child(_small_caption("船上外来货 · 本港收购"))
+		for good_id in foreign_cargo:
+			_add_journal_trade_good_card(market, str(good_id), false)
 
 	market.add_child(_small_caption("可用航线"))
 	for destination in GameData.TRADE_PORTS:
@@ -1878,6 +1857,49 @@ func _open_harbor():
 	market.add_child(upgrades)
 	market.add_child(_label("本轮商会净收支：%+d银币｜生涯已实现货差：%+d｜累计成交%d件" % [state.trade_profit, state.trade_lifetime_profit, state.trade_volume], 11, MUTED))
 	_open_modal("货物贸易", content, Vector2(720, 1120) if mobile_mode else Vector2(760, 650))
+
+func _add_journal_trade_good_card(market, good_id, can_buy):
+	var good = GameData.TRADE_GOODS[good_id]
+	var card = _panel_container(PANEL_SOFT, 10, LINE, 1)
+	var card_margin = _inside_margin(11, 9)
+	card.add_child(card_margin)
+	var stack = VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 7)
+	card_margin.add_child(stack)
+	var held = int(state.cargo.get(good_id, 0))
+	var average = state.cargo_average_cost(good_id)
+	var estimate = state.trade_sell_price(good_id) - average if held > 0 else 0
+	var origin_id = str(good.get("origin", ""))
+	var origin_name = str(GameData.TRADE_PORTS.get(origin_id, {"name": "未知港口"}).name)
+	var stock_tag = "本港特产" if origin_id == str(state.player.location) else ("港内进口" if can_buy else "外来货")
+	stack.add_child(_label("%s · %s · 产地%s · %d格/%s" % [good.name, stock_tag, origin_name, int(good.space), good.unit], 13, INK))
+	var price_text = "买%d / 卖%d" % [state.trade_buy_price(good_id), state.trade_sell_price(good_id)] if can_buy else "本港收购%d" % state.trade_sell_price(good_id)
+	stack.add_child(_label("%s · 持有%d%s · 均价%d · 单件预估%+d" % [price_text, held, good.unit, average, estimate], 11, GOLD))
+	var row = HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	stack.add_child(row)
+	if can_buy:
+		var buy = _button("买1", "primary")
+		buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		buy.disabled = state.max_buyable_cargo(good_id) <= 0
+		buy.pressed.connect(_trade_buy.bind(good_id))
+		row.add_child(buy)
+		var buy_max = _button("买满", "gold")
+		buy_max.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		buy_max.disabled = state.max_buyable_cargo(good_id) <= 0
+		buy_max.pressed.connect(_trade_buy.bind(good_id, true))
+		row.add_child(buy_max)
+	var sell = _button("卖1", "ghost")
+	sell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sell.disabled = held <= 0
+	sell.pressed.connect(_trade_sell.bind(good_id))
+	row.add_child(sell)
+	var sell_all = _button("全卖", "ghost")
+	sell_all.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sell_all.disabled = held <= 0
+	sell_all.pressed.connect(_trade_sell.bind(good_id, true))
+	row.add_child(sell_all)
+	market.add_child(card)
 
 func _hold_upgrade_state(button):
 	button.disabled = state.cargo_capacity() >= 30

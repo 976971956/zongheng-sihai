@@ -269,6 +269,7 @@ func _run():
 	scene._open_trade_2d()
 	_check(is_instance_valid(scene.overlay), "主线完成后必须能从2D地图打开港口市场")
 	_check(_has_button_text(scene.overlay, "买1") and _has_button_text(scene.overlay, "买满") and _has_button_text(scene.overlay, "全卖") and _has_button_text(scene.overlay, "拉古萨") and _has_button_text(scene.overlay, "商会交付") and _has_button_text(scene.overlay, "护航物资") and _has_label_text(scene.overlay, "持有银币") and _has_label_text(scene.overlay, "总声望") and _has_label_text(scene.overlay, "今日行情"), "2D港口市场必须包含资产、批量买卖、订单声望、护航、跨港航线和动态行情")
+	_check(_has_label_text(scene.overlay, "交易商人｜蕾娜") and _has_label_text(scene.overlay, "本港特产｜威尼斯玻璃") and _has_label_text(scene.overlay, "本港货栈 · 只可买入以下货物") and not _has_label_text(scene.overlay, "石墙羊毛布"), "威尼斯必须由专属贸易NPC只出售本地货单，不能展示全球商品总目录")
 	var silver_before = int(scene.state.player.silver)
 	scene._trade_buy_2d("venetian_glass")
 	_check(int(scene.state.cargo.get("venetian_glass", 0)) == 1 and int(scene.state.player.silver) < silver_before, "2D市场买货必须同步货舱和银币")
@@ -294,6 +295,8 @@ func _run():
 	# 九港复用同一港区地图，但重新加载或走入码头视觉区域时不能篡改真实所在港口。
 	scene.state.quest_index = GameData.QUESTS.size()
 	scene.state.player.location = "alexandria_dock"
+	scene.state.cargo["venetian_glass"] = 1
+	scene.state.cargo_costs["venetian_glass"] = 24
 	scene.current_region = "city"
 	scene.current_zone = ""
 	scene.player_actor.position = scene._spawn_for_location("alexandria_dock")
@@ -305,6 +308,7 @@ func _run():
 	scene._update_nearest_actor()
 	scene._interact()
 	_check(_has_label_text(scene.overlay, "亚历山大港口市场") and _has_button_text(scene.overlay, "向亚历山大商会交付"), "非对话任务时点击亚历山大商人必须直接打开当地港口市场")
+	_check(_has_label_text(scene.overlay, "交易商人｜香料商萨米尔") and _has_label_text(scene.overlay, "本港特产｜亚历山大香料") and _has_label_text(scene.overlay, "船上外来货 · 本港收购") and _has_label_text(scene.overlay, "威尼斯玻璃 · 外来货"), "亚历山大商人必须出售自己的香料，并单独收购船上的威尼斯货物")
 	scene._close_overlay()
 	await process_frame
 
