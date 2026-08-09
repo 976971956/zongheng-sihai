@@ -16,7 +16,7 @@ func _init():
 		total_losses += int(count)
 	_check(total_losses == 0, "标准成长路线在%d次随机压测中不应出现无法继续的必败节点：%s" % [RUNS, str(milestone_losses)])
 	if failures.is_empty():
-		print("PLAYABILITY_OK: %d次正常成长压测全部通过，四层试炼与黑帆连战无卡关" % RUNS)
+		print("PLAYABILITY_OK: %d次完整成长压测全部通过，训练场、黑帆与白鲸三座四层副本无卡关" % RUNS)
 		quit(0)
 	else:
 		for failure in failures:
@@ -86,6 +86,29 @@ func _run_normal_player(seed_value):
 		return
 	_complete_current_quest(state, "captain_ledger")
 	_check(int(state.player.level) >= 15, "种子%d：黑帆章结束时应达到Lv.15，实际Lv.%d" % [seed_value, int(state.player.level)])
+
+	# 完成叙事与贸易目标后，按实际奖励成长进入白鲸号四层副本。
+	for quest_id in ["return_chart", "alisa_truth", "lighthouse_letter", "sail_lighthouse", "samir_testimony", "lighthouse_repairs", "ragusa_nightwatch", "three_port_trust", "guarded_passage", "tide_medicine", "keeper_return"]:
+		_complete_current_quest(state, quest_id)
+	state.equip_item("lighthouse_compass")
+	for quest_id in ["white_whale_news", "sail_malta", "meet_isabella", "island_feast", "wreck_entry"]:
+		_complete_current_quest(state, quest_id)
+	state.use_item("maltese_stew")
+	for encounter in [
+		{"enemy": "wreck_crab", "quest": "clear_reef", "gear": "whale_bone_sabre"},
+		{"enemy": "drowned_sailor", "quest": "drowned_deck", "gear": "survivor_coat"},
+		{"enemy": "fog_siren", "quest": "fog_hold", "gear": "siren_charm"},
+		{"enemy": "abyss_siren", "quest": "white_whale_heart", "gear": ""}
+	]:
+		_prepare_rest(state)
+		if not _fight(state, str(encounter.enemy)):
+			_record_loss("white_whale/%s" % str(encounter.enemy))
+			return
+		_complete_current_quest(state, str(encounter.quest))
+		if str(encounter.gear) != "":
+			state.equip_item(str(encounter.gear))
+	_complete_current_quest(state, "heir_testimony")
+	_check(int(state.player.level) == GameData.MAX_LEVEL, "种子%d：白鲸遗航结束时应达到Lv.%d" % [seed_value, GameData.MAX_LEVEL])
 
 func _complete_current_quest(state, expected_id):
 	var quest = state.get_current_quest()

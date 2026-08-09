@@ -42,6 +42,7 @@ var bounty_index = 0
 var bounty_progress = 0
 var bounty_cycles = 0
 var enemy_respawns = {}
+var meal_buff_battles = 0
 
 func _init():
 	rng.randomize()
@@ -70,8 +71,8 @@ func new_game():
 	trade_profit = 0
 	trade_volume = 0
 	trade_lifetime_profit = 0
-	port_reputation = {"venice_dock": 0, "ragusa_dock": 0, "alexandria_dock": 0}
-	trade_order_cycles = {"venice_dock": 0, "ragusa_dock": 0, "alexandria_dock": 0}
+	port_reputation = {"venice_dock": 0, "ragusa_dock": 0, "alexandria_dock": 0, "malta_dock": 0}
+	trade_order_cycles = {"venice_dock": 0, "ragusa_dock": 0, "alexandria_dock": 0, "malta_dock": 0}
 	completed_trade_orders = {}
 	voyage_protection = 0
 	battle_stance = "balanced"
@@ -86,6 +87,7 @@ func new_game():
 	bounty_progress = 0
 	bounty_cycles = 0
 	enemy_respawns = {}
+	meal_buff_battles = 0
 	message_history = ["你从海边小屋醒来，已经不记得自己的名字。"]
 	player.hp = get_stats().max_hp
 
@@ -128,6 +130,10 @@ func get_stats():
 		"bear_card": stats.max_hp = int(round(float(stats.max_hp) * 1.08))
 		"tide_card": stats.speed += 4
 		"corsair_card": stats.attack += 4
+	if meal_buff_battles > 0:
+		stats.max_hp += 45
+		stats.attack += 6
+		stats.defense += 3
 
 	# One online teammate grants 5% attack/defense in the original rules.
 	var team_bonus = min(0.20, float(party_members.size()) * 0.05)
@@ -196,7 +202,7 @@ func get_exit_lock(edge):
 	return "通往下一层的道路尚未开放，请先击败%s。" % GameData.ENEMIES[required_enemy].name
 
 func _is_dungeon_location(location_id):
-	return str(location_id).begins_with("training_dungeon_") or str(location_id).begins_with("black_sail_")
+	return str(location_id).begins_with("training_dungeon_") or str(location_id).begins_with("black_sail_") or str(location_id).begins_with("white_whale_")
 
 func talk_to(npc_id):
 	var location = GameData.LOCATIONS[player.location]
@@ -234,13 +240,17 @@ func use_item(item_id):
 	var before = int(player.hp)
 	var healed = 0
 	var cured = false
+	var meal_activated = false
 	if int(item.get("heal", 0)) > 0 and before < int(stats.max_hp):
 		player.hp = min(int(stats.max_hp), before + int(item.heal))
 		healed = int(player.hp) - before
 	if bool(item.get("cure_status", false)) and not statuses.is_empty():
 		statuses = {}
 		cured = true
-	if healed == 0 and not cured:
+	if int(item.get("meal_battles", 0)) > 0 and meal_buff_battles <= 0:
+		meal_buff_battles = int(item.meal_battles)
+		meal_activated = true
+	if healed == 0 and not cured and not meal_activated:
 		return {"ok": false, "message": "现在不需要使用%s。" % item.name}
 	_remove_item(item_id, 1)
 	var details = []
@@ -248,6 +258,8 @@ func use_item(item_id):
 		details.append("恢复%d点体力" % healed)
 	if cured:
 		details.append("解除所有不良状态")
+	if meal_activated:
+		details.append("接下来%d场战斗获得餐食加成" % meal_buff_battles)
 	message_history.push_front("使用%s，%s。" % [item.name, "，".join(details)])
 	_trim_history()
 	save_game()
@@ -730,7 +742,7 @@ func _finish_battle_win(enemy_id, round_logs):
 	player.silver += silver
 	var leveled = _add_xp(int(enemy.exp))
 	defeated[enemy_id] = int(defeated.get(enemy_id, 0)) + 1
-	if enemy_id in ["dungeon_guard", "stone_puppet", "tide_beast", "vermilion_phantom", "corsair_deckhand", "corsair_raider", "corsair_guard", "corsair_captain"]:
+	if _is_dungeon_location(str(player.location)):
 		dungeon_cleared[enemy_id] = true
 	if not _is_dungeon_location(str(player.location)):
 		enemy_respawns[str(enemy_id)] = float(Time.get_unix_time_from_system()) + ENEMY_RESPAWN_SECONDS
@@ -750,6 +762,7 @@ func _finish_battle_win(enemy_id, round_logs):
 	_trim_history()
 	active_battle = {}
 	statuses = {}
+	_consume_meal_battle()
 	save_game()
 	return {
 		"ok": true, "battle_over": true, "won": true, "fled": false,
@@ -770,6 +783,7 @@ func _finish_battle_loss(enemy_id, round_logs):
 	statuses = {}
 	active_battle = {}
 	dungeon_cleared = {}
+	_consume_meal_battle()
 	round_logs.append("你失去了意识。巡逻队把你送回酒馆，未损失装备和银币。")
 	message_history.push_front("挑战%s失败，被送回威尼斯酒馆。" % enemy.name)
 	_trim_history()
@@ -792,6 +806,12 @@ func _roll_attack(attack, defense, attacker_level, defender_level):
 	if crit:
 		damage = int(round(damage * 1.55))
 	return {"damage": max(1, damage), "miss": false, "crit": crit}
+
+func _consume_meal_battle():
+	if meal_buff_battles <= 0:
+		return
+	meal_buff_battles -= 1
+	player.hp = min(int(player.hp), int(get_stats().max_hp))
 
 func _add_xp(amount):
 	var leveled = false
@@ -1167,6 +1187,42 @@ func buy_max_cargo(good_id):
 func sell_all_cargo(good_id):
 	return sell_cargo(good_id, int(cargo.get(good_id, 0)))
 
+func available_recipes(port_id = ""):
+	var resolved_port = str(player.location) if str(port_id) == "" else str(port_id)
+	var recipes = []
+	for recipe_id in GameData.RECIPES:
+		var recipe = GameData.RECIPES[recipe_id]
+		if str(recipe.port) == resolved_port:
+			var entry = recipe.duplicate(true)
+			entry.id = str(recipe_id)
+			recipes.append(entry)
+	return recipes
+
+func cook_provision(recipe_id):
+	if not GameData.RECIPES.has(recipe_id):
+		return {"ok": false, "message": "这份食谱尚未学会。"}
+	var recipe = GameData.RECIPES[recipe_id]
+	if str(player.location) != str(recipe.port):
+		return {"ok": false, "message": "这份餐食只能在%s厨房烹制。" % GameData.TRADE_PORTS[str(recipe.port)].name}
+	for good_id in recipe.cargo:
+		var need = int(recipe.cargo[good_id])
+		var held = int(cargo.get(good_id, 0))
+		if held < need:
+			return {"ok": false, "message": "还缺少%s×%d，货舱现有%d。" % [GameData.TRADE_GOODS[good_id].name, need - held, held]}
+	var fee = int(recipe.get("silver", 0))
+	if int(player.silver) < fee:
+		return {"ok": false, "message": "还需要%d银币支付厨房费用。" % fee}
+	for good_id in recipe.cargo:
+		_remove_item_from_cargo(str(good_id), int(recipe.cargo[good_id]))
+	player.silver -= fee
+	trade_profit -= fee
+	_add_item(str(recipe.result), 1)
+	var quest_completed = _advance_quest("cook", str(recipe_id))
+	message_history.push_front("在马耳他厨房烹制了%s。" % recipe.name)
+	_trim_history()
+	save_game()
+	return {"ok": true, "message": "烹制完成：%s×1\n%s" % [recipe.name, recipe.description], "item": str(recipe.result), "quest_completed": quest_completed}
+
 func voyage_risk(port_id):
 	var route = GameData.trade_route(str(player.location), str(port_id))
 	if route.is_empty():
@@ -1304,7 +1360,7 @@ func save_game():
 		"equipment_upgrades": equipment_upgrades, "trade_contract_claimed": trade_contract_claimed,
 		"trade_contract_count": trade_contract_count, "active_card": active_card, "discoveries": discoveries,
 		"bounty_index": bounty_index, "bounty_progress": bounty_progress, "bounty_cycles": bounty_cycles,
-		"enemy_respawns": enemy_respawns
+		"enemy_respawns": enemy_respawns, "meal_buff_battles": meal_buff_battles
 	}
 	var file = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file:
@@ -1370,6 +1426,7 @@ func load_game():
 	if typeof(completed_trade_orders) != TYPE_DICTIONARY:
 		completed_trade_orders = {}
 	voyage_protection = clamp(int(parsed.get("voyage_protection", 0)), 0, 1)
+	meal_buff_battles = clamp(int(parsed.get("meal_buff_battles", 0)), 0, 3)
 	for trade_port_id in GameData.TRADE_PORTS:
 		port_reputation[str(trade_port_id)] = clamp(int(port_reputation.get(str(trade_port_id), 0)), 0, 30)
 		trade_order_cycles[str(trade_port_id)] = max(0, int(trade_order_cycles.get(str(trade_port_id), 0)))

@@ -149,6 +149,21 @@ func _run():
 	scene._switch_region("city", "venice_dock")
 	_check(scene.state.dungeon_cleared.is_empty(), "离开黑帆据点后必须重置逐层进度")
 
+	scene.state.quest_index = 32
+	scene.state.quest_progress = 0
+	scene.state.player.level = 20
+	scene._switch_region("city", "malta_dock")
+	_check(_has_actor(scene, "malta_keeper") and _has_actor(scene, "white_whale"), "第三卷到达马耳他后必须生成守钟人与白鲸残骸入口")
+	scene._navigate_to_quest()
+	_check(scene.task_navigation_active and scene.current_region == "city", "白鲸残骸导航必须从马耳他港步行寻找入口")
+	await _walk_task_navigation(scene)
+	_check(scene.current_region == "white_whale" and str(scene.state.player.location) == "white_whale_1", "白鲸任务导航必须进入残骸一层")
+	_check(_has_actor(scene, "wreck_crab") and not _has_actor(scene, "abyss_siren"), "白鲸残骸只能显示当前已解锁敌人")
+	_check(scene._dungeon_floor_lock("white_whale_2") != "", "未击败覆甲礁蟹时沉水甲板必须锁定")
+	scene.state.dungeon_cleared["wreck_crab"] = true
+	scene._spawn_world_actors()
+	_check(_has_actor(scene, "drowned_sailor") and scene._dungeon_floor_lock("white_whale_2") == "", "击败覆甲礁蟹后必须生成下一层敌人并开放道路")
+
 	# Validate visible encounter -> side-view battle using the same production state.
 	scene.state.quest_index = 3
 	scene.state.quest_progress = 2
@@ -271,10 +286,10 @@ func _run():
 	scene.state.bounty_index = 0
 	scene.state.bounty_progress = 3
 	scene._open_quest()
-	_check(_has_label_text(scene.overlay, "第二卷·灯塔下的回声") and _has_label_text(scene.overlay, "剧情回顾") and _has_button_text(scene.overlay, "领取悬赏奖励"), "主线结束后任务页必须显示第二卷进度、剧情回顾和可持续领取的悬赏")
+	_check(_has_label_text(scene.overlay, "第三卷·白鲸遗航") and _has_label_text(scene.overlay, "剧情回顾") and _has_button_text(scene.overlay, "领取悬赏奖励"), "主线结束后任务页必须显示第三卷进度、剧情回顾和可持续领取的悬赏")
 
 	if failures.is_empty():
-		print("WORLD_2D_OK: 移动、背包、任务、副本、逐回合自动战斗、战败回酒馆、怪物刷新与贸易全部通过")
+		print("WORLD_2D_OK: 移动、任务导航、三座副本、自动战斗、怪物刷新、四港贸易与厨房全部通过")
 		quit(0)
 	else:
 		for failure in failures:

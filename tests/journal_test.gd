@@ -39,13 +39,18 @@ func _run():
 	scene.state.quest_index = GameData.QUESTS.size()
 	scene.state.bounty_progress = int(scene.state.get_bounty().need)
 	scene._open_quest_detail()
-	_check(_has_text(scene.modal_layer, "第二卷") and _has_button(scene.modal_layer, "领取悬赏奖励"), "完整日志在第二卷结束后必须衔接循环悬赏")
+	_check(_has_text(scene.modal_layer, "第三卷") and _has_button(scene.modal_layer, "领取悬赏奖励"), "完整日志在第三卷结束后必须衔接循环悬赏")
 	scene._close_modal()
 
 	scene.state.player.location = "venice_dock"
 	scene.state.player.silver = 1000
 	scene._open_harbor()
 	_check(_has_text(scene.modal_layer, "持有银币") and _has_text(scene.modal_layer, "浮动") and _has_text(scene.modal_layer, "商会推荐") and _has_text(scene.modal_layer, "港口订单") and _has_text(scene.modal_layer, "总声望") and _has_button(scene.modal_layer, "护航物资") and _has_button(scene.modal_layer, "买满") and _has_button(scene.modal_layer, "全卖") and _has_button(scene.modal_layer, "加固船体"), "完整日志贸易页必须包含钱包、订单声望、护航、批量交易、商路推荐与船体改造")
+	scene._close_modal()
+	scene.state.player.location = "malta_dock"
+	scene.state.cargo = {"citrus": 2, "olive_oil": 1, "spices": 1}
+	scene._open_harbor()
+	_check(_has_text(scene.modal_layer, "马耳他港口市场") and _has_text(scene.modal_layer, "港口厨房") and _has_button(scene.modal_layer, "烹制"), "马耳他贸易页必须显示厨房配方与烹制操作")
 
 	if failures.is_empty():
 		print("JOURNAL_OK: 完整日志的任务、怪物卡、悬赏与贸易入口全部通过")

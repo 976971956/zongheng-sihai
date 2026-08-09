@@ -686,6 +686,8 @@ func _audio_region_for_location(location_id):
 		return "dungeon"
 	if location_id.begins_with("black_sail_"):
 		return "black_sail"
+	if location_id.begins_with("white_whale_"):
+		return "white_whale"
 	if location_id in ["residential_quarter", "venice_mine", "venice_back_hill", "venice_wildwood", "venice_north_gate"]:
 		return "field"
 	return "city"
@@ -1553,7 +1555,7 @@ func _open_quest_detail():
 		content.add_child(recap)
 	var quest = state.get_current_quest()
 	if quest.is_empty():
-		content.add_child(_empty_state("第二卷·灯塔下的回声已完成。三港星图与灯塔星盘把下一段航路指向马耳他。"))
+		content.add_child(_empty_state("第三卷·白鲸遗航已完成。白鲸号家书把下一段航路指向开普敦北河潮门。"))
 	else:
 		content.add_child(_label(quest.title, 20, GOLD))
 		content.add_child(_label(quest.story, 13, Color("b7cfd5")))
@@ -1631,6 +1633,16 @@ func _quest_route_hint(index):
 		"three_port_trust": "完成任意港口订单或盈利出售货物 → 三港总声望达到6",
 		"guarded_passage": "任意港口 → 购买护航物资",
 		"tide_medicine": "亚历山大买4袋东方香料 → 航行威尼斯 → 交付订单",
+		"white_whale_news": "海边小屋 → 与艾丽莎交谈",
+		"sail_malta": "威尼斯码头 → 启航前往马耳他",
+		"meet_isabella": "马耳他港 → 与守钟人伊莎贝拉交谈",
+		"island_feast": "马耳他港购买配料 → 港口厨房烹制海风炖汤",
+		"wreck_entry": "马耳他港 → 步行进入白鲸号残骸",
+		"clear_reef": "白鲸残骸一层 → 击败覆甲礁蟹",
+		"drowned_deck": "白鲸残骸二层 → 击败溺潮水手",
+		"fog_hold": "白鲸残骸三层 → 击败雾歌海妖",
+		"white_whale_heart": "白鲸残骸四层 → 击败深渊海妖",
+		"heir_testimony": "返回马耳他港 → 与伊莎贝拉交谈",
 		"keeper_return": "威尼斯码头 → 步行老海鸥酒馆 → 解读星图"
 	}
 	return str(routes.get(quest_id, "打开2D世界的任务导航寻找当前目标。"))
@@ -1749,6 +1761,24 @@ func _open_harbor():
 		order_claim.pressed.connect(_claim_trade_order_from_journal)
 		order_row.add_child(order_claim)
 		market.add_child(order_row)
+	for recipe in state.available_recipes(port_id):
+		var ingredients = []
+		var can_cook = int(state.player.silver) >= int(recipe.silver)
+		for good_id in recipe.cargo:
+			var need = int(recipe.cargo[good_id])
+			var held = int(state.cargo.get(good_id, 0))
+			ingredients.append("%s %d/%d" % [GameData.TRADE_GOODS[good_id].name, held, need])
+			can_cook = can_cook and held >= need
+		var recipe_row = HBoxContainer.new()
+		recipe_row.add_theme_constant_override("separation", 8)
+		var recipe_info = _label("港口厨房｜%s\n%s｜费用%d银币" % [recipe.name, "、".join(ingredients), int(recipe.silver)], 11, GOLD)
+		recipe_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		recipe_row.add_child(recipe_info)
+		var cook = _button("烹制", "gold")
+		cook.disabled = not can_cook
+		cook.pressed.connect(_cook_recipe.bind(str(recipe.id)))
+		recipe_row.add_child(cook)
+		market.add_child(recipe_row)
 	var protection = _button("护航物资已装船" if state.voyage_protection > 0 else "购买护航物资 45银 · 下次航行免损", "ghost")
 	protection.disabled = state.voyage_protection > 0 or int(state.player.silver) < 45
 	protection.pressed.connect(_buy_voyage_protection_from_journal)
@@ -1856,6 +1886,16 @@ func _trade_sell(good_id, sell_all = false):
 	refresh_ui()
 	_show_toast(result.message, result.ok)
 	call_deferred("_open_harbor")
+
+func _cook_recipe(recipe_id):
+	var result = state.cook_provision(recipe_id)
+	_close_modal()
+	refresh_ui()
+	_show_toast(str(result.get("message", "无法烹制")), bool(result.get("ok", false)))
+	if bool(result.get("quest_completed", false)):
+		call_deferred("_show_quest_completion_prompt")
+	else:
+		call_deferred("_open_harbor")
 
 func _trade_sail(destination):
 	var result = state.sail_to(destination)

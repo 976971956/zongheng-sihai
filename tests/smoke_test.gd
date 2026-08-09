@@ -161,8 +161,48 @@ func _init():
 	state.talk_to("tavern_keeper")
 	var volume_two_reward = _claim(state, "keeper_return")
 	_check(volume_two_reward.reward_item == "lighthouse_compass" and state.equip_item("lighthouse_compass").ok, "第二卷结局必须奖励可装备的灯塔星盘")
-	_check(state.get_current_quest().is_empty() and int(state.player.level) == GameData.MAX_LEVEL, "两卷完整主线必须支持成长至Lv.20")
+	_check(state.get_current_quest().id == "white_whale_news" and int(state.player.level) >= 20, "第二卷结束后必须立即接续第三卷白鲸号线索")
 	_check(str(state.player.title) == "灯塔守望者", "第二卷结局必须授予灯塔守望者称号")
+
+	state.player.location = "alisa_hut"
+	state.talk_to("alisa")
+	_claim(state, "white_whale_news")
+	state.player.location = "venice_dock"
+	var malta_voyage = state.sail_to("malta_dock")
+	_check(bool(malta_voyage.ok) and str(state.player.location) == "malta_dock", "第四港马耳他必须能从威尼斯直航抵达")
+	_claim(state, "sail_malta")
+	state.talk_to("malta_keeper")
+	_claim(state, "meet_isabella")
+	state.buy_cargo("citrus", 2)
+	state.buy_cargo("olive_oil", 1)
+	state.buy_cargo("spices", 1)
+	var cooking = state.cook_provision("maltese_stew")
+	_check(bool(cooking.ok) and bool(cooking.quest_completed) and int(state.inventory.get("maltese_stew", 0)) == 1, "马耳他厨房必须消耗贸易货物并产出可用餐食")
+	_claim(state, "island_feast")
+	var attack_without_meal = int(state.get_stats().attack)
+	var eat = state.use_item("maltese_stew")
+	_check(bool(eat.ok) and state.meal_buff_battles == 3 and int(state.get_stats().attack) == attack_without_meal + 6, "海风炖汤必须提供持续3场战斗的真实属性加成")
+	state.arrive_from_2d("white_whale_1")
+	_claim(state, "wreck_entry")
+	_check(not state.move_to("white_whale_2").ok, "未击败覆甲礁蟹时必须锁住沉水甲板")
+	_win_times(state, "wreck_crab", 1)
+	_claim(state, "clear_reef")
+	_check(state.move_to("white_whale_2").ok, "击败覆甲礁蟹后必须开放沉水甲板")
+	_win_times(state, "drowned_sailor", 1)
+	_claim(state, "drowned_deck")
+	_check(state.move_to("white_whale_3").ok, "击败溺潮水手后必须开放雾锁货舱")
+	_win_times(state, "fog_siren", 1)
+	_claim(state, "fog_hold")
+	_check(state.move_to("white_whale_4").ok, "击败雾歌海妖后必须开放鲸心船舱")
+	_win_times(state, "abyss_siren", 1)
+	_claim(state, "white_whale_heart")
+	_check(state.meal_buff_battles == 0, "远航餐食必须按完成的战斗场次正确消耗")
+	state.player.location = "malta_dock"
+	state.talk_to("malta_keeper")
+	var volume_three_reward = _claim(state, "heir_testimony")
+	_check(volume_three_reward.reward_item == "white_whale_coat" and state.equip_item("white_whale_coat").ok, "第三卷结局必须奖励可装备的白鲸守望衣")
+	_check(state.get_current_quest().is_empty() and int(state.player.level) == GameData.MAX_LEVEL, "三卷完整主线必须支持成长至Lv.30")
+	_check(str(state.player.title) == "白鲸继航者", "第三卷结局必须授予白鲸继航者称号")
 
 	state.inventory["ghost_card"] = 1
 	var defense_before_card = int(state.get_stats().defense)
@@ -182,7 +222,7 @@ func _init():
 	var silver_before = int(state.player.silver)
 	var identify = state.identify_unknown()
 	_check(identify.ok and int(state.player.silver) == silver_before - 5, "未知道具应消耗5银币并成功鉴定")
-	_check(GameData.LOCATIONS.size() == 20, "世界图应包含威尼斯、贸易港和两座四层副本")
+	_check(GameData.LOCATIONS.size() == 25, "世界图应包含威尼斯、四座贸易港和三座四层副本")
 	_check(GameData.SLOT_NAMES.has("waist"), "装备系统应包含腰部槽位")
 	state.player.level = GameData.MAX_LEVEL
 	state.player.xp = 350
@@ -199,7 +239,7 @@ func _init():
 	_check(not dungeon_reset.move_to("training_dungeon_2").ok, "离开副本后必须重置逐层解锁进度")
 
 	if failures.is_empty():
-		print("SMOKE_OK: 两卷主线、逐层副本、港口订单、声望、护航与贸易利润全部通过")
+		print("SMOKE_OK: 三卷主线、三座逐层副本、四港贸易、烹饪补给与成长闭环全部通过")
 		quit(0)
 	else:
 		for failure in failures:

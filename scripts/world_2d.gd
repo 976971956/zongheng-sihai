@@ -37,6 +37,10 @@ const ENEMY_SPAWNS = {
 	,"corsair_raider": {"region": "black_sail", "name": "黑帆袭击者", "position": Vector2(360, 680), "color": Color("56463e"), "accent": Color("c77b49"), "location": "black_sail_2"}
 	,"corsair_guard": {"region": "black_sail", "name": "黑帆重卫", "position": Vector2(360, 425), "color": Color("536573"), "accent": Color("d4b85c"), "location": "black_sail_3"}
 	,"corsair_captain": {"region": "black_sail", "name": "船长雷蒙", "position": Vector2(360, 225), "color": Color("263d57"), "accent": Color("e3bd5b"), "location": "black_sail_4"}
+	,"wreck_crab": {"region": "white_whale", "name": "覆甲礁蟹", "position": Vector2(360, 930), "color": Color("536f72"), "accent": Color("d7c58b"), "location": "white_whale_1"}
+	,"drowned_sailor": {"region": "white_whale", "name": "溺潮水手", "position": Vector2(360, 680), "color": Color("315b67"), "accent": Color("79cbd0"), "location": "white_whale_2"}
+	,"fog_siren": {"region": "white_whale", "name": "雾歌海妖", "position": Vector2(360, 425), "color": Color("55718b"), "accent": Color("b5e8e4"), "location": "white_whale_3"}
+	,"abyss_siren": {"region": "white_whale", "name": "深渊海妖·涅瑞娅", "position": Vector2(360, 225), "color": Color("203e61"), "accent": Color("6be1d3"), "location": "white_whale_4"}
 }
 
 const DISCOVERY_SPAWNS = {
@@ -97,10 +101,11 @@ var task_navigation_open_service = ""
 var region_by_location = {
 	"alisa_hut": "city", "venice_tavern": "city", "venice_square": "city",
 	"venice_market": "city", "venice_dock": "city", "venice_north_gate": "city",
-	"ragusa_dock": "city", "alexandria_dock": "city",
+	"ragusa_dock": "city", "alexandria_dock": "city", "malta_dock": "city",
 	"residential_quarter": "field", "venice_mine": "field", "venice_back_hill": "field", "venice_wildwood": "field",
 	"training_dungeon_1": "dungeon", "training_dungeon_2": "dungeon", "training_dungeon_3": "dungeon", "training_dungeon_4": "dungeon"
 	,"black_sail_1": "black_sail", "black_sail_2": "black_sail", "black_sail_3": "black_sail", "black_sail_4": "black_sail"
+	,"white_whale_1": "white_whale", "white_whale_2": "white_whale", "white_whale_3": "white_whale", "white_whale_4": "white_whale"
 }
 
 var region_zones = {
@@ -129,6 +134,12 @@ var region_zones = {
 		"black_sail_2": {"point": Vector2(360, 720), "radius": 105},
 		"black_sail_3": {"point": Vector2(360, 465), "radius": 105},
 		"black_sail_4": {"point": Vector2(360, 210), "radius": 115}
+	},
+	"white_whale": {
+		"white_whale_1": {"point": Vector2(360, 970), "radius": 115},
+		"white_whale_2": {"point": Vector2(360, 720), "radius": 105},
+		"white_whale_3": {"point": Vector2(360, 465), "radius": 105},
+		"white_whale_4": {"point": Vector2(360, 210), "radius": 115}
 	}
 }
 
@@ -136,7 +147,8 @@ var region_obstacles = {
 	"city": [Rect2(20, 160, 170, 190), Rect2(20, 730, 210, 190), Rect2(530, 160, 170, 230), Rect2(235, 25, 80, 200), Rect2(405, 25, 80, 200)],
 	"field": [Rect2(495, 135, 225, 285), Rect2(20, 835, 235, 195), Rect2(465, 815, 235, 205)],
 	"dungeon": [Rect2(0, 285, 295, 58), Rect2(425, 285, 295, 58), Rect2(0, 540, 295, 58), Rect2(425, 540, 295, 58), Rect2(0, 795, 295, 58), Rect2(425, 795, 295, 58)],
-	"black_sail": [Rect2(0, 285, 295, 58), Rect2(425, 285, 295, 58), Rect2(0, 540, 295, 58), Rect2(425, 540, 295, 58), Rect2(0, 795, 295, 58), Rect2(425, 795, 295, 58)]
+	"black_sail": [Rect2(0, 285, 295, 58), Rect2(425, 285, 295, 58), Rect2(0, 540, 295, 58), Rect2(425, 540, 295, 58), Rect2(0, 795, 295, 58), Rect2(425, 795, 295, 58)],
+	"white_whale": [Rect2(0, 285, 295, 58), Rect2(425, 285, 295, 58), Rect2(0, 540, 295, 58), Rect2(425, 540, 295, 58), Rect2(0, 795, 295, 58), Rect2(425, 795, 295, 58)]
 }
 
 func _ready():
@@ -245,13 +257,17 @@ func _spawn_world_actors():
 			_add_actor("npc", "ragusa_broker", "拉古萨经纪人", Vector2(205, 870), Color("665044"), GOLD, "ragusa_dock")
 		elif active_port == "alexandria_dock":
 			_add_actor("npc", "alexandria_merchant", "香料商萨米尔", Vector2(205, 870), Color("6d563e"), GOLD, "alexandria_dock")
+		elif active_port == "malta_dock":
+			_add_actor("npc", "malta_keeper", "守钟人伊莎贝拉", Vector2(205, 870), Color("49697a"), GOLD, "malta_dock")
+			if state.quest_index >= 32:
+				_add_actor("travel", "white_whale", "白鲸号残骸", Vector2(520, 910), Color("315d66"), TEAL, "white_whale_1")
 		else:
 			_add_actor("npc", "alisa", "艾丽莎", Vector2(150, 365), Color("628ec6"), Color("f2d58b"), "alisa_hut")
 			_add_actor("npc", "tavern_keeper", "酒馆老板", Vector2(180, 675), Color("8c6750"), Color("c78d52"), "venice_tavern")
 			_add_actor("npc", "ship_owner", "船老板", Vector2(205, 870), Color("3d7287"), Color("d6b35c"), "venice_dock")
 			_spawn_enemy_if_ready("drunk_sailor")
 			_add_actor("travel", "field", "前往城外", Vector2(455, 285), Color("547b61"), GOLD, "residential_quarter")
-		if state.quest_index >= 12:
+		if active_port not in ["ragusa_dock", "alexandria_dock", "malta_dock"] and state.quest_index >= 12:
 			_add_actor("travel", "black_sail", "黑帆据点", Vector2(520, 910), Color("493b45"), RED, "black_sail_1")
 	elif current_region == "field":
 		_spawn_enemy_if_ready("sewer_rat")
@@ -263,9 +279,12 @@ func _spawn_world_actors():
 	elif current_region == "dungeon":
 		_spawn_next_dungeon_enemy(["dungeon_guard", "stone_puppet", "tide_beast", "vermilion_phantom"])
 		_add_actor("travel", "field", "离开副本", Vector2(215, 1080), Color("4e7781"), GOLD, "residential_quarter")
-	else:
+	elif current_region == "black_sail":
 		_spawn_next_dungeon_enemy(["corsair_deckhand", "corsair_raider", "corsair_guard", "corsair_captain"])
 		_add_actor("travel", "city", "返回港口", Vector2(215, 1080), Color("4e7781"), GOLD, "venice_dock")
+	else:
+		_spawn_next_dungeon_enemy(["wreck_crab", "drowned_sailor", "fog_siren", "abyss_siren"])
+		_add_actor("travel", "city", "返回马耳他", Vector2(215, 1080), Color("4e7781"), GOLD, "malta_dock")
 	for discovery_id in DISCOVERY_SPAWNS:
 		_spawn_discovery_if_available(discovery_id)
 
@@ -281,7 +300,7 @@ func _spawn_discovery_if_available(discovery_id):
 	var spawn = DISCOVERY_SPAWNS[discovery_id]
 	if str(spawn.region) != current_region:
 		return
-	if current_region in ["dungeon", "black_sail"] and _dungeon_floor_lock(str(spawn.location)) != "":
+	if current_region in ["dungeon", "black_sail", "white_whale"] and _dungeon_floor_lock(str(spawn.location)) != "":
 		return
 	var data = GameData.DISCOVERIES[discovery_id]
 	_add_actor("discovery", discovery_id, data.name, spawn.position, Color("735a2f"), GOLD, spawn.location)
@@ -350,7 +369,7 @@ func _try_respawn_enemy(enemy_id, scheduled_deadline = -1.0):
 	var data = ENEMY_SPAWNS.get(enemy_id, {})
 	if data.is_empty():
 		return
-	if str(data.region) in ["dungeon", "black_sail"] and bool(state.dungeon_cleared.get(enemy_id, false)):
+	if str(data.region) in ["dungeon", "black_sail", "white_whale"] and bool(state.dungeon_cleared.get(enemy_id, false)):
 		state.enemy_respawns.erase(key)
 		return
 	if str(data.region) != current_region:
@@ -385,7 +404,7 @@ func _despawn_defeated_enemy():
 		nearest_actor = {}
 		action_button.text = "敌人已击败"
 		action_button.disabled = true
-	if current_region in ["dungeon", "black_sail"]:
+	if current_region in ["dungeon", "black_sail", "white_whale"]:
 		state.enemy_respawns.erase(_enemy_spawn_key(enemy_id))
 		call_deferred("_spawn_world_actors")
 		call_deferred("_refresh_waypoint")
@@ -422,13 +441,15 @@ func _spawn_for_location(location_id):
 		"alisa_hut": Vector2(250, 365), "venice_tavern": Vector2(250, 690),
 		"venice_square": Vector2(360, 790), "venice_market": Vector2(450, 700),
 		"venice_dock": Vector2(360, 915), "venice_north_gate": Vector2(360, 365),
-		"ragusa_dock": Vector2(360, 915), "alexandria_dock": Vector2(360, 915),
+		"ragusa_dock": Vector2(360, 915), "alexandria_dock": Vector2(360, 915), "malta_dock": Vector2(360, 915),
 		"residential_quarter": Vector2(350, 1045), "venice_mine": Vector2(500, 505),
 		"venice_back_hill": Vector2(230, 450), "venice_wildwood": Vector2(500, 820),
 		"training_dungeon_1": Vector2(360, 1025), "training_dungeon_2": Vector2(360, 775),
 		"training_dungeon_3": Vector2(360, 520), "training_dungeon_4": Vector2(360, 285)
 		,"black_sail_1": Vector2(360, 1025), "black_sail_2": Vector2(360, 775),
-		"black_sail_3": Vector2(360, 520), "black_sail_4": Vector2(360, 285)
+		"black_sail_3": Vector2(360, 520), "black_sail_4": Vector2(360, 285),
+		"white_whale_1": Vector2(360, 1025), "white_whale_2": Vector2(360, 775),
+		"white_whale_3": Vector2(360, 520), "white_whale_4": Vector2(360, 285)
 	}
 	if overrides.has(location_id):
 		return _world_point(overrides[location_id])
@@ -655,7 +676,7 @@ func _update_nearest_actor():
 			action_button.text = "进入 · %s" % nearest_actor.name
 		elif nearest_actor.kind == "discovery":
 			action_button.text = "调查 · %s" % nearest_actor.name
-		elif str(nearest_actor.id) in ["ship_owner", "ragusa_broker", "alexandria_merchant"] and state.is_trade_unlocked() and not _is_current_talk_target(str(nearest_actor.id)):
+		elif str(nearest_actor.id) in ["ship_owner", "ragusa_broker", "alexandria_merchant", "malta_keeper"] and state.is_trade_unlocked() and not _is_current_talk_target(str(nearest_actor.id)):
 			action_button.text = "港口贸易 · %s" % str(nearest_actor.name)
 		else:
 			action_button.text = ("交谈 · " if nearest_actor.kind == "npc" else "挑战 · ") + nearest_actor.name
@@ -671,7 +692,7 @@ func _update_zone(force):
 			best_id = location_id
 	if best_id == "":
 		return
-	if current_region in ["dungeon", "black_sail"]:
+	if current_region in ["dungeon", "black_sail", "white_whale"]:
 		var floor_lock = _dungeon_floor_lock(best_id)
 		if floor_lock != "":
 			hint_label.text = floor_lock
@@ -701,7 +722,10 @@ func _dungeon_floor_lock(location_id):
 		"training_dungeon_4": "tide_beast",
 		"black_sail_2": "corsair_deckhand",
 		"black_sail_3": "corsair_raider",
-		"black_sail_4": "corsair_guard"
+		"black_sail_4": "corsair_guard",
+		"white_whale_2": "wreck_crab",
+		"white_whale_3": "drowned_sailor",
+		"white_whale_4": "fog_siren"
 	}
 	var required_enemy = str(requirements.get(location_id, ""))
 	if required_enemy == "" or bool(state.dungeon_cleared.get(required_enemy, false)):
@@ -732,7 +756,7 @@ func _interact():
 		_switch_region(str(nearest_actor.id), str(nearest_actor.location))
 		return
 	var actor_location = str(nearest_actor.get("location", ""))
-	if current_region in ["dungeon", "black_sail"]:
+	if current_region in ["dungeon", "black_sail", "white_whale"]:
 		var floor_lock = _dungeon_floor_lock(actor_location)
 		if floor_lock != "":
 			_show_message("道路尚未开放", floor_lock)
@@ -752,7 +776,7 @@ func _interact():
 			_show_message("无法调查", str(discovery_result.get("message", "这里什么也没有。")))
 		return
 	if nearest_actor.kind == "npc":
-		if str(nearest_actor.id) in ["ship_owner", "ragusa_broker", "alexandria_merchant"] and state.is_trade_unlocked() and not _is_current_talk_target(str(nearest_actor.id)):
+		if str(nearest_actor.id) in ["ship_owner", "ragusa_broker", "alexandria_merchant", "malta_keeper"] and state.is_trade_unlocked() and not _is_current_talk_target(str(nearest_actor.id)):
 			_open_trade_2d()
 			return
 		var result = state.talk_to(nearest_actor.id)
@@ -778,8 +802,11 @@ func _switch_region(region_id, entrance_location):
 	if region_id == "black_sail" and int(state.player.level) < 6:
 		_show_message("黑帆据点尚未开放", "需要达到 Lv.6 并完成威尼斯试炼后才能追踪黑帆航线。")
 		return
+	if region_id == "white_whale" and int(state.player.level) < 20:
+		_show_message("残骸海域尚未开放", "需要达到 Lv.20，并在马耳他准备好远航补给。")
+		return
 	var previous_region = current_region
-	var dungeon_regions = ["dungeon", "black_sail"]
+	var dungeon_regions = ["dungeon", "black_sail", "white_whale"]
 	if previous_region != region_id and (previous_region in dungeon_regions or region_id in dungeon_regions):
 		state.dungeon_cleared = {}
 	current_region = region_id
@@ -790,6 +817,8 @@ func _switch_region(region_id, entrance_location):
 		target_location = "training_dungeon_1"
 	elif current_region == "black_sail" and _dungeon_floor_lock(target_location) != "":
 		target_location = "black_sail_1"
+	elif current_region == "white_whale" and _dungeon_floor_lock(target_location) != "":
+		target_location = "white_whale_1"
 	var arrival = state.arrive_from_2d(target_location)
 	map_node.set_region(current_region)
 	_spawn_world_actors()
@@ -862,7 +891,7 @@ func _claim_quest_2d():
 	content.add_child(_label(str(result.reward_text), 18, TEAL))
 	var next_quest = state.get_current_quest()
 	if next_quest.is_empty():
-		content.add_child(_label("第二卷·灯塔下的回声完成！三港星图已经指出下一站：马耳他。", 17, INK))
+		content.add_child(_label("第三卷·白鲸遗航完成！家书与守望衣已经指出下一站：开普敦北河潮门。", 17, INK))
 	else:
 		content.add_child(_label("下一个任务｜%s" % next_quest.title, 20, GOLD))
 		var story = _label(next_quest.story, 16, MUTED)
@@ -1359,8 +1388,8 @@ func _open_quest():
 		content.add_child(recap)
 	var quest = state.get_current_quest()
 	if quest.is_empty():
-		content.add_child(_label("第二卷·灯塔下的回声已完成", 22, GOLD))
-		var epilogue = _label("你取得三港星图与灯塔星盘，确认艾丽莎的父亲最后驶向马耳他。港口订单、行情贸易、悬赏与副本仍会继续记录你的航海生涯。\n\n当前称号：%s" % str(state.player.title), 16, TEAL)
+		content.add_child(_label("第三卷·白鲸遗航已完成", 22, GOLD))
+		var epilogue = _label("你在马耳他找回白鲸号家书，确认失踪者的后裔仍在世，也得到了通往开普敦北河潮门的航路。港口订单、烹饪、行情贸易、悬赏与副本仍会继续记录你的航海生涯。\n\n当前称号：%s" % str(state.player.title), 16, TEAL)
 		epilogue.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		content.add_child(epilogue)
 	else:
@@ -1426,6 +1455,8 @@ func _quest_navigation_target():
 	elif objective.type == "trade_order":
 		var order = GameData.TRADE_ORDERS.get(str(objective.target), {})
 		target_location = str(order.get("port", "venice_dock"))
+	elif objective.type == "cook":
+		target_location = str(GameData.RECIPES.get(str(objective.target), {"port": "malta_dock"}).port)
 	elif objective.type in ["trade_buy", "trade_sell", "trade_reputation", "prepare_voyage", "upgrade_ship"]:
 		target_location = str(state.player.location) if str(state.player.location) in GameData.TRADE_PORTS else "venice_dock"
 	elif objective.type == "upgrade_equipment":
@@ -1439,7 +1470,7 @@ func _quest_navigation_target():
 			return {"region": "dungeon", "location": "training_dungeon_3", "actor_id": "tide_beast", "name": "三层潮汐兽"}
 	if target_location == "":
 		target_location = "venice_square"
-	var actor_id = "" if objective.type in ["visit", "trade_order", "trade_reputation", "prepare_voyage", "trade_buy", "trade_sell", "upgrade_ship"] else str(objective.target)
+	var actor_id = "" if objective.type in ["visit", "trade_order", "trade_reputation", "prepare_voyage", "trade_buy", "trade_sell", "upgrade_ship", "cook"] else str(objective.target)
 	return {
 		"region": str(region_by_location.get(target_location, "city")),
 		"location": target_location, "actor_id": actor_id,
@@ -1486,7 +1517,7 @@ func _navigate_to_quest():
 	if not quest.is_empty() and str(quest.objective.type) == "upgrade_equipment":
 		_open_inventory()
 		return
-	var needs_harbor = not quest.is_empty() and (str(quest.objective.type) in ["trade_buy", "trade_sell", "trade_order", "trade_reputation", "prepare_voyage", "upgrade_ship"] or (str(quest.objective.type) == "visit" and str(quest.objective.target) in GameData.TRADE_PORTS))
+	var needs_harbor = not quest.is_empty() and (str(quest.objective.type) in ["trade_buy", "trade_sell", "trade_order", "trade_reputation", "prepare_voyage", "upgrade_ship", "cook"] or (str(quest.objective.type) == "visit" and str(quest.objective.target) in GameData.TRADE_PORTS))
 	if needs_harbor:
 		if str(state.player.location) in GameData.TRADE_PORTS:
 			_open_trade_2d()
@@ -1543,12 +1574,16 @@ func _task_navigation_next_region(from_region, target_region):
 		return str(target_region)
 	match str(from_region):
 		"city":
-			return "black_sail" if str(target_region) == "black_sail" else "field"
+			if str(target_region) in ["black_sail", "white_whale"]:
+				return str(target_region)
+			return "field"
 		"field":
 			return "dungeon" if str(target_region) == "dungeon" else "city"
 		"dungeon":
 			return "field"
 		"black_sail":
+			return "city"
+		"white_whale":
 			return "city"
 		_:
 			return str(target_region)
@@ -1663,14 +1698,16 @@ func _open_world_map():
 		{"title": "威尼斯城外", "locations": ["residential_quarter", "venice_mine", "venice_back_hill", "venice_wildwood"]},
 		{"title": "四层经验副本", "locations": ["training_dungeon_1", "training_dungeon_2", "training_dungeon_3", "training_dungeon_4"]}
 		,{"title": "黑帆据点", "locations": ["black_sail_1", "black_sail_2", "black_sail_3", "black_sail_4"]}
+		,{"title": "白鲸号残骸", "locations": ["white_whale_1", "white_whale_2", "white_whale_3", "white_whale_4"]}
 	]:
 		list.add_child(_label(group.title, 17, TEAL))
 		for location_id in group.locations:
 			var destination = _button(GameData.LOCATIONS[location_id].name, "ghost")
 			var is_training = str(location_id).begins_with("training_dungeon_")
 			var is_black_sail = str(location_id).begins_with("black_sail_")
-			var lock_text = _dungeon_floor_lock(location_id) if is_training or is_black_sail else ""
-			destination.disabled = lock_text != "" or (is_training and int(state.player.level) < 3) or (is_black_sail and (int(state.player.level) < 6 or state.quest_index < 12))
+			var is_white_whale = str(location_id).begins_with("white_whale_")
+			var lock_text = _dungeon_floor_lock(location_id) if is_training or is_black_sail or is_white_whale else ""
+			destination.disabled = lock_text != "" or (is_training and int(state.player.level) < 3) or (is_black_sail and (int(state.player.level) < 6 or state.quest_index < 12)) or (is_white_whale and (int(state.player.level) < 20 or state.quest_index < 32))
 			destination.tooltip_text = lock_text
 			destination.pressed.connect(_travel_to_location.bind(location_id))
 			list.add_child(destination)
@@ -1689,6 +1726,7 @@ func _region_name(region_id):
 		"field": return "威尼斯城外"
 		"dungeon": return "四层经验副本"
 		"black_sail": return "黑帆据点"
+		"white_whale": return "白鲸号残骸"
 		_: return "威尼斯城内"
 
 func _open_trade_2d():
@@ -1745,6 +1783,28 @@ func _open_trade_2d():
 		order_panel.add_theme_stylebox_override("panel", _style(Color(0.18, 0.13, 0.03, 0.9), 11, Color(GOLD, 0.5), 1, 11))
 		order_panel.add_child(order_card)
 		list.add_child(order_panel)
+	for recipe in state.available_recipes(port_id):
+		var ingredients = []
+		var can_cook = int(state.player.silver) >= int(recipe.silver)
+		for good_id in recipe.cargo:
+			var need = int(recipe.cargo[good_id])
+			var held = int(state.cargo.get(good_id, 0))
+			ingredients.append("%s %d/%d" % [GameData.TRADE_GOODS[good_id].name, held, need])
+			can_cook = can_cook and held >= need
+		var recipe_card = VBoxContainer.new()
+		recipe_card.add_theme_constant_override("separation", 6)
+		recipe_card.add_child(_label("港口厨房｜%s" % recipe.name, 16, GOLD))
+		var recipe_copy = _label("%s\n材料：%s｜厨房费%d银币" % [recipe.description, "、".join(ingredients), int(recipe.silver)], 13, INK)
+		recipe_copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		recipe_card.add_child(recipe_copy)
+		var cook_button = _button("烹制远航餐食", "gold")
+		cook_button.disabled = not can_cook
+		cook_button.pressed.connect(_cook_recipe_2d.bind(str(recipe.id)))
+		recipe_card.add_child(cook_button)
+		var recipe_panel = PanelContainer.new()
+		recipe_panel.add_theme_stylebox_override("panel", _style(Color(0.12, 0.14, 0.06, 0.92), 11, Color(GOLD, 0.5), 1, 11))
+		recipe_panel.add_child(recipe_card)
+		list.add_child(recipe_panel)
 	var protection_text = "护航物资已装船｜下次航行风险-8，并免除一次风暴损失" if state.voyage_protection > 0 else "购买护航物资 45银｜下次航行风险-8，并免除一次风暴损失"
 	var protection = _button(protection_text, "primary" if state.voyage_protection <= 0 else "ghost")
 	protection.disabled = state.voyage_protection > 0 or int(state.player.silver) < 45
@@ -1832,6 +1892,18 @@ func _trade_buy_2d(good_id, buy_max = false):
 		call_deferred("_show_quest_claim")
 	else:
 		call_deferred("_open_trade_2d")
+
+func _cook_recipe_2d(recipe_id):
+	var result = state.cook_provision(recipe_id)
+	_refresh_hud()
+	_close_overlay()
+	if bool(result.get("quest_completed", false)):
+		AudioDirector.play_sfx("reward")
+		call_deferred("_show_quest_claim")
+	elif bool(result.get("ok", false)):
+		_show_message("烹制完成", str(result.message))
+	else:
+		_show_message("无法烹制", str(result.get("message", "材料不足")))
 
 func _trade_sell_2d(good_id, sell_all = false):
 	var result = state.sell_all_cargo(good_id) if sell_all else state.sell_cargo(good_id)

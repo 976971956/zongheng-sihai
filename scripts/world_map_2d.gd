@@ -22,7 +22,7 @@ func _draw():
 	var texture = CITY_ART
 	if region_mode == "field":
 		texture = FIELD_ART
-	elif region_mode in ["dungeon", "black_sail"]:
+	elif region_mode in ["dungeon", "black_sail", "white_whale"]:
 		texture = DUNGEON_ART
 	draw_texture_rect(texture, Rect2(Vector2.ZERO, WORLD_SIZE), false)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * WORLD_SCALE)
@@ -48,7 +48,7 @@ func _draw_art_overlays():
 		# Firelight pulse ties the four training chambers together.
 		var pulse = 0.025 + (sin(wave_time * 2.4) + 1.0) * 0.012
 		draw_circle(Vector2(360, 170), 118, Color(0.95, 0.25, 0.12, pulse))
-	else:
+	elif region_mode == "black_sail":
 		# The corsair stronghold reuses the stone layout but has its own ominous
 		# lighting, torn sails and crossed-cutlass insignia.
 		draw_rect(Rect2(0, 0, 720, 1280), Color(0.16, 0.015, 0.028, 0.26))
@@ -69,6 +69,18 @@ func _draw_art_overlays():
 		]), PackedColorArray([Color(0.02, 0.02, 0.028, 0.9)]))
 		draw_line(Vector2(325, 72), Vector2(325, 182), Color(0.62, 0.42, 0.26, 0.9), 5)
 		draw_circle(Vector2(351, 128), 9, Color(0.68, 0.08, 0.10, 0.9))
+	else:
+		# 白鲸号残骸：冷蓝潮光、船肋与漂移海雾让共用的四层结构拥有独立辨识度。
+		draw_rect(Rect2(0, 0, 720, 1280), Color(0.01, 0.16, 0.20, 0.36))
+		var pulse = 0.045 + (sin(wave_time * 1.5) + 1.0) * 0.02
+		draw_circle(Vector2(360, 170), 145, Color(0.15, 0.92, 0.84, pulse))
+		for chamber_y in [112.0, 367.0, 622.0, 877.0]:
+			draw_arc(Vector2(360, chamber_y + 82), 118, PI + 0.25, TAU - 0.25, 20, Color(0.72, 0.78, 0.67, 0.38), 7)
+			for rib_x in [-92.0, -55.0, 55.0, 92.0]:
+				draw_line(Vector2(360 + rib_x, chamber_y + 48), Vector2(360 + rib_x * 0.72, chamber_y + 155), Color(0.68, 0.74, 0.65, 0.30), 5)
+		for index in range(7):
+			var drift = sin(wave_time * 0.55 + index) * 22.0
+			draw_circle(Vector2(80 + index * 96 + drift, 230 + (index % 4) * 250), 42, Color(0.65, 0.95, 0.94, 0.035))
 
 func _draw_city():
 	# Land, canals and the open sea.

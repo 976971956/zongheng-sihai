@@ -177,6 +177,12 @@ const LOCATIONS = {
 		"exits": [],
 		"npcs": ["alexandria_merchant"], "enemies": [], "services": ["harbor"]
 	},
+	"malta_dock": {
+		"name": "马耳他 · 蜂蜜石港", "tag": "贸易港", "chapter": "第七章 · 白鲸残影",
+		"description": "金色石墙围住深蓝海湾，渔船与商船挤满港池。白鲸号的旧船钟被悬在仓栈门口，每逢退潮便会自己响起。",
+		"flavor": "马耳他盛产柑橘，也保留着白鲸号最后一批船员的名册。港口厨房可把贸易货物烹制成远航补给。",
+		"exits": [], "npcs": ["malta_keeper"], "enemies": [], "services": ["harbor", "cook"]
+	},
 	"black_sail_1": {
 		"name": "黑帆据点 · 外围码头", "tag": "远洋副本", "chapter": "第二章 · 黑帆密令",
 		"description": "被遗弃的海蚀洞里搭起了走私码头，黑帆水手正在搬运从商船上劫来的货箱。", "flavor": "击败外围守卫后才能深入据点。",
@@ -196,6 +202,26 @@ const LOCATIONS = {
 		"name": "黑帆据点 · 船长厅", "tag": "Boss区域", "chapter": "第二章 · 黑帆密令",
 		"description": "洞窟尽头停着一艘没有桅杆的黑船。船长雷蒙正等待追踪而来的航者。", "flavor": "击败雷蒙，夺回记载神秘鳞片航线的黑帆海图。",
 		"exits": [], "npcs": [], "enemies": ["corsair_captain"], "services": []
+	},
+	"white_whale_1": {
+		"name": "白鲸残骸 · 礁岸", "tag": "远洋副本", "chapter": "第七章 · 白鲸残影",
+		"description": "白色龙骨横卧在礁石间，破碎船壳随浪起伏。甲板蟹盘踞在唯一还能落脚的登船板上。", "flavor": "击败礁岸守卫后才能进入残骸。",
+		"exits": [{"to": "white_whale_2", "direction": "北", "label": "登上倾斜甲板", "requires_defeat": "wreck_crab"}], "npcs": [], "enemies": ["wreck_crab"], "services": []
+	},
+	"white_whale_2": {
+		"name": "白鲸残骸 · 沉水甲板", "tag": "远洋副本", "chapter": "第八章 · 马耳他盛宴",
+		"description": "海水漫过半截船舱，旧日水手的影子仍在重复最后一次值夜。", "flavor": "潮水会拖慢脚步，餐食补给能让长战更稳定。",
+		"exits": [{"to": "white_whale_1", "direction": "南", "label": "返回礁岸"}, {"to": "white_whale_3", "direction": "北", "label": "进入雾锁货舱", "requires_defeat": "drowned_sailor"}], "npcs": [], "enemies": ["drowned_sailor"], "services": []
+	},
+	"white_whale_3": {
+		"name": "白鲸残骸 · 雾锁货舱", "tag": "远洋副本", "chapter": "第九章 · 寻裔之路",
+		"description": "来自各港的货箱被白雾封住，歌声从龙骨深处传来，诱人忘记归路。", "flavor": "雾歌海妖会施加诅咒，万能药可以解除异常状态。",
+		"exits": [{"to": "white_whale_2", "direction": "南", "label": "返回沉水甲板"}, {"to": "white_whale_4", "direction": "北", "label": "前往鲸心船舱", "requires_defeat": "fog_siren"}], "npcs": [], "enemies": ["fog_siren"], "services": []
+	},
+	"white_whale_4": {
+		"name": "白鲸残骸 · 鲸心船舱", "tag": "Boss区域", "chapter": "第九章 · 寻裔之路",
+		"description": "船钟、星图与发光鳞片同时共鸣。深渊海妖守着一封未能送达马耳他的家书。", "flavor": "击败深渊海妖，找回白鲸号失踪者留下的证词。",
+		"exits": [{"to": "white_whale_3", "direction": "南", "label": "返回雾锁货舱"}], "npcs": [], "enemies": ["abyss_siren"], "services": []
 	}
 }
 
@@ -206,26 +232,32 @@ const NPCS = {
 	"jeweler": {"name": "珠宝匠贝里昂", "role": "鉴定与宝石", "dialogue": "怪物身上掉下来的未知道具，只有鉴定后才知道属性。真正的宝石系统要到后面才会开放。"},
 	"ship_owner": {"name": "船老板", "role": "船只与航行", "dialogue": "完成威尼斯试炼后，我会把海燕号交给你。比较各港价格、控制货舱，再决定把银币压在哪批货上。"},
 	"ragusa_broker": {"name": "拉古萨经纪人", "role": "港口商人", "dialogue": "这里的羊毛和橄榄油便宜。若你从威尼斯带来玻璃，我能给出不错的价钱。"},
-	"alexandria_merchant": {"name": "香料商萨米尔", "role": "港口商人", "dialogue": "季风改变的不只是航期，也会改变香料的价格。低买高卖，但别忘了返航的费用。"}
+	"alexandria_merchant": {"name": "香料商萨米尔", "role": "港口商人", "dialogue": "季风改变的不只是航期，也会改变香料的价格。低买高卖，但别忘了返航的费用。"},
+	"malta_keeper": {"name": "伊莎贝拉", "role": "白鲸号守钟人", "dialogue": "我守着这口船钟，也守着一份二十年没人敢读完的名册。若你真要寻找白鲸号，就先学会让同行的人平安吃上一顿饭。"}
 }
 
 const TRADE_PORTS = {
 	"venice_dock": {"name": "威尼斯", "specialty": "玻璃器皿", "note": "玻璃便宜，香料昂贵"},
 	"ragusa_dock": {"name": "拉古萨", "specialty": "羊毛布", "note": "羊毛与橄榄油价格较低"},
-	"alexandria_dock": {"name": "亚历山大", "specialty": "东方香料", "note": "香料便宜，玻璃需求旺盛"}
+	"alexandria_dock": {"name": "亚历山大", "specialty": "东方香料", "note": "香料便宜，玻璃需求旺盛"},
+	"malta_dock": {"name": "马耳他", "specialty": "金岛柑橘", "note": "柑橘便宜，可在港口厨房制作远航餐食"}
 }
 
 const TRADE_GOODS = {
-	"venetian_glass": {"name": "威尼斯玻璃", "unit": "箱", "space": 2, "prices": {"venice_dock": 24, "ragusa_dock": 46, "alexandria_dock": 61}},
-	"wool_cloth": {"name": "羊毛布", "unit": "捆", "space": 1, "prices": {"venice_dock": 43, "ragusa_dock": 25, "alexandria_dock": 47}},
-	"olive_oil": {"name": "橄榄油", "unit": "桶", "space": 2, "prices": {"venice_dock": 48, "ragusa_dock": 30, "alexandria_dock": 24}},
-	"spices": {"name": "东方香料", "unit": "袋", "space": 1, "prices": {"venice_dock": 82, "ragusa_dock": 61, "alexandria_dock": 35}}
+	"venetian_glass": {"name": "威尼斯玻璃", "unit": "箱", "space": 2, "prices": {"venice_dock": 24, "ragusa_dock": 46, "alexandria_dock": 61, "malta_dock": 52}},
+	"wool_cloth": {"name": "羊毛布", "unit": "捆", "space": 1, "prices": {"venice_dock": 43, "ragusa_dock": 25, "alexandria_dock": 47, "malta_dock": 42}},
+	"olive_oil": {"name": "橄榄油", "unit": "桶", "space": 2, "prices": {"venice_dock": 48, "ragusa_dock": 30, "alexandria_dock": 24, "malta_dock": 28}},
+	"spices": {"name": "东方香料", "unit": "袋", "space": 1, "prices": {"venice_dock": 82, "ragusa_dock": 61, "alexandria_dock": 35, "malta_dock": 57}},
+	"citrus": {"name": "金岛柑橘", "unit": "筐", "space": 1, "prices": {"venice_dock": 42, "ragusa_dock": 38, "alexandria_dock": 45, "malta_dock": 20}}
 }
 
 const TRADE_ROUTES = {
 	"ragusa_dock|venice_dock": {"days": 2, "fee": 14, "risk": 14},
 	"alexandria_dock|venice_dock": {"days": 5, "fee": 30, "risk": 30},
-	"alexandria_dock|ragusa_dock": {"days": 4, "fee": 24, "risk": 24}
+	"alexandria_dock|ragusa_dock": {"days": 4, "fee": 24, "risk": 24},
+	"malta_dock|venice_dock": {"days": 4, "fee": 26, "risk": 24},
+	"malta_dock|ragusa_dock": {"days": 3, "fee": 20, "risk": 20},
+	"alexandria_dock|malta_dock": {"days": 3, "fee": 22, "risk": 22}
 }
 
 const TRADE_EVENTS = [
@@ -233,8 +265,13 @@ const TRADE_EVENTS = [
 	{"name": "威尼斯庆典", "description": "威尼斯庆典大量收购东方香料。", "port": "venice_dock", "good": "spices", "multiplier": 1.30},
 	{"name": "拉古萨纺织季", "description": "拉古萨羊毛集中上市，采购价下降。", "port": "ragusa_dock", "good": "wool_cloth", "multiplier": 0.78},
 	{"name": "亚历山大宫廷订单", "description": "亚历山大贵族高价征集威尼斯玻璃。", "port": "alexandria_dock", "good": "venetian_glass", "multiplier": 1.28},
-	{"name": "橄榄丰收", "description": "拉古萨橄榄油丰收，市场供应充足。", "port": "ragusa_dock", "good": "olive_oil", "multiplier": 0.76}
+	{"name": "橄榄丰收", "description": "拉古萨橄榄油丰收，市场供应充足。", "port": "ragusa_dock", "good": "olive_oil", "multiplier": 0.76},
+	{"name": "金岛丰收祭", "description": "马耳他柑橘集中上市，适合采购远销。", "port": "malta_dock", "good": "citrus", "multiplier": 0.74}
 ]
+
+const RECIPES = {
+	"maltese_stew": {"name": "马耳他海风炖汤", "port": "malta_dock", "cargo": {"olive_oil": 1, "spices": 1, "citrus": 2}, "silver": 5, "result": "maltese_stew", "description": "恢复体力，并在接下来3场战斗中获得攻击、防御和体力加成。"}
+}
 
 # 港口订单兼顾剧情委托与可重复跑商。剧情订单优先显示，完成后各港会继续轮换日常委托。
 const TRADE_ORDERS = {
@@ -246,13 +283,16 @@ const TRADE_ORDERS = {
 	"ragusa_glass_banquet": {"title": "总督玻璃宴具", "port": "ragusa_dock", "good": "venetian_glass", "amount": 2, "bonus": 85, "reputation": 2, "description": "总督府宴会需要一批威尼斯玻璃器皿。"},
 	"ragusa_spice_fair": {"title": "商队香料会", "port": "ragusa_dock", "good": "spices", "amount": 3, "bonus": 100, "reputation": 2, "description": "陆路商队正在收购便于转运的香料。"},
 	"alexandria_wool_sails": {"title": "红海船队帆布", "port": "alexandria_dock", "good": "wool_cloth", "amount": 4, "bonus": 120, "reputation": 2, "description": "远航船队需要结实的羊毛帆布。"},
-	"alexandria_palace_glass": {"title": "宫廷彩窗", "port": "alexandria_dock", "good": "venetian_glass", "amount": 2, "bonus": 135, "reputation": 2, "description": "宫廷工匠正在修补一组彩色玻璃窗。"}
+	"alexandria_palace_glass": {"title": "宫廷彩窗", "port": "alexandria_dock", "good": "venetian_glass", "amount": 2, "bonus": 135, "reputation": 2, "description": "宫廷工匠正在修补一组彩色玻璃窗。"},
+	"malta_citrus_fleet": {"title": "舰队防坏血病补给", "port": "malta_dock", "good": "citrus", "amount": 5, "bonus": 115, "reputation": 2, "description": "巡航舰队需要新鲜柑橘补充远航餐食。"},
+	"malta_glass_lanterns": {"title": "守钟塔风灯", "port": "malta_dock", "good": "venetian_glass", "amount": 2, "bonus": 125, "reputation": 2, "description": "守钟塔需要经得住海风的新玻璃灯罩。"}
 }
 
 const PORT_ORDER_ROTATION = {
 	"venice_dock": ["venice_spice_feast", "venice_wool_uniforms"],
 	"ragusa_dock": ["ragusa_glass_banquet", "ragusa_spice_fair"],
-	"alexandria_dock": ["alexandria_wool_sails", "alexandria_palace_glass"]
+	"alexandria_dock": ["alexandria_wool_sails", "alexandria_palace_glass"],
+	"malta_dock": ["malta_citrus_fleet", "malta_glass_lanterns"]
 }
 
 const ENEMIES = {
@@ -269,6 +309,10 @@ const ENEMIES = {
 	,"corsair_raider": {"name": "黑帆袭击者", "level": 8, "rank": "副本精英", "hp": 260, "attack": 31, "defense": 16, "speed": 16, "exp": 230, "silver": [58, 78], "drops": ["corsair_cutlass", "gunner_coat", "universal_medicine", "corsair_card"], "effect": {"name": "中毒", "chance": 0.16, "rounds": 3}, "intro": "袭击者在火药桶之间疾行，淬毒短刃闪着冷光。"}
 	,"corsair_guard": {"name": "黑帆重卫", "level": 10, "rank": "副本精英", "hp": 380, "attack": 38, "defense": 24, "speed": 12, "exp": 340, "silver": [78, 108], "drops": ["gunner_coat", "captain_hat", "stamina_tonic"], "special": {"name": "破阵冲锋", "every": 3, "damage_multiplier": 1.40}, "intro": "重卫架起盾牌，沉重脚步震落洞顶的细沙。"}
 	,"corsair_captain": {"name": "黑帆船长雷蒙", "level": 12, "rank": "副本 Boss", "hp": 620, "attack": 48, "defense": 29, "speed": 18, "exp": 620, "silver": [150, 210], "drops": ["corsair_cutlass", "gunner_coat", "captain_hat", "black_sail_charm"], "effect": {"name": "诅咒", "chance": 0.20, "rounds": 3}, "special": {"name": "黑潮连斩", "every": 3, "damage_multiplier": 1.60}, "intro": "雷蒙展开黑帆海图，拔剑宣告这里将是你的终点。"}
+	,"wreck_crab": {"name": "覆甲礁蟹", "level": 21, "rank": "副本", "hp": 640, "attack": 48, "defense": 32, "speed": 16, "exp": 1100, "silver": [120, 170], "drops": ["stamina_tonic", "whale_bone_sabre"], "intro": "覆满船钉的巨蟹从白鲸号龙骨下爬出，铁螯砸向礁石。"}
+	,"drowned_sailor": {"name": "溺潮水手", "level": 24, "rank": "副本精英", "hp": 760, "attack": 54, "defense": 36, "speed": 23, "exp": 1500, "silver": [150, 210], "drops": ["survivor_coat", "universal_medicine"], "effect": {"name": "缓慢", "chance": 0.20, "rounds": 2}, "intro": "水手幻影攥着腐朽缆绳，仍在执行二十年前没有完成的封舱命令。"}
+	,"fog_siren": {"name": "雾歌海妖", "level": 27, "rank": "副本精英", "hp": 900, "attack": 60, "defense": 40, "speed": 31, "exp": 2100, "silver": [190, 260], "drops": ["siren_charm", "stamina_tonic"], "effect": {"name": "诅咒", "chance": 0.24, "rounds": 3}, "intro": "白雾凝成披着船帆的身影，歌声正一点点抹去你的名字。"}
+	,"abyss_siren": {"name": "深渊海妖·涅瑞娅", "level": 29, "rank": "副本 Boss", "hp": 1120, "attack": 68, "defense": 45, "speed": 36, "exp": 3500, "silver": [320, 430], "drops": ["whale_bone_sabre", "survivor_coat", "siren_charm"], "effect": {"name": "诅咒", "chance": 0.28, "rounds": 3}, "special": {"name": "鲸落挽歌", "every": 3, "damage_multiplier": 1.48}, "intro": "涅瑞娅从鲸心船舱升起。她身后的潮水里，映出白鲸号沉没的最后一夜。"}
 }
 
 const ITEMS = {
@@ -299,6 +343,11 @@ const ITEMS = {
 	,"black_sail_charm": {"name": "黑帆航路仪", "type": "equipment", "slot": "charm", "rarity": "传说", "description": "记录神秘鳞片航路的精密仪器。", "stats": {"max_hp": 55, "attack": 9, "defense": 7, "speed": 5}, "price": 680}
 	,"tide_seal": {"name": "潮纹银章", "type": "equipment", "slot": "charm", "rarity": "传说", "description": "艾丽莎父亲留下的银章，背面刻着你失去的名字。", "stats": {"max_hp": 70, "attack": 12, "defense": 8, "speed": 6}, "price": 880}
 	,"lighthouse_compass": {"name": "灯塔星盘", "type": "equipment", "slot": "charm", "rarity": "传说", "description": "萨米尔从灯塔密室取出的星盘，指针会追随发光鳞片的潮汐。", "stats": {"max_hp": 92, "attack": 16, "defense": 11, "speed": 9}, "price": 1280}
+	,"maltese_stew": {"name": "马耳他海风炖汤", "type": "consumable", "rarity": "远航餐食", "description": "恢复160点体力；接下来3场战斗最大体力+45、攻击+6、防御+3。", "heal": 160, "meal_battles": 3, "price": 120}
+	,"whale_bone_sabre": {"name": "白鲸骨刃", "type": "equipment", "slot": "weapon", "rarity": "传说", "description": "以白鲸号断裂龙骨与潮纹钢重铸的长刃。", "stats": {"attack": 26, "speed": 5}, "price": 1450}
+	,"survivor_coat": {"name": "遗航者外套", "type": "equipment", "slot": "body", "rarity": "传说", "description": "衣袋里仍缝着白鲸号船员名册的一角。", "stats": {"max_hp": 78, "defense": 18, "speed": 3}, "price": 1520}
+	,"siren_charm": {"name": "雾歌耳坠", "type": "equipment", "slot": "charm", "rarity": "传说", "description": "雾歌海妖凝成的水晶，使持有者不再迷失于海雾。", "stats": {"max_hp": 105, "attack": 19, "defense": 14, "speed": 11}, "price": 1780}
+	,"white_whale_coat": {"name": "白鲸守望衣", "type": "equipment", "slot": "body", "rarity": "神话", "description": "伊莎贝拉依照先祖遗图缝制的航海衣，内衬记录着下一段北河航路。", "stats": {"max_hp": 120, "attack": 7, "defense": 24, "speed": 5}, "price": 2280}
 }
 
 const IDENTIFY_POOL = ["linen_cap", "traveler_boots", "bronze_charm", "guard_belt", "spider_knife"]
@@ -315,6 +364,9 @@ const QUEST_DIALOGUES = {
 	"lighthouse_letter|tavern_keeper": "卡西安，亚历山大的萨米尔托船带来一封密信。灯塔昨夜亮起了和你鳞片一样的蓝光。别只带剑去——准备三箱威尼斯玻璃，商人更愿意对能解决问题的人开口。",
 	"samir_testimony|alexandria_merchant": "艾丽莎的父亲来过这里。他让人封住灯塔地下的潮门，又把开启它的星图拆成三份，交给三港最可信的商会。先帮我修好灯塔镜室，我才敢把第一份交给你。",
 	"keeper_return|tavern_keeper": "三港印记已经在星盘上合为一体。艾丽莎的父亲并非葬身海上——最后一封账簿写着，他搭乘‘白鲸号’去了马耳他。卡西安，你找回名字只是开始，下一次潮门开启时，我们就去找他。"
+	,"white_whale_news|alisa": "父亲临行前一直在修一口旧船钟。他说白鲸号不是一艘船，而是一群彼此承诺要回家的人。带上星盘去马耳他，找到守钟人伊莎贝拉。"
+	,"meet_isabella|malta_keeper": "星盘认出了你。可是白鲸号残骸被海妖的雾困住了，空着肚子进去只会成为下一道影子。把柑橘、香料和橄榄油带来，我教你做船员们最后那顿炖汤。"
+	,"heir_testimony|malta_keeper": "这封家书证明父亲救下了最后一名白鲸后裔。那个人就是我的祖母。你父亲随后向南追查北河潮门——卡西安，我们都不是孤身的遗民。穿上这件守望衣，下一程去开普敦。"
 }
 
 const BOUNTIES = [
@@ -360,6 +412,16 @@ const QUESTS = [
 	,{"id": "guarded_passage", "title": "穿越季风", "story": "在任意港口购买一次护航物资，为长航程免除一次风暴损失。", "objective": {"type": "prepare_voyage", "target": "storm_kit", "need": 1}, "reward": {"exp": 4200, "silver": 520}}
 	,{"id": "tide_medicine", "title": "潮汐药引", "story": "把四袋东方香料送回威尼斯，完成唤醒旧航海日志的药剂。", "objective": {"type": "trade_order", "target": "venice_tide_medicine", "need": 1}, "reward": {"exp": 4600, "silver": 620}}
 	,{"id": "keeper_return", "title": "灯塔下的回声", "story": "回到老海鸥酒馆，让老板解读三港星图与旧航海日志。", "objective": {"type": "talk", "target": "tavern_keeper", "need": 1}, "reward": {"exp": 6000, "silver": 900, "item": "lighthouse_compass", "title": "灯塔守望者"}}
+	,{"id": "white_whale_news", "title": "白鲸号的消息", "story": "回海边小屋告诉艾丽莎：她的父亲最后搭乘白鲸号去了马耳他。", "objective": {"type": "talk", "target": "alisa", "need": 1}, "reward": {"exp": 7000, "silver": 700, "item": "stamina_tonic"}}
+	,{"id": "sail_malta", "title": "驶向马耳他", "story": "驾驶海燕号抵达马耳他蜂蜜石港，寻找白鲸号守钟人。", "objective": {"type": "visit", "target": "malta_dock", "need": 1}, "reward": {"exp": 7500, "silver": 760}}
+	,{"id": "meet_isabella", "title": "守钟人伊莎贝拉", "story": "在马耳他港与伊莎贝拉交谈，查阅白鲸号最后的船员名册。", "objective": {"type": "talk", "target": "malta_keeper", "need": 1}, "reward": {"exp": 8000, "silver": 820}}
+	,{"id": "island_feast", "title": "美味任务·海风炖汤", "story": "购齐两筐柑橘、一桶橄榄油和一袋香料，在马耳他厨房烹制海风炖汤。", "objective": {"type": "cook", "target": "maltese_stew", "need": 1}, "reward": {"exp": 8500, "silver": 880, "item": "maltese_stew"}}
+	,{"id": "wreck_entry", "title": "白鲸残骸", "story": "带着远航餐食前往马耳他外海，登上白鲸号残骸的礁岸。", "objective": {"type": "visit", "target": "white_whale_1", "need": 1}, "reward": {"exp": 9000, "silver": 940}}
+	,{"id": "clear_reef", "title": "清理礁岸", "story": "击败盘踞登船板的覆甲礁蟹，打开通往沉水甲板的道路。", "objective": {"type": "kill", "target": "wreck_crab", "need": 1}, "reward": {"exp": 10000, "silver": 1000, "item": "whale_bone_sabre"}}
+	,{"id": "drowned_deck", "title": "未完成的值夜", "story": "击败沉水甲板上的溺潮水手，让他的灵魂结束最后一次值夜。", "objective": {"type": "kill", "target": "drowned_sailor", "need": 1}, "reward": {"exp": 11000, "silver": 1100, "item": "survivor_coat"}}
+	,{"id": "fog_hold", "title": "寻裔之路·雾锁货舱", "story": "穿过货舱白雾，击败试图抹去船员姓名的雾歌海妖。", "objective": {"type": "kill", "target": "fog_siren", "need": 1}, "reward": {"exp": 13000, "silver": 1250, "item": "siren_charm"}}
+	,{"id": "white_whale_heart", "title": "鲸落挽歌", "story": "进入鲸心船舱，击败深渊海妖涅瑞娅，夺回未能寄出的家书。", "objective": {"type": "kill", "target": "abyss_siren", "need": 1}, "reward": {"exp": 18000, "silver": 1500}}
+	,{"id": "heir_testimony", "title": "白鲸继航者", "story": "带着家书回到马耳他港，让伊莎贝拉说出白鲸后裔与下一段航路的真相。", "objective": {"type": "talk", "target": "malta_keeper", "need": 1}, "reward": {"exp": 22000, "silver": 2000, "item": "white_whale_coat", "title": "白鲸继航者"}}
 ]
 
 const STORY_CHAPTERS = [
@@ -370,19 +432,23 @@ const STORY_CHAPTERS = [
 	{"title": "第四章·灯塔来信", "start": 19, "end": 22, "summary": "亚历山大灯塔发出蓝光。你以货物修复镜室，从萨米尔处取得第一枚商会印记。"},
 	{"title": "第五章·三港星图", "start": 23, "end": 25, "summary": "你用真实的贸易帮助三港，在季风到来前赢得商会信任并备妥护航物资。"},
 	{"title": "第六章·灯塔回声", "start": 26, "end": 27, "summary": "潮汐药剂唤醒旧日志，星盘指出艾丽莎父亲最后驶向了马耳他。"}
+	,{"title": "第七章·白鲸残影", "start": 28, "end": 30, "summary": "你循着白鲸号的消息抵达马耳他，与守钟人伊莎贝拉相认。"}
+	,{"title": "第八章·马耳他盛宴", "start": 31, "end": 34, "summary": "一份古老食谱把贸易货物变成远航补给，你由礁岸踏入白鲸号残骸。"}
+	,{"title": "第九章·寻裔之路", "start": 35, "end": 37, "summary": "你穿过沉船迷雾夺回家书，确认白鲸后裔仍在，并得到通向北河的线索。"}
 ]
 
 const STORY_VOLUMES = [
 	{"title": "第一卷·潮汐纪事", "start": 0, "end": 18},
-	{"title": "第二卷·灯塔下的回声", "start": 19, "end": 27}
+	{"title": "第二卷·灯塔下的回声", "start": 19, "end": 27},
+	{"title": "第三卷·白鲸遗航", "start": 28, "end": 37}
 ]
 
 const SLOT_NAMES = {"weapon": "手持", "head": "头戴", "body": "身穿", "waist": "腰部", "boots": "脚穿", "charm": "配饰"}
 
-const MAX_LEVEL = 20
+const MAX_LEVEL = 30
 
 static func xp_needed(level):
-	var curve = [0, 70, 115, 175, 255, 360, 500, 680, 900, 1160, 1460, 1800, 2180, 2600, 3060, 3560, 4080, 4660, 5300, 6000, 6780]
+	var curve = [0, 70, 115, 175, 255, 360, 500, 680, 900, 1160, 1460, 1800, 2180, 2600, 3060, 3560, 4080, 4660, 5300, 6000, 6780, 7640, 8580, 9600, 10700, 11880, 13140, 14480, 15900, 17400, 19000]
 	if level < curve.size():
 		return curve[level]
 	return 500 + (level - 5) * 180
@@ -399,6 +465,7 @@ static func objective_name(objective):
 		"trade_order": return "交付%s" % TRADE_ORDERS.get(str(objective.target), {"title": "港口订单"}).title
 		"trade_reputation": return "三港总声望"
 		"prepare_voyage": return "购买护航物资"
+		"cook": return "烹制%s" % RECIPES.get(str(objective.target), {"name": "远航餐食"}).name
 		_: return str(objective.target)
 
 static func quest_dialogue(quest_id, npc_id):
