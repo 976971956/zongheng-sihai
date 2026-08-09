@@ -85,7 +85,7 @@ func _run_normal_player(seed_value):
 		_record_loss("black_sail/captain")
 		return
 	_complete_current_quest(state, "captain_ledger")
-	_check(int(state.player.level) == GameData.MAX_LEVEL, "种子%d：黑帆章结束时应达到Lv.%d，实际Lv.%d" % [seed_value, GameData.MAX_LEVEL, int(state.player.level)])
+	_check(int(state.player.level) >= 15, "种子%d：黑帆章结束时应达到Lv.15，实际Lv.%d" % [seed_value, int(state.player.level)])
 
 func _complete_current_quest(state, expected_id):
 	var quest = state.get_current_quest()

@@ -115,8 +115,54 @@ func _init():
 	_check(bool(state.talk_to("alisa").get("quest_completed", false)), "黑帆海图必须引导玩家回到艾丽莎小屋")
 	var story_reward = _claim(state, "alisa_truth")
 	_check(story_reward.reward_item == "tide_seal" and state.equip_item("tide_seal").ok, "第一卷结局必须奖励潮汐银章并可装备")
-	_check(state.get_current_quest().is_empty() and int(state.player.level) == GameData.MAX_LEVEL, "完整主线必须支持角色成长至Lv.15")
+	_check(state.get_current_quest().id == "lighthouse_letter" and int(state.player.level) >= 15, "第一卷结束后必须立即接续第二卷灯塔来信")
 	_check(str(state.player.title) == "潮汐追迹者", "第一卷结局必须授予剧情称号")
+
+	state.player.location = "venice_tavern"
+	state.talk_to("tavern_keeper")
+	_claim(state, "lighthouse_letter")
+	state.player.location = "venice_dock"
+	var glass_for_lighthouse = state.buy_cargo("venetian_glass", 3)
+	_check(bool(glass_for_lighthouse.ok), "第二卷启航前必须能准备灯塔玻璃订单")
+	state.buy_voyage_protection()
+	state.sail_to("alexandria_dock")
+	_claim(state, "sail_lighthouse")
+	state.talk_to("alexandria_merchant")
+	_claim(state, "samir_testimony")
+	var lighthouse_order = state.claim_trade_order()
+	_check(bool(lighthouse_order.ok) and state.port_reputation_value("alexandria_dock") == 2, "灯塔订单必须交付货物并提升亚历山大声望")
+	_claim(state, "lighthouse_repairs")
+	state.buy_cargo("olive_oil", 4)
+	state.buy_voyage_protection()
+	state.sail_to("ragusa_dock")
+	var ragusa_order = state.claim_trade_order()
+	_check(bool(ragusa_order.ok) and state.total_trade_reputation() >= 4, "拉古萨剧情订单必须形成第二条跨港交付路线")
+	_claim(state, "ragusa_nightwatch")
+	_check(state.quest_progress == min(6, state.total_trade_reputation()), "进入三港信任任务时必须继承已有声望，不能要求重刷")
+	state.buy_voyage_protection()
+	state.sail_to("venice_dock")
+	state.buy_cargo("venetian_glass", 2)
+	state.buy_voyage_protection()
+	state.sail_to("ragusa_dock")
+	var repeat_order = state.claim_trade_order()
+	_check(bool(repeat_order.ok) and state.total_trade_reputation() >= 6 and state.quest_can_claim(), "日常港口订单必须可循环并推进三港声望主线")
+	_claim(state, "three_port_trust")
+	var protection = state.buy_voyage_protection()
+	_check(bool(protection.ok) and bool(protection.quest_completed), "购买护航物资必须推进季风准备任务")
+	_claim(state, "guarded_passage")
+	state.sail_to("alexandria_dock")
+	state.buy_cargo("spices", 4)
+	state.buy_voyage_protection()
+	state.sail_to("venice_dock")
+	var medicine_order = state.claim_trade_order()
+	_check(bool(medicine_order.ok), "潮汐药引必须通过亚历山大到威尼斯的香料订单完成")
+	_claim(state, "tide_medicine")
+	state.player.location = "venice_tavern"
+	state.talk_to("tavern_keeper")
+	var volume_two_reward = _claim(state, "keeper_return")
+	_check(volume_two_reward.reward_item == "lighthouse_compass" and state.equip_item("lighthouse_compass").ok, "第二卷结局必须奖励可装备的灯塔星盘")
+	_check(state.get_current_quest().is_empty() and int(state.player.level) == GameData.MAX_LEVEL, "两卷完整主线必须支持成长至Lv.20")
+	_check(str(state.player.title) == "灯塔守望者", "第二卷结局必须授予灯塔守望者称号")
 
 	state.inventory["ghost_card"] = 1
 	var defense_before_card = int(state.get_stats().defense)
@@ -141,7 +187,7 @@ func _init():
 	state.player.level = GameData.MAX_LEVEL
 	state.player.xp = 350
 	state._add_xp(500)
-	_check(int(state.player.xp) == 0, "Lv.15经验必须封顶并保持MAX")
+	_check(int(state.player.xp) == 0, "满级经验必须封顶并保持MAX")
 
 	var dungeon_reset = TestState.new()
 	dungeon_reset.player.level = 4
@@ -153,7 +199,7 @@ func _init():
 	_check(not dungeon_reset.move_to("training_dungeon_2").ok, "离开副本后必须重置逐层解锁进度")
 
 	if failures.is_empty():
-		print("SMOKE_OK: 威尼斯主线、逐层副本、贸易航线、买卖利润与船只升级全部通过")
+		print("SMOKE_OK: 两卷主线、逐层副本、港口订单、声望、护航与贸易利润全部通过")
 		quit(0)
 	else:
 		for failure in failures:

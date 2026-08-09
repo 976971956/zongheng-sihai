@@ -218,7 +218,7 @@ func _run():
 	_check(bool(equipment_upgrade.get("ok", false)) and scene.state.equipment_upgrade_level("warrior_blade") == 1 and int(scene.state.get_stats().attack) > attack_before_upgrade, "贸易银币必须可以用于强化已装备武器并提升属性")
 	scene._open_trade_2d()
 	_check(is_instance_valid(scene.overlay), "主线完成后必须能从2D地图打开港口市场")
-	_check(_has_button_text(scene.overlay, "买1") and _has_button_text(scene.overlay, "买满") and _has_button_text(scene.overlay, "全卖") and _has_button_text(scene.overlay, "拉古萨") and _has_label_text(scene.overlay, "持有银币") and _has_label_text(scene.overlay, "浮动盈亏") and _has_label_text(scene.overlay, "今日行情"), "2D港口市场必须包含资产、成本盈亏、批量买卖、跨港航线和动态行情")
+	_check(_has_button_text(scene.overlay, "买1") and _has_button_text(scene.overlay, "买满") and _has_button_text(scene.overlay, "全卖") and _has_button_text(scene.overlay, "拉古萨") and _has_button_text(scene.overlay, "交付订单") and _has_button_text(scene.overlay, "护航物资") and _has_label_text(scene.overlay, "持有银币") and _has_label_text(scene.overlay, "总声望") and _has_label_text(scene.overlay, "今日行情"), "2D港口市场必须包含资产、批量买卖、订单声望、护航、跨港航线和动态行情")
 	var silver_before = int(scene.state.player.silver)
 	scene._trade_buy_2d("venetian_glass")
 	_check(int(scene.state.cargo.get("venetian_glass", 0)) == 1 and int(scene.state.player.silver) < silver_before, "2D市场买货必须同步货舱和银币")
@@ -227,12 +227,34 @@ func _run():
 	_check(bool(armor_upgrade.get("ok", false)) and int(scene.state.ship.get("armor", 0)) == 1, "船只必须可以加固护甲并降低航线风险")
 	var sail_result = scene.state.sail_to("ragusa_dock")
 	_check(bool(sail_result.get("ok", false)) and sail_result.has("event") and int(sail_result.get("risk", 99)) < int(GameData.trade_route("venice_dock", "ragusa_dock").risk), "航行必须结算随机事件，船体护甲必须降低风险")
+	scene.state.cargo["venetian_glass"] = 2
+	scene.state.cargo_costs["venetian_glass"] = 48
+	var order_result = scene.state.claim_trade_order()
+	_check(bool(order_result.get("ok", false)) and scene.state.port_reputation_value("ragusa_dock") == 2 and scene.state.trade_order_cycles["ragusa_dock"] == 1, "港口订单必须消耗指定货物、奖励声望并轮换下一单")
+	var risk_without_protection = scene.state.voyage_risk("venice_dock")
+	var protection_result = scene.state.buy_voyage_protection()
+	_check(bool(protection_result.get("ok", false)) and scene.state.voyage_risk("venice_dock") < risk_without_protection, "护航物资必须降低下一次航行风险")
 	scene.state.trade_profit = 120
 	var unknown_before = int(scene.state.inventory.get("unknown_equipment", 0))
 	var contract_result = scene.state.claim_trade_contract()
 	_check(bool(contract_result.get("ok", false)) and int(scene.state.inventory.get("unknown_equipment", 0)) == unknown_before + 1, "贸易利润必须推进商会委托并可以领取成长奖励")
 	_check(scene.state.trade_contract_count == 1 and scene.state.trade_contract_target() == 180 and scene.state.trade_contract_progress() == 0, "商会委托领取后必须自动开启更高目标的下一轮")
 	_check(not scene.state.best_trade_opportunity().is_empty(), "港口必须能计算一条可见的动态商路推荐")
+
+	# 三港复用同一港区地图，但重新加载或走入码头视觉区域时不能篡改真实所在港口。
+	scene.state.quest_index = GameData.QUESTS.size()
+	scene.state.player.location = "alexandria_dock"
+	scene.current_region = "city"
+	scene.current_zone = ""
+	scene.player_actor.position = scene._spawn_for_location("alexandria_dock")
+	scene._spawn_world_actors()
+	scene._update_zone(true)
+	_check(str(scene.state.player.location) == "alexandria_dock" and _has_actor(scene, "alexandria_merchant"), "亚历山大港重新进入2D地图后必须保留港口位置和当地商人")
+	scene.player_actor.position = _actor_position(scene, "alexandria_merchant")
+	scene._update_nearest_actor()
+	scene._interact()
+	_check(_has_label_text(scene.overlay, "亚历山大港口市场") and _has_button_text(scene.overlay, "交付订单"), "非对话任务时点击亚历山大商人必须直接打开当地港口市场")
+	scene._close_overlay()
 
 	var boss_state = TestState.new()
 	boss_state.player.level = 5
@@ -249,7 +271,7 @@ func _run():
 	scene.state.bounty_index = 0
 	scene.state.bounty_progress = 3
 	scene._open_quest()
-	_check(_has_label_text(scene.overlay, "第一卷进度") and _has_label_text(scene.overlay, "剧情回顾") and _has_button_text(scene.overlay, "领取悬赏奖励"), "主线结束后任务页必须显示章节进度、剧情回顾和可持续领取的悬赏")
+	_check(_has_label_text(scene.overlay, "第二卷·灯塔下的回声") and _has_label_text(scene.overlay, "剧情回顾") and _has_button_text(scene.overlay, "领取悬赏奖励"), "主线结束后任务页必须显示第二卷进度、剧情回顾和可持续领取的悬赏")
 
 	if failures.is_empty():
 		print("WORLD_2D_OK: 移动、背包、任务、副本、逐回合自动战斗、战败回酒馆、怪物刷新与贸易全部通过")

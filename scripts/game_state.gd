@@ -25,6 +25,11 @@ var ship = {}
 var trade_day = 1
 var trade_profit = 0
 var trade_volume = 0
+var trade_lifetime_profit = 0
+var port_reputation = {}
+var trade_order_cycles = {}
+var completed_trade_orders = {}
+var voyage_protection = 0
 var battle_stance = "balanced"
 var auto_heal_threshold = 35
 var auto_cure_status = true
@@ -64,6 +69,11 @@ func new_game():
 	trade_day = 1
 	trade_profit = 0
 	trade_volume = 0
+	trade_lifetime_profit = 0
+	port_reputation = {"venice_dock": 0, "ragusa_dock": 0, "alexandria_dock": 0}
+	trade_order_cycles = {"venice_dock": 0, "ragusa_dock": 0, "alexandria_dock": 0}
+	completed_trade_orders = {}
+	voyage_protection = 0
 	battle_stance = "balanced"
 	auto_heal_threshold = 35
 	auto_cure_status = true
@@ -353,7 +363,14 @@ func story_progress():
 			break
 	var chapter_total = int(chapter.end) - int(chapter.start) + 1
 	var chapter_completed = clamp(completed - int(chapter.start), 0, chapter_total)
-	return {"completed": completed, "total": total, "chapter": str(chapter.title), "chapter_completed": chapter_completed, "chapter_total": chapter_total, "summary": str(chapter.summary)}
+	var volume = GameData.STORY_VOLUMES.back()
+	for entry in GameData.STORY_VOLUMES:
+		if completed <= int(entry.end):
+			volume = entry
+			break
+	var volume_total = int(volume.end) - int(volume.start) + 1
+	var volume_completed = clamp(completed - int(volume.start), 0, volume_total)
+	return {"completed": completed, "total": total, "volume": str(volume.title), "volume_completed": volume_completed, "volume_total": volume_total, "chapter": str(chapter.title), "chapter_completed": chapter_completed, "chapter_total": chapter_total, "summary": str(chapter.summary)}
 
 func completed_story_titles(limit = 3):
 	var titles = []
@@ -824,6 +841,7 @@ func claim_quest():
 	var old_title = quest.title
 	quest_index += 1
 	quest_progress = 0
+	_sync_current_quest_progress()
 	var next_quest = get_current_quest()
 	var chapter_complete = next_quest.is_empty()
 	message_history.push_front("完成任务「%s」。" % old_title)
@@ -850,6 +868,18 @@ func _advance_quest(action_type, target, amount = 1):
 	var objective = quest.objective
 	if objective.type == action_type and objective.target == target:
 		quest_progress = min(int(objective.need), quest_progress + amount)
+	return not was_complete and quest_can_claim()
+
+func _sync_current_quest_progress():
+	var quest = get_current_quest()
+	if quest.is_empty():
+		return false
+	var was_complete = quest_can_claim()
+	var objective = quest.objective
+	if str(objective.type) == "trade_reputation" and str(objective.target) == "total":
+		quest_progress = min(int(objective.need), total_trade_reputation())
+	elif str(objective.type) == "prepare_voyage" and str(objective.target) == "storm_kit" and voyage_protection > 0:
+		quest_progress = min(int(objective.need), 1)
 	return not was_complete and quest_can_claim()
 
 func is_trade_unlocked():
@@ -883,6 +913,99 @@ func upgrade_equipped(slot):
 	_trim_history()
 	save_game()
 	return {"ok": true, "message": "%s强化成功：+%d（-%d银币）" % [GameData.ITEMS[item_id].name, level + 1, cost], "level": level + 1, "cost": cost, "quest_completed": quest_completed}
+
+func port_reputation_value(port_id = ""):
+	var resolved_port = str(player.location) if str(port_id) == "" else str(port_id)
+	return max(0, int(port_reputation.get(resolved_port, 0)))
+
+func total_trade_reputation():
+	var total = 0
+	for port_id in GameData.TRADE_PORTS:
+		total += port_reputation_value(str(port_id))
+	return total
+
+func _add_port_reputation(port_id, amount):
+	var resolved_port = str(port_id)
+	if not GameData.TRADE_PORTS.has(resolved_port) or int(amount) <= 0:
+		return false
+	port_reputation[resolved_port] = min(30, port_reputation_value(resolved_port) + int(amount))
+	return _sync_current_quest_progress()
+
+func current_trade_order(port_id = ""):
+	var resolved_port = str(player.location) if str(port_id) == "" else str(port_id)
+	if not GameData.TRADE_PORTS.has(resolved_port):
+		return {}
+	var quest = get_current_quest()
+	if not quest.is_empty() and str(quest.objective.type) == "trade_order":
+		var story_order_id = str(quest.objective.target)
+		var story_order = GameData.TRADE_ORDERS.get(story_order_id, {})
+		if not story_order.is_empty() and str(story_order.port) == resolved_port and not bool(completed_trade_orders.get(story_order_id, false)):
+			var result = story_order.duplicate(true)
+			result.id = story_order_id
+			result.story = true
+			return result
+	var rotation = GameData.PORT_ORDER_ROTATION.get(resolved_port, [])
+	if rotation.is_empty():
+		return {}
+	var cycle = max(0, int(trade_order_cycles.get(resolved_port, 0)))
+	var order_id = str(rotation[cycle % rotation.size()])
+	var order = GameData.TRADE_ORDERS[order_id].duplicate(true)
+	order.id = order_id
+	order.story = false
+	return order
+
+func trade_order_can_claim(port_id = ""):
+	var order = current_trade_order(port_id)
+	return not order.is_empty() and str(player.location) == str(order.port) and int(cargo.get(str(order.good), 0)) >= int(order.amount)
+
+func claim_trade_order():
+	var order = current_trade_order()
+	if order.is_empty():
+		return {"ok": false, "message": "当前港口暂时没有可交付的订单。"}
+	var good_id = str(order.good)
+	var amount = int(order.amount)
+	var held = int(cargo.get(good_id, 0))
+	if held < amount:
+		return {"ok": false, "message": "交付「%s」还需要%s×%d，当前%d。" % [order.title, GameData.TRADE_GOODS[good_id].name, amount, held]}
+	var old_cost = int(cargo_costs.get(good_id, 0))
+	var removed_cost = int(round(float(old_cost) * float(amount) / float(max(1, held))))
+	var market_income = trade_sell_price(good_id) * amount
+	var bonus = int(order.bonus)
+	var income = market_income + bonus
+	var realized_profit = income - removed_cost
+	_remove_item_from_cargo(good_id, amount)
+	player.silver += income
+	trade_profit += income
+	trade_lifetime_profit += realized_profit
+	trade_volume += amount
+	var order_id = str(order.id)
+	if bool(order.get("story", false)):
+		completed_trade_orders[order_id] = true
+	else:
+		trade_order_cycles[str(order.port)] = int(trade_order_cycles.get(str(order.port), 0)) + 1
+	var quest_completed = _advance_quest("trade_order", order_id)
+	quest_completed = _add_port_reputation(str(order.port), int(order.reputation)) or quest_completed
+	message_history.push_front("完成%s订单「%s」，获得%d银币并提升%d声望。" % [GameData.TRADE_PORTS[str(order.port)].name, order.title, income, int(order.reputation)])
+	_trim_history()
+	save_game()
+	return {"ok": true, "message": "订单完成：%s\n货款%d + 奖金%d｜实际利润%+d｜声望+%d" % [order.title, market_income, bonus, realized_profit, int(order.reputation)], "income": income, "bonus": bonus, "realized_profit": realized_profit, "reputation": int(order.reputation), "quest_completed": quest_completed}
+
+func buy_voyage_protection():
+	if not is_trade_unlocked() or not GameData.TRADE_PORTS.has(player.location):
+		return {"ok": false, "message": "只能在港口购买护航物资。"}
+	if voyage_protection > 0:
+		return {"ok": false, "message": "护航物资已经装船，将在下一次航行中使用。"}
+	var cost = 45
+	if int(player.silver) < cost:
+		return {"ok": false, "message": "购买护航物资需要%d银币。" % cost}
+	player.silver -= cost
+	trade_profit -= cost
+	voyage_protection = 1
+	var quest_completed = _advance_quest("prepare_voyage", "storm_kit")
+	message_history.push_front("护航物资已装船：下一次航行风险降低并免除一次风暴损失。")
+	_trim_history()
+	save_game()
+	return {"ok": true, "message": "护航物资已装船（-%d银币）\n下一次航行风险-8，并免除一次风暴损失。" % cost, "cost": cost, "quest_completed": quest_completed}
 
 func trade_contract_progress():
 	return clamp(max(0, int(trade_profit)), 0, trade_contract_target())
@@ -922,8 +1045,7 @@ func best_trade_opportunity():
 		for good_id in GameData.TRADE_GOODS:
 			var good = GameData.TRADE_GOODS[good_id]
 			var buy_price = trade_buy_price(good_id)
-			var arrival_buy = GameData.trade_market_price(str(destination), str(good_id), trade_day + days)
-			var sell_price = int(floor(float(arrival_buy) * 0.90))
+			var sell_price = trade_sell_price_at(str(destination), str(good_id), trade_day + days)
 			var units = max(1, int(floor(float(cargo_capacity()) / float(good.space))))
 			var total_profit = (sell_price - buy_price) * units - int(route.fee)
 			if best.is_empty() or total_profit > int(best.total_profit):
@@ -970,10 +1092,20 @@ func max_buyable_cargo(good_id):
 	return max(0, min(by_space, by_silver))
 
 func trade_buy_price(good_id):
-	return GameData.trade_market_price(str(player.location), good_id, trade_day)
+	return trade_buy_price_at(str(player.location), good_id, trade_day)
 
 func trade_sell_price(good_id):
-	return int(floor(float(trade_buy_price(good_id)) * 0.90))
+	return trade_sell_price_at(str(player.location), good_id, trade_day)
+
+func trade_buy_price_at(port_id, good_id, day):
+	var market_price = GameData.trade_market_price(str(port_id), str(good_id), int(day))
+	var discount = min(0.10, float(port_reputation_value(str(port_id))) * 0.005)
+	return max(1, int(round(float(market_price) * (1.0 - discount))))
+
+func trade_sell_price_at(port_id, good_id, day):
+	var market_price = GameData.trade_market_price(str(port_id), str(good_id), int(day))
+	var sell_rate = 0.90 + min(0.05, float(port_reputation_value(str(port_id))) * 0.0025)
+	return max(1, int(floor(float(market_price) * sell_rate)))
 
 func buy_cargo(good_id, amount = 1):
 	if not is_trade_unlocked():
@@ -1012,6 +1144,7 @@ func sell_cargo(good_id, amount = 1):
 	var realized_profit = total - removed_cost
 	player.silver += total
 	trade_profit += total
+	trade_lifetime_profit += realized_profit
 	var quest_completed = _advance_quest("trade_sell", str(good_id), actual_amount)
 	var left = old_count - actual_amount
 	if left <= 0:
@@ -1021,6 +1154,8 @@ func sell_cargo(good_id, amount = 1):
 		cargo[good_id] = left
 		cargo_costs[good_id] = max(0, old_cost - removed_cost)
 	trade_volume += actual_amount
+	if realized_profit > 0:
+		quest_completed = _add_port_reputation(str(player.location), max(1, int(floor(float(actual_amount) / 3.0)))) or quest_completed
 	message_history.push_front("在%s卖出%d%s%s。" % [GameData.TRADE_PORTS[player.location].name, actual_amount, good.unit, good.name])
 	_trim_history()
 	save_game()
@@ -1031,6 +1166,14 @@ func buy_max_cargo(good_id):
 
 func sell_all_cargo(good_id):
 	return sell_cargo(good_id, int(cargo.get(good_id, 0)))
+
+func voyage_risk(port_id):
+	var route = GameData.trade_route(str(player.location), str(port_id))
+	if route.is_empty():
+		return 0
+	var card_risk_bonus = 4 if active_card == "corsair_card" else 0
+	var protection_bonus = 8 if voyage_protection > 0 else 0
+	return max(4, int(route.get("risk", 15)) - int(ship.get("armor", 0)) * 6 - card_risk_bonus - protection_bonus)
 
 func sail_to(port_id):
 	if not is_trade_unlocked():
@@ -1051,22 +1194,27 @@ func sail_to(port_id):
 	trade_day += days
 	player.location = port_id
 	var quest_completed = _advance_quest("visit", str(port_id))
-	var card_risk_bonus = 4 if active_card == "corsair_card" else 0
-	var risk = max(4, int(route.get("risk", 15)) - int(ship.get("armor", 0)) * 6 - card_risk_bonus)
+	var protected_voyage = voyage_protection > 0
+	var risk = max(4, int(route.get("risk", 15)) - int(ship.get("armor", 0)) * 6 - (4 if active_card == "corsair_card" else 0) - (8 if protected_voyage else 0))
+	if protected_voyage:
+		voyage_protection = 0
 	var event_message = "航程平安。"
 	var event_roll = rng.randi_range(1, 100)
 	if event_roll <= risk:
-		var cargo_ids = cargo.keys()
-		cargo_ids.sort()
-		if not cargo_ids.is_empty():
-			var lost_id = str(cargo_ids[rng.randi_range(0, cargo_ids.size() - 1)])
-			_remove_item_from_cargo(lost_id, 1)
-			event_message = "遭遇风暴，损失1%s%s。" % [GameData.TRADE_GOODS[lost_id].unit, GameData.TRADE_GOODS[lost_id].name]
+		if protected_voyage:
+			event_message = "遭遇风暴，护航物资稳住货舱，未受损失。"
 		else:
-			var repair_cost = min(int(player.silver), 8 + risk)
-			player.silver -= repair_cost
-			trade_profit -= repair_cost
-			event_message = "遭遇风暴，支付%d银币修理船体。" % repair_cost
+			var cargo_ids = cargo.keys()
+			cargo_ids.sort()
+			if not cargo_ids.is_empty():
+				var lost_id = str(cargo_ids[rng.randi_range(0, cargo_ids.size() - 1)])
+				_remove_item_from_cargo(lost_id, 1)
+				event_message = "遭遇风暴，损失1%s%s。" % [GameData.TRADE_GOODS[lost_id].unit, GameData.TRADE_GOODS[lost_id].name]
+			else:
+				var repair_cost = min(int(player.silver), 8 + risk)
+				player.silver -= repair_cost
+				trade_profit -= repair_cost
+				event_message = "遭遇风暴，支付%d银币修理船体。" % repair_cost
 	elif event_roll >= 88:
 		var discovery = 18 + days * 4
 		player.silver += discovery
@@ -1075,7 +1223,7 @@ func sail_to(port_id):
 	message_history.push_front("海燕号从%s航行%d日，抵达%s。%s" % [from_name, days, GameData.TRADE_PORTS[port_id].name, event_message])
 	_trim_history()
 	save_game()
-	return {"ok": true, "message": "抵达%s · 航费%d · 用时%d日\n%s" % [GameData.TRADE_PORTS[port_id].name, fee, days, event_message], "days": days, "fee": fee, "risk": risk, "event": event_message, "from": from_port, "quest_completed": quest_completed}
+	return {"ok": true, "message": "抵达%s · 航费%d · 用时%d日\n%s" % [GameData.TRADE_PORTS[port_id].name, fee, days, event_message], "days": days, "fee": fee, "risk": risk, "event": event_message, "from": from_port, "protected": protected_voyage, "quest_completed": quest_completed}
 
 func _remove_item_from_cargo(good_id, count):
 	var old_count = int(cargo.get(good_id, 0))
@@ -1149,6 +1297,9 @@ func save_game():
 		"party_members": party_members, "companion_unlocked": companion_unlocked, "pet": pet,
 		"dungeon_cleared": dungeon_cleared, "cargo": cargo, "cargo_costs": cargo_costs, "ship": ship,
 		"trade_day": trade_day, "trade_profit": trade_profit, "trade_volume": trade_volume,
+		"trade_lifetime_profit": trade_lifetime_profit, "port_reputation": port_reputation,
+		"trade_order_cycles": trade_order_cycles, "completed_trade_orders": completed_trade_orders,
+		"voyage_protection": voyage_protection,
 		"battle_stance": battle_stance, "auto_heal_threshold": auto_heal_threshold, "auto_cure_status": auto_cure_status,
 		"equipment_upgrades": equipment_upgrades, "trade_contract_claimed": trade_contract_claimed,
 		"trade_contract_count": trade_contract_count, "active_card": active_card, "discoveries": discoveries,
@@ -1208,6 +1359,20 @@ func load_game():
 	trade_day = max(1, int(parsed.get("trade_day", 1)))
 	trade_profit = int(parsed.get("trade_profit", 0))
 	trade_volume = max(0, int(parsed.get("trade_volume", 0)))
+	trade_lifetime_profit = int(parsed.get("trade_lifetime_profit", 0))
+	port_reputation = parsed.get("port_reputation", {"venice_dock": 0, "ragusa_dock": 0, "alexandria_dock": 0})
+	if typeof(port_reputation) != TYPE_DICTIONARY:
+		port_reputation = {}
+	trade_order_cycles = parsed.get("trade_order_cycles", {"venice_dock": 0, "ragusa_dock": 0, "alexandria_dock": 0})
+	if typeof(trade_order_cycles) != TYPE_DICTIONARY:
+		trade_order_cycles = {}
+	completed_trade_orders = parsed.get("completed_trade_orders", {})
+	if typeof(completed_trade_orders) != TYPE_DICTIONARY:
+		completed_trade_orders = {}
+	voyage_protection = clamp(int(parsed.get("voyage_protection", 0)), 0, 1)
+	for trade_port_id in GameData.TRADE_PORTS:
+		port_reputation[str(trade_port_id)] = clamp(int(port_reputation.get(str(trade_port_id), 0)), 0, 30)
+		trade_order_cycles[str(trade_port_id)] = max(0, int(trade_order_cycles.get(str(trade_port_id), 0)))
 	battle_stance = str(parsed.get("battle_stance", "balanced"))
 	if not battle_stance in ["assault", "balanced", "guard", "plunder"]:
 		battle_stance = "balanced"
@@ -1252,5 +1417,7 @@ func load_game():
 	if int(player.level) >= GameData.MAX_LEVEL:
 		player.level = GameData.MAX_LEVEL
 		player.xp = 0
+	quest_index = clamp(quest_index, 0, GameData.QUESTS.size())
+	_sync_current_quest_progress()
 	player.hp = clamp(int(player.hp), 1, int(get_stats().max_hp))
 	return true

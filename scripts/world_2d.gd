@@ -655,8 +655,8 @@ func _update_nearest_actor():
 			action_button.text = "进入 · %s" % nearest_actor.name
 		elif nearest_actor.kind == "discovery":
 			action_button.text = "调查 · %s" % nearest_actor.name
-		elif nearest_actor.id == "ship_owner" and state.is_trade_unlocked():
-			action_button.text = "港口贸易 · 船老板"
+		elif str(nearest_actor.id) in ["ship_owner", "ragusa_broker", "alexandria_merchant"] and state.is_trade_unlocked() and not _is_current_talk_target(str(nearest_actor.id)):
+			action_button.text = "港口贸易 · %s" % str(nearest_actor.name)
 		else:
 			action_button.text = ("交谈 · " if nearest_actor.kind == "npc" else "挑战 · ") + nearest_actor.name
 
@@ -678,6 +678,11 @@ func _update_zone(force):
 			return
 	var state_location = str(state.player.location)
 	var same_effective_location = best_id == state_location or (best_id == "venice_dock" and state_location in GameData.TRADE_PORTS)
+	# 三座港口共用一张2D港区图，进入威尼斯码头的视觉区域时不能把远洋港口存档改回威尼斯。
+	if best_id == "venice_dock" and state_location in GameData.TRADE_PORTS:
+		current_zone = best_id
+		_refresh_hud()
+		return
 	if best_id == current_zone and same_effective_location and not force:
 		return
 	var result = state.arrive_from_2d(best_id)
@@ -747,7 +752,7 @@ func _interact():
 			_show_message("无法调查", str(discovery_result.get("message", "这里什么也没有。")))
 		return
 	if nearest_actor.kind == "npc":
-		if nearest_actor.id == "ship_owner" and state.is_trade_unlocked():
+		if str(nearest_actor.id) in ["ship_owner", "ragusa_broker", "alexandria_merchant"] and state.is_trade_unlocked() and not _is_current_talk_target(str(nearest_actor.id)):
 			_open_trade_2d()
 			return
 		var result = state.talk_to(nearest_actor.id)
@@ -761,6 +766,10 @@ func _interact():
 		else:
 			active_enemy_actor = {}
 			_show_message("无法战斗", result.message)
+
+func _is_current_talk_target(npc_id):
+	var quest = state.get_current_quest()
+	return not quest.is_empty() and str(quest.objective.type) == "talk" and str(quest.objective.target) == str(npc_id)
 
 func _switch_region(region_id, entrance_location):
 	if region_id == "dungeon" and int(state.player.level) < 3:
@@ -853,7 +862,7 @@ func _claim_quest_2d():
 	content.add_child(_label(str(result.reward_text), 18, TEAL))
 	var next_quest = state.get_current_quest()
 	if next_quest.is_empty():
-		content.add_child(_label("第一卷·黑帆之谜完成！你找回了自己的名字，但亚历山大灯塔下的真相仍在等待。", 17, INK))
+		content.add_child(_label("第二卷·灯塔下的回声完成！三港星图已经指出下一站：马耳他。", 17, INK))
 	else:
 		content.add_child(_label("下一个任务｜%s" % next_quest.title, 20, GOLD))
 		var story = _label(next_quest.story, 16, MUTED)
@@ -1340,7 +1349,7 @@ func _open_quest():
 	content.add_theme_constant_override("separation", 14)
 	content.add_child(_label("航海任务", 26, GOLD))
 	var progress = state.story_progress()
-	content.add_child(_label("第一卷进度 %d/%d｜%s %d/%d" % [int(progress.completed), int(progress.total), str(progress.chapter), int(progress.chapter_completed), int(progress.chapter_total)], 15, TEAL))
+	content.add_child(_label("%s %d/%d｜%s %d/%d" % [str(progress.volume), int(progress.volume_completed), int(progress.volume_total), str(progress.chapter), int(progress.chapter_completed), int(progress.chapter_total)], 15, TEAL))
 	content.add_child(_label("持有银币：%d" % int(state.player.silver), 14, GOLD))
 	var recap_titles = state.completed_story_titles(3)
 	if not recap_titles.is_empty():
@@ -1350,8 +1359,8 @@ func _open_quest():
 		content.add_child(recap)
 	var quest = state.get_current_quest()
 	if quest.is_empty():
-		content.add_child(_label("第一卷·黑帆之谜已完成", 22, GOLD))
-		var epilogue = _label("你取回了失去的名字——卡西安。海图指向亚历山大，而威尼斯的悬赏、贸易与副本仍会继续记录你的传奇。\n\n当前称号：%s" % str(state.player.title), 16, TEAL)
+		content.add_child(_label("第二卷·灯塔下的回声已完成", 22, GOLD))
+		var epilogue = _label("你取得三港星图与灯塔星盘，确认艾丽莎的父亲最后驶向马耳他。港口订单、行情贸易、悬赏与副本仍会继续记录你的航海生涯。\n\n当前称号：%s" % str(state.player.title), 16, TEAL)
 		epilogue.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		content.add_child(epilogue)
 	else:
@@ -1414,7 +1423,10 @@ func _quest_navigation_target():
 			if str(objective.target) in GameData.LOCATIONS[location_id].enemies:
 				target_location = location_id
 				break
-	elif objective.type in ["trade_buy", "trade_sell", "upgrade_ship"]:
+	elif objective.type == "trade_order":
+		var order = GameData.TRADE_ORDERS.get(str(objective.target), {})
+		target_location = str(order.get("port", "venice_dock"))
+	elif objective.type in ["trade_buy", "trade_sell", "trade_reputation", "prepare_voyage", "upgrade_ship"]:
 		target_location = str(state.player.location) if str(state.player.location) in GameData.TRADE_PORTS else "venice_dock"
 	elif objective.type == "upgrade_equipment":
 		target_location = str(state.player.location)
@@ -1427,7 +1439,7 @@ func _quest_navigation_target():
 			return {"region": "dungeon", "location": "training_dungeon_3", "actor_id": "tide_beast", "name": "三层潮汐兽"}
 	if target_location == "":
 		target_location = "venice_square"
-	var actor_id = "" if objective.type == "visit" else str(objective.target)
+	var actor_id = "" if objective.type in ["visit", "trade_order", "trade_reputation", "prepare_voyage", "trade_buy", "trade_sell", "upgrade_ship"] else str(objective.target)
 	return {
 		"region": str(region_by_location.get(target_location, "city")),
 		"location": target_location, "actor_id": actor_id,
@@ -1471,13 +1483,11 @@ func _update_waypoint_screen_position():
 
 func _navigate_to_quest():
 	var quest = state.get_current_quest()
-	if not quest.is_empty() and str(quest.objective.type) == "visit" and str(quest.objective.target) in GameData.TRADE_PORTS:
-		_open_trade_2d()
-		return
 	if not quest.is_empty() and str(quest.objective.type) == "upgrade_equipment":
 		_open_inventory()
 		return
-	if not quest.is_empty() and str(quest.objective.type) in ["trade_buy", "trade_sell", "upgrade_ship"]:
+	var needs_harbor = not quest.is_empty() and (str(quest.objective.type) in ["trade_buy", "trade_sell", "trade_order", "trade_reputation", "prepare_voyage", "upgrade_ship"] or (str(quest.objective.type) == "visit" and str(quest.objective.target) in GameData.TRADE_PORTS))
+	if needs_harbor:
 		if str(state.player.location) in GameData.TRADE_PORTS:
 			_open_trade_2d()
 			return
@@ -1696,7 +1706,7 @@ func _open_trade_2d():
 	var wallet = _label("持有银币：%d" % int(state.player.silver), 20, GOLD)
 	wallet.add_theme_stylebox_override("normal", _style(Color(0.18, 0.13, 0.03, 0.94), 11, Color(GOLD, 0.66), 1, 11))
 	content.add_child(wallet)
-	content.add_child(_label("第%d日 · 货舱%d/%d · 货值%d · 浮动盈亏%+d · 船速Lv.%d · 护甲Lv.%d" % [state.trade_day, state.cargo_used(), state.cargo_capacity(), state.cargo_market_value(), state.cargo_unrealized_profit(), int(state.ship.speed), int(state.ship.get("armor", 0))], 14, TEAL))
+	content.add_child(_label("第%d日 · 货舱%d/%d · 货值%d · 浮动盈亏%+d · 本港声望%d · 总声望%d" % [state.trade_day, state.cargo_used(), state.cargo_capacity(), state.cargo_market_value(), state.cargo_unrealized_profit(), state.port_reputation_value(port_id), state.total_trade_reputation()], 14, TEAL))
 	var scroll = ScrollContainer.new()
 	scroll.custom_minimum_size.y = 560
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -1717,6 +1727,29 @@ func _open_trade_2d():
 		forecast.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		forecast.add_theme_stylebox_override("normal", _style(Color(0.03, 0.17, 0.15, 0.92), 10, Color(TEAL, 0.5), 1, 10))
 		list.add_child(forecast)
+	var order = state.current_trade_order(port_id)
+	if not order.is_empty():
+		var order_good = GameData.TRADE_GOODS[str(order.good)]
+		var held_for_order = int(state.cargo.get(str(order.good), 0))
+		var order_card = VBoxContainer.new()
+		order_card.add_theme_constant_override("separation", 6)
+		order_card.add_child(_label("港口订单｜%s%s" % [str(order.title), " · 主线" if bool(order.get("story", false)) else ""], 16, GOLD))
+		var order_copy = _label("%s\n交付%s×%d｜货舱%d/%d｜额外奖金%d｜声望+%d" % [str(order.description), str(order_good.name), int(order.amount), held_for_order, int(order.amount), int(order.bonus), int(order.reputation)], 13, INK)
+		order_copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		order_card.add_child(order_copy)
+		var order_claim = _button("交付订单", "gold")
+		order_claim.disabled = not state.trade_order_can_claim(port_id)
+		order_claim.pressed.connect(_claim_trade_order_2d)
+		order_card.add_child(order_claim)
+		var order_panel = PanelContainer.new()
+		order_panel.add_theme_stylebox_override("panel", _style(Color(0.18, 0.13, 0.03, 0.9), 11, Color(GOLD, 0.5), 1, 11))
+		order_panel.add_child(order_card)
+		list.add_child(order_panel)
+	var protection_text = "护航物资已装船｜下次航行风险-8，并免除一次风暴损失" if state.voyage_protection > 0 else "购买护航物资 45银｜下次航行风险-8，并免除一次风暴损失"
+	var protection = _button(protection_text, "primary" if state.voyage_protection <= 0 else "ghost")
+	protection.disabled = state.voyage_protection > 0 or int(state.player.silver) < 45
+	protection.pressed.connect(_buy_voyage_protection_2d)
+	list.add_child(protection)
 	var contract = HBoxContainer.new()
 	contract.add_theme_constant_override("separation", 8)
 	var contract_target = state.trade_contract_target()
@@ -1770,8 +1803,7 @@ func _open_trade_2d():
 			continue
 		var route = GameData.trade_route(port_id, destination)
 		var days = max(1, int(route.days) - (int(state.ship.speed) - 1))
-		var card_risk_bonus = 4 if state.active_card == "corsair_card" else 0
-		var risk = max(4, int(route.get("risk", 15)) - int(state.ship.get("armor", 0)) * 6 - card_risk_bonus)
+		var risk = state.voyage_risk(destination)
 		var sail = _button("启航前往%s · %d日 · %d银币 · 风险%d%%" % [GameData.TRADE_PORTS[destination].name, days, int(route.fee), risk], "gold")
 		sail.disabled = int(state.player.silver) < int(route.fee)
 		sail.pressed.connect(_trade_sail_2d.bind(destination))
@@ -1786,6 +1818,7 @@ func _open_trade_2d():
 		upgrade_button.disabled = (upgrade_entry.id == "hold" and state.cargo_capacity() >= 30) or (upgrade_entry.id == "speed" and int(state.ship.speed) >= 4) or (upgrade_entry.id == "armor" and int(state.ship.get("armor", 0)) >= 3)
 		upgrade_button.pressed.connect(_trade_upgrade_2d.bind(upgrade_entry.id))
 		list.add_child(upgrade_button)
+	list.add_child(_label("本轮商会净收支：%+d｜生涯已实现货差：%+d｜累计成交%d件" % [state.trade_profit, state.trade_lifetime_profit, state.trade_volume], 13, MUTED))
 	var close = _button("返回港口地图", "primary")
 	close.pressed.connect(_close_overlay)
 	content.add_child(close)
@@ -1827,6 +1860,30 @@ func _claim_trade_contract_2d():
 	_refresh_hud()
 	_close_overlay()
 	_show_message("商会委托", str(result.get("message", "领取失败")))
+
+func _claim_trade_order_2d():
+	var result = state.claim_trade_order()
+	if bool(result.get("ok", false)):
+		AudioDirector.play_sfx("reward")
+	_refresh_hud()
+	_close_overlay()
+	if bool(result.get("quest_completed", false)):
+		call_deferred("_show_quest_claim")
+	elif bool(result.get("ok", false)):
+		_show_message("港口订单", str(result.message))
+	else:
+		_show_message("无法交付", str(result.message))
+
+func _buy_voyage_protection_2d():
+	var result = state.buy_voyage_protection()
+	_refresh_hud()
+	_close_overlay()
+	if bool(result.get("quest_completed", false)):
+		call_deferred("_show_quest_claim")
+	elif bool(result.get("ok", false)):
+		_show_message("护航物资", str(result.message))
+	else:
+		_show_message("无法购买", str(result.message))
 
 func _trade_sail_2d(destination):
 	var result = state.sail_to(destination)

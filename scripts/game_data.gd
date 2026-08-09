@@ -236,6 +236,25 @@ const TRADE_EVENTS = [
 	{"name": "橄榄丰收", "description": "拉古萨橄榄油丰收，市场供应充足。", "port": "ragusa_dock", "good": "olive_oil", "multiplier": 0.76}
 ]
 
+# 港口订单兼顾剧情委托与可重复跑商。剧情订单优先显示，完成后各港会继续轮换日常委托。
+const TRADE_ORDERS = {
+	"alexandria_lighthouse_glass": {"title": "灯塔修缮急单", "port": "alexandria_dock", "good": "venetian_glass", "amount": 3, "bonus": 150, "reputation": 2, "description": "灯塔镜室急需耐高温的威尼斯玻璃。"},
+	"ragusa_lamp_oil": {"title": "石墙港灯油", "port": "ragusa_dock", "good": "olive_oil", "amount": 4, "bonus": 125, "reputation": 2, "description": "城墙守夜人要在风季前补足灯油。"},
+	"venice_tide_medicine": {"title": "潮汐药引", "port": "venice_dock", "good": "spices", "amount": 4, "bonus": 180, "reputation": 2, "description": "酒馆医师要用东方香料配制唤醒旧记忆的药剂。"},
+	"venice_spice_feast": {"title": "翼狮庆典香料", "port": "venice_dock", "good": "spices", "amount": 3, "bonus": 90, "reputation": 2, "description": "庆典厨房高价收购三袋东方香料。"},
+	"venice_wool_uniforms": {"title": "卫队冬装", "port": "venice_dock", "good": "wool_cloth", "amount": 4, "bonus": 80, "reputation": 2, "description": "城防队为冬季巡逻订购羊毛布。"},
+	"ragusa_glass_banquet": {"title": "总督玻璃宴具", "port": "ragusa_dock", "good": "venetian_glass", "amount": 2, "bonus": 85, "reputation": 2, "description": "总督府宴会需要一批威尼斯玻璃器皿。"},
+	"ragusa_spice_fair": {"title": "商队香料会", "port": "ragusa_dock", "good": "spices", "amount": 3, "bonus": 100, "reputation": 2, "description": "陆路商队正在收购便于转运的香料。"},
+	"alexandria_wool_sails": {"title": "红海船队帆布", "port": "alexandria_dock", "good": "wool_cloth", "amount": 4, "bonus": 120, "reputation": 2, "description": "远航船队需要结实的羊毛帆布。"},
+	"alexandria_palace_glass": {"title": "宫廷彩窗", "port": "alexandria_dock", "good": "venetian_glass", "amount": 2, "bonus": 135, "reputation": 2, "description": "宫廷工匠正在修补一组彩色玻璃窗。"}
+}
+
+const PORT_ORDER_ROTATION = {
+	"venice_dock": ["venice_spice_feast", "venice_wool_uniforms"],
+	"ragusa_dock": ["ragusa_glass_banquet", "ragusa_spice_fair"],
+	"alexandria_dock": ["alexandria_wool_sails", "alexandria_palace_glass"]
+}
+
 const ENEMIES = {
 	"drunk_sailor": {"name": "喝醉的水手", "level": 1, "rank": "普通", "hp": 42, "attack": 8, "defense": 2, "speed": 4, "exp": 22, "silver": [6, 11], "drops": ["unknown_equipment", "small_milk"], "intro": "醉醺醺的水手举起酒瓶，摇晃着向你冲来。"},
 	"sewer_rat": {"name": "灰毛巨鼠", "level": 1, "rank": "普通", "hp": 34, "attack": 7, "defense": 1, "speed": 7, "exp": 18, "silver": [4, 8], "drops": ["unknown_equipment", "sea_salt_bread"], "effect": {"name": "中毒", "chance": 0.12, "rounds": 3}, "intro": "巨鼠从废水渠里钻出，牙齿上泛着绿色液光。"},
@@ -279,6 +298,7 @@ const ITEMS = {
 	,"captain_hat": {"name": "黑帆船长帽", "type": "equipment", "slot": "head", "rarity": "史诗", "description": "帽檐下藏着一枚被刮去图案的徽章。", "stats": {"max_hp": 26, "defense": 7, "speed": 4}, "price": 420}
 	,"black_sail_charm": {"name": "黑帆航路仪", "type": "equipment", "slot": "charm", "rarity": "传说", "description": "记录神秘鳞片航路的精密仪器。", "stats": {"max_hp": 55, "attack": 9, "defense": 7, "speed": 5}, "price": 680}
 	,"tide_seal": {"name": "潮纹银章", "type": "equipment", "slot": "charm", "rarity": "传说", "description": "艾丽莎父亲留下的银章，背面刻着你失去的名字。", "stats": {"max_hp": 70, "attack": 12, "defense": 8, "speed": 6}, "price": 880}
+	,"lighthouse_compass": {"name": "灯塔星盘", "type": "equipment", "slot": "charm", "rarity": "传说", "description": "萨米尔从灯塔密室取出的星盘，指针会追随发光鳞片的潮汐。", "stats": {"max_hp": 92, "attack": 16, "defense": 11, "speed": 9}, "price": 1280}
 }
 
 const IDENTIFY_POOL = ["linen_cap", "traveler_boots", "bronze_charm", "guard_belt", "spider_knife"]
@@ -291,7 +311,10 @@ const QUEST_DIALOGUES = {
 	"scale_memory|alisa": "你终于醒了。父亲在沙滩上发现你时，你手里紧紧攅着这片发光的鳞。去问问老海鸥酒馆的老板吧，他见过的船比我们见过的人还多。",
 	"tavern_clue|tavern_keeper": "这不是普通的鱼鳞。二十年前，一支没有旗帜的船队带着同样的光经过威尼斯。想追上它，先证明你能在北门活下来。",
 	"return_chart|tavern_keeper": "雷蒙只是替人守着这张图。你看，黑帆航线的终点不在走私洞，而在亚历山大灯塔之下。先回去见艾丽莎。她一直有件事没告诉你。",
-	"alisa_truth|alisa": "对不起。父亲救起你后就带着另一片鳞出海，再也没有回来。他留下这枚银章，说只有拿回黑帆海图的人才能看见背面的字。现在它亮了——卡西安。那是你的名字。"
+	"alisa_truth|alisa": "对不起。父亲救起你后就带着另一片鳞出海，再也没有回来。他留下这枚银章，说只有拿回黑帆海图的人才能看见背面的字。现在它亮了——卡西安。那是你的名字。",
+	"lighthouse_letter|tavern_keeper": "卡西安，亚历山大的萨米尔托船带来一封密信。灯塔昨夜亮起了和你鳞片一样的蓝光。别只带剑去——准备三箱威尼斯玻璃，商人更愿意对能解决问题的人开口。",
+	"samir_testimony|alexandria_merchant": "艾丽莎的父亲来过这里。他让人封住灯塔地下的潮门，又把开启它的星图拆成三份，交给三港最可信的商会。先帮我修好灯塔镜室，我才敢把第一份交给你。",
+	"keeper_return|tavern_keeper": "三港印记已经在星盘上合为一体。艾丽莎的父亲并非葬身海上——最后一封账簿写着，他搭乘‘白鲸号’去了马耳他。卡西安，你找回名字只是开始，下一次潮门开启时，我们就去找他。"
 }
 
 const BOUNTIES = [
@@ -328,21 +351,38 @@ const QUESTS = [
 	,{"id": "captain_ledger", "title": "黑帆船长雷蒙", "story": "登上船长厅，击败雷蒙并夺取记录发光鳞片航线的海图。", "objective": {"type": "kill", "target": "corsair_captain", "need": 1}, "reward": {"exp": 5200, "silver": 600, "item": "black_sail_charm"}}
 	,{"id": "return_chart", "title": "黑帆海图", "story": "将从雷蒙手中夺回的黑帆海图带给老海鸥酒馆老板。", "objective": {"type": "talk", "target": "tavern_keeper", "need": 1}, "reward": {"exp": 0, "silver": 260, "item": "stamina_tonic"}}
 	,{"id": "alisa_truth", "title": "潮汐中的名字", "story": "回到海边小屋见艾丽莎，听她说出一直隐瞒的真相。", "objective": {"type": "talk", "target": "alisa", "need": 1}, "reward": {"exp": 0, "silver": 320, "item": "tide_seal", "title": "潮汐追迹者"}}
+	,{"id": "lighthouse_letter", "title": "灯塔来信", "story": "第一卷之后，酒馆老板收到萨米尔的密信。回酒馆确认灯塔异象。", "objective": {"type": "talk", "target": "tavern_keeper", "need": 1}, "reward": {"exp": 1800, "silver": 260}}
+	,{"id": "sail_lighthouse", "title": "驶向灯塔港", "story": "备好三箱威尼斯玻璃，驾驶海燕号抵达亚历山大。", "objective": {"type": "visit", "target": "alexandria_dock", "need": 1}, "reward": {"exp": 2200, "silver": 300}}
+	,{"id": "samir_testimony", "title": "香料商的证词", "story": "在亚历山大港寻找萨米尔，询问艾丽莎父亲与潮门的秘密。", "objective": {"type": "talk", "target": "alexandria_merchant", "need": 1}, "reward": {"exp": 2600, "silver": 340}}
+	,{"id": "lighthouse_repairs", "title": "修缮灯塔镜室", "story": "向亚历山大商会交付三箱威尼斯玻璃，换取第一枚商会印记。", "objective": {"type": "trade_order", "target": "alexandria_lighthouse_glass", "need": 1}, "reward": {"exp": 3000, "silver": 380}}
+	,{"id": "ragusa_nightwatch", "title": "石墙港的灯火", "story": "把四桶橄榄油送到拉古萨，为守夜人补足灯油。", "objective": {"type": "trade_order", "target": "ragusa_lamp_oil", "need": 1}, "reward": {"exp": 3400, "silver": 420}}
+	,{"id": "three_port_trust", "title": "三港信任", "story": "继续完成港口订单，将三港总声望提升到6，取得商会星图。", "objective": {"type": "trade_reputation", "target": "total", "need": 6}, "reward": {"exp": 3800, "silver": 480}}
+	,{"id": "guarded_passage", "title": "穿越季风", "story": "在任意港口购买一次护航物资，为长航程免除一次风暴损失。", "objective": {"type": "prepare_voyage", "target": "storm_kit", "need": 1}, "reward": {"exp": 4200, "silver": 520}}
+	,{"id": "tide_medicine", "title": "潮汐药引", "story": "把四袋东方香料送回威尼斯，完成唤醒旧航海日志的药剂。", "objective": {"type": "trade_order", "target": "venice_tide_medicine", "need": 1}, "reward": {"exp": 4600, "silver": 620}}
+	,{"id": "keeper_return", "title": "灯塔下的回声", "story": "回到老海鸥酒馆，让老板解读三港星图与旧航海日志。", "objective": {"type": "talk", "target": "tavern_keeper", "need": 1}, "reward": {"exp": 6000, "silver": 900, "item": "lighthouse_compass", "title": "灯塔守望者"}}
 ]
 
 const STORY_CHAPTERS = [
 	{"title": "序章·失去的名字", "start": 0, "end": 2, "summary": "你被艾丽莎一家从海难中救起，发光鳞片把线索引向威尼斯酒馆。"},
 	{"title": "第一章·威尼斯试炼", "start": 3, "end": 6, "summary": "你替城市清理危机、集结伙伴，并在四层副本中证明了自己。"},
 	{"title": "第二章·海燕号商路", "start": 7, "end": 11, "summary": "海燕号启航。贸易、强化与船只改造让你获得追查黑帆的力量。"},
-	{"title": "第三章·黑帆之谜", "start": 12, "end": 18, "summary": "你潜入黑帆据点夺回海图，并循着潮声找回被隐藏的名字。"}
+	{"title": "第三章·黑帆之谜", "start": 12, "end": 18, "summary": "你潜入黑帆据点夺回海图，并循着潮声找回被隐藏的名字。"},
+	{"title": "第四章·灯塔来信", "start": 19, "end": 22, "summary": "亚历山大灯塔发出蓝光。你以货物修复镜室，从萨米尔处取得第一枚商会印记。"},
+	{"title": "第五章·三港星图", "start": 23, "end": 25, "summary": "你用真实的贸易帮助三港，在季风到来前赢得商会信任并备妥护航物资。"},
+	{"title": "第六章·灯塔回声", "start": 26, "end": 27, "summary": "潮汐药剂唤醒旧日志，星盘指出艾丽莎父亲最后驶向了马耳他。"}
+]
+
+const STORY_VOLUMES = [
+	{"title": "第一卷·潮汐纪事", "start": 0, "end": 18},
+	{"title": "第二卷·灯塔下的回声", "start": 19, "end": 27}
 ]
 
 const SLOT_NAMES = {"weapon": "手持", "head": "头戴", "body": "身穿", "waist": "腰部", "boots": "脚穿", "charm": "配饰"}
 
-const MAX_LEVEL = 15
+const MAX_LEVEL = 20
 
 static func xp_needed(level):
-	var curve = [0, 70, 115, 175, 255, 360, 500, 680, 900, 1160, 1460, 1800, 2180, 2600, 3060, 3560]
+	var curve = [0, 70, 115, 175, 255, 360, 500, 680, 900, 1160, 1460, 1800, 2180, 2600, 3060, 3560, 4080, 4660, 5300, 6000, 6780]
 	if level < curve.size():
 		return curve[level]
 	return 500 + (level - 5) * 180
@@ -356,6 +396,9 @@ static func objective_name(objective):
 		"trade_sell": return "卖出%s" % TRADE_GOODS[objective.target].name
 		"upgrade_equipment": return "强化%s" % SLOT_NAMES[objective.target]
 		"upgrade_ship": return "升级船体护甲"
+		"trade_order": return "交付%s" % TRADE_ORDERS.get(str(objective.target), {"title": "港口订单"}).title
+		"trade_reputation": return "三港总声望"
+		"prepare_voyage": return "购买护航物资"
 		_: return str(objective.target)
 
 static func quest_dialogue(quest_id, npc_id):

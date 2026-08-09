@@ -1545,7 +1545,7 @@ func _open_quest_detail():
 	var content = VBoxContainer.new()
 	content.add_theme_constant_override("separation", 12)
 	var progress = state.story_progress()
-	content.add_child(_label("第一卷进度 %d/%d｜%s %d/%d" % [int(progress.completed), int(progress.total), str(progress.chapter), int(progress.chapter_completed), int(progress.chapter_total)], 13, TEAL))
+	content.add_child(_label("%s %d/%d｜%s %d/%d" % [str(progress.volume), int(progress.volume_completed), int(progress.volume_total), str(progress.chapter), int(progress.chapter_completed), int(progress.chapter_total)], 13, TEAL))
 	var recap_titles = state.completed_story_titles(3)
 	if not recap_titles.is_empty():
 		var recap = _label("剧情回顾｜%s\n%s" % [" → ".join(recap_titles), str(progress.summary)], 12, MUTED)
@@ -1553,7 +1553,7 @@ func _open_quest_detail():
 		content.add_child(recap)
 	var quest = state.get_current_quest()
 	if quest.is_empty():
-		content.add_child(_empty_state("第一卷·黑帆之谜已完成。你找回了名字“卡西安”，海图的下一站指向亚历山大灯塔。"))
+		content.add_child(_empty_state("第二卷·灯塔下的回声已完成。三港星图与灯塔星盘把下一段航路指向马耳他。"))
 	else:
 		content.add_child(_label(quest.title, 20, GOLD))
 		content.add_child(_label(quest.story, 13, Color("b7cfd5")))
@@ -1622,7 +1622,16 @@ func _quest_route_hint(index):
 		"cave_battery": "黑帆据点三层 → 夺取洞窟炮台",
 		"captain_ledger": "黑帆据点四层 → 击败船长雷蒙",
 		"return_chart": "回威尼斯酒馆 → 交付黑帆海图",
-		"alisa_truth": "回海边小屋 → 与艾丽莎交谈"
+		"alisa_truth": "回海边小屋 → 与艾丽莎交谈",
+		"lighthouse_letter": "步行返回老海鸥酒馆 → 阅读萨米尔来信",
+		"sail_lighthouse": "步行到威尼斯码头 → 可先买3箱玻璃 → 启航亚历山大",
+		"samir_testimony": "亚历山大灯塔港 → 与香料商萨米尔交谈",
+		"lighthouse_repairs": "亚历山大港口订单 → 交付3箱威尼斯玻璃",
+		"ragusa_nightwatch": "亚历山大买4桶橄榄油 → 航行拉古萨 → 交付订单",
+		"three_port_trust": "完成任意港口订单或盈利出售货物 → 三港总声望达到6",
+		"guarded_passage": "任意港口 → 购买护航物资",
+		"tide_medicine": "亚历山大买4袋东方香料 → 航行威尼斯 → 交付订单",
+		"keeper_return": "威尼斯码头 → 步行老海鸥酒馆 → 解读星图"
 	}
 	return str(routes.get(quest_id, "打开2D世界的任务导航寻找当前目标。"))
 
@@ -1711,7 +1720,7 @@ func _open_harbor():
 		state.player.location = port_id
 	var port = GameData.TRADE_PORTS[port_id]
 	content.add_child(_label("%s港口市场" % port.name, 20, GOLD))
-	var status = _label("持有银币：%d｜第%d日 · %s · 船速Lv.%d · 货舱%d/%d · 货值%d · 浮动盈亏%+d" % [int(state.player.silver), state.trade_day, state.ship.name, int(state.ship.speed), state.cargo_used(), state.cargo_capacity(), state.cargo_market_value(), state.cargo_unrealized_profit()], 12, TEAL)
+	var status = _label("持有银币：%d｜第%d日 · %s · 货舱%d/%d · 货值%d · 浮动%+d · 本港声望%d / 总声望%d" % [int(state.player.silver), state.trade_day, state.ship.name, state.cargo_used(), state.cargo_capacity(), state.cargo_market_value(), state.cargo_unrealized_profit(), state.port_reputation_value(port_id), state.total_trade_reputation()], 12, TEAL)
 	status.add_theme_stylebox_override("normal", _style(Color(0.04, 0.18, 0.18, 0.86), 10, Color(TEAL, 0.45), 1, 11))
 	content.add_child(status)
 	content.add_child(_label("行情：%s｜买入价每日波动；本港卖出价为行情的90%%。" % port.note, 11, MUTED))
@@ -1727,6 +1736,23 @@ func _open_harbor():
 	var opportunity = state.best_trade_opportunity()
 	if not opportunity.is_empty():
 		market.add_child(_label("商会推荐｜%s → %s｜%d日后满舱估算净利 %+d" % [GameData.TRADE_GOODS[str(opportunity.good_id)].name, GameData.TRADE_PORTS[str(opportunity.destination)].name, int(opportunity.days), int(opportunity.total_profit)], 11, TEAL))
+	var order = state.current_trade_order(port_id)
+	if not order.is_empty():
+		var order_row = HBoxContainer.new()
+		order_row.add_theme_constant_override("separation", 8)
+		var held_for_order = int(state.cargo.get(str(order.good), 0))
+		var order_info = _label("港口订单｜%s%s\n%s×%d · 货舱%d/%d · 奖金%d · 声望+%d" % [str(order.title), " · 主线" if bool(order.get("story", false)) else "", GameData.TRADE_GOODS[str(order.good)].name, int(order.amount), held_for_order, int(order.amount), int(order.bonus), int(order.reputation)], 11, GOLD)
+		order_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		order_row.add_child(order_info)
+		var order_claim = _button("交付订单", "gold")
+		order_claim.disabled = not state.trade_order_can_claim(port_id)
+		order_claim.pressed.connect(_claim_trade_order_from_journal)
+		order_row.add_child(order_claim)
+		market.add_child(order_row)
+	var protection = _button("护航物资已装船" if state.voyage_protection > 0 else "购买护航物资 45银 · 下次航行免损", "ghost")
+	protection.disabled = state.voyage_protection > 0 or int(state.player.silver) < 45
+	protection.pressed.connect(_buy_voyage_protection_from_journal)
+	market.add_child(protection)
 	var contract = HBoxContainer.new()
 	contract.add_theme_constant_override("separation", 8)
 	var contract_target = state.trade_contract_target()
@@ -1786,8 +1812,7 @@ func _open_harbor():
 			continue
 		var route = GameData.trade_route(port_id, destination)
 		var days = max(1, int(route.days) - (int(state.ship.speed) - 1))
-		var card_risk_bonus = 4 if state.active_card == "corsair_card" else 0
-		var risk = max(4, int(route.get("risk", 15)) - int(state.ship.get("armor", 0)) * 6 - card_risk_bonus)
+		var risk = state.voyage_risk(destination)
 		var sail = _button("前往%s · %d日 · 航费%d · 风险%d%%" % [GameData.TRADE_PORTS[destination].name, days, int(route.fee), risk], "primary")
 		sail.disabled = int(state.player.silver) < int(route.fee)
 		sail.pressed.connect(_trade_sail.bind(destination))
@@ -1812,7 +1837,7 @@ func _open_harbor():
 	armor.pressed.connect(_trade_upgrade.bind("armor"))
 	upgrades.add_child(armor)
 	market.add_child(upgrades)
-	market.add_child(_label("贸易净收支：%+d银币｜累计成交%d笔（已计买货与航费）" % [state.trade_profit, state.trade_volume], 11, MUTED))
+	market.add_child(_label("本轮商会净收支：%+d银币｜生涯已实现货差：%+d｜累计成交%d件" % [state.trade_profit, state.trade_lifetime_profit, state.trade_volume], 11, MUTED))
 	_open_modal("货物贸易", content, Vector2(720, 1120) if mobile_mode else Vector2(760, 650))
 
 func _hold_upgrade_state(button):
@@ -1856,6 +1881,28 @@ func _claim_trade_contract_from_journal():
 	refresh_ui()
 	_show_toast(result.message, result.ok)
 	call_deferred("_open_harbor")
+
+func _claim_trade_order_from_journal():
+	var result = state.claim_trade_order()
+	if bool(result.get("ok", false)):
+		AudioDirector.play_sfx("reward")
+	_close_modal()
+	refresh_ui()
+	_show_toast(result.message, result.ok)
+	if bool(result.get("quest_completed", false)):
+		call_deferred("_show_quest_completion_prompt")
+	else:
+		call_deferred("_open_harbor")
+
+func _buy_voyage_protection_from_journal():
+	var result = state.buy_voyage_protection()
+	_close_modal()
+	refresh_ui()
+	_show_toast(result.message, result.ok)
+	if bool(result.get("quest_completed", false)):
+		call_deferred("_show_quest_completion_prompt")
+	else:
+		call_deferred("_open_harbor")
 
 func _show_welcome():
 	var content = VBoxContainer.new()
