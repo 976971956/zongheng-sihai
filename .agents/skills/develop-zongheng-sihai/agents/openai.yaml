@@ -1,0 +1,4 @@
+interface:
+  display_name: "纵横四海开发与发布"
+  short_description: "修改、完整验证并自动发布纵横四海 Godot 手机游戏项目"
+  default_prompt: "使用 $develop-zongheng-sihai 完成游戏修改、完整测试并发布线上版本。"
