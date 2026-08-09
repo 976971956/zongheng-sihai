@@ -33,6 +33,7 @@ func _run():
 	_check("player_walk_back_v1" in str(scene.player_actor.art_sprite.texture.resource_path), "主角向上走时必须切换为背面步态")
 	scene.player_actor.set_motion(Vector2.ZERO)
 	_check(scene.actors.size() >= 4, "地图必须包含NPC和可见敌人")
+	_check(_has_actor(scene, "guard_captain") and _has_actor(scene, "jeweler") and _has_actor(scene, "venice_shipwright"), "威尼斯必须生成守卫、珠宝商与船匠，不能只存在于数据配置中")
 	_check(scene.player_actor.position.x > 0 and scene.player_actor.position.y > 0, "玩家必须出生在可行走地图内")
 	var saved_respawn_key = scene._enemy_spawn_key("drunk_sailor")
 	scene.state.enemy_respawns[saved_respawn_key] = scene._world_time_seconds() + 60.0
@@ -280,10 +281,29 @@ func _run():
 	scene._spawn_world_actors()
 	scene._update_zone(true)
 	_check(str(scene.state.player.location) == "alexandria_dock" and _has_actor(scene, "alexandria_merchant"), "亚历山大港重新进入2D地图后必须保留港口位置和当地商人")
+	_check(_has_actor(scene, "alex_lighthouse_keeper") and _has_actor(scene, "alex_shipwright"), "远洋港口必须同时生成剧情人物、港务人物和船匠，不能只有一名NPC")
 	scene.player_actor.position = _actor_position(scene, "alexandria_merchant")
 	scene._update_nearest_actor()
 	scene._interact()
 	_check(_has_label_text(scene.overlay, "亚历山大港口市场") and _has_button_text(scene.overlay, "交付订单"), "非对话任务时点击亚历山大商人必须直接打开当地港口市场")
+	scene._close_overlay()
+	await process_frame
+
+	# 航海必须使用可视化九港海图，并在航行动画完成后落到真实目的港。
+	scene.state.player.silver = 1000
+	scene._open_sailing_map()
+	_check(is_instance_valid(scene.sailing_map) and scene.sailing_map.port_buttons.size() == GameData.TRADE_PORTS.size(), "航海图必须显示全部九座港口节点")
+	_check(not scene.sailing_map.port_buttons["amsterdam_dock"].disabled, "主线完成后九座港口必须全部在海图上解锁")
+	scene.sailing_map.select_port("venice_dock")
+	_check("亚历山大" in scene.sailing_route_label.text and "威尼斯" in scene.sailing_route_label.text and not scene.sailing_confirm_button.disabled, "选择港口后必须显示起终点、航期、航费和风险")
+	scene._start_sailing_voyage(0.05)
+	_check(scene.sailing_map.traveling, "确认启航后海图必须播放船只移动过程")
+	for _voyage_frame in range(20):
+		if not is_instance_valid(scene.sailing_map) or not scene.sailing_map.traveling:
+			break
+		await create_timer(0.03).timeout
+	_check(str(scene.state.player.location) == "venice_dock" and _has_actor(scene, "ship_owner"), "航行动画完成后必须抵达目的港并重建当地NPC")
+	_check(_has_label_text(scene.overlay, "航行抵达"), "抵港后必须显示航费、天数与随机航行事件结算")
 	scene._close_overlay()
 
 	var boss_state = TestState.new()

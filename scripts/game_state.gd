@@ -1234,11 +1234,21 @@ func voyage_risk(port_id):
 	var protection_bonus = 8 if voyage_protection > 0 else 0
 	return max(4, int(route.get("risk", 15)) - int(ship.get("armor", 0)) * 6 - card_risk_bonus - protection_bonus)
 
+func is_port_unlocked(port_id):
+	var resolved_port = str(port_id)
+	if not GameData.TRADE_PORTS.has(resolved_port):
+		return false
+	if str(player.location) == resolved_port:
+		return true
+	return quest_index >= int(GameData.PORT_UNLOCK_QUEST.get(resolved_port, 0))
+
 func sail_to(port_id):
 	if not is_trade_unlocked():
 		return {"ok": false, "message": "贸易航线尚未解锁。"}
 	if not GameData.TRADE_PORTS.has(player.location) or not GameData.TRADE_PORTS.has(port_id):
 		return {"ok": false, "message": "航线目的地不存在。"}
+	if not is_port_unlocked(port_id):
+		return {"ok": false, "message": "该港口尚未从主线海图中解锁。继续推进章节即可发现这条航路。"}
 	var route = GameData.trade_route(player.location, port_id)
 	if route.is_empty():
 		return {"ok": false, "message": "两座港口之间没有直达航线。"}

@@ -11,6 +11,16 @@ func _init():
 	state.rng.seed = 424242
 	_check(state.player.location == "alisa_hut", "新游戏应从海边小屋开始")
 	_check(state.get_current_quest().objective.type == "talk", "首个任务应为交谈任务")
+	var port_lock_state = TestState.new()
+	port_lock_state.quest_index = 8
+	port_lock_state.player.location = "venice_dock"
+	_check(port_lock_state.is_port_unlocked("ragusa_dock") and not port_lock_state.is_port_unlocked("alexandria_dock"), "九港海图必须随主线逐港解锁，不能在第一卷一次性开放远洋港口")
+	port_lock_state.player.silver = 999
+	_check(not port_lock_state.sail_to("alexandria_dock").ok, "尚未发现的港口不能绕过海图锁定直接启航")
+	_check(GameData.NPCS.size() >= 31, "九港剧情与服务人物必须完整配置，不能只保留少量任务NPC")
+	for port_id in GameData.TRADE_PORTS:
+		if port_id != "venice_dock":
+			_check(GameData.LOCATIONS[port_id].npcs.size() >= 3, "%s至少需要剧情、贸易和港口服务三名可互动人物" % GameData.TRADE_PORTS[port_id].name)
 	var opening_story = state.story_progress()
 	_check(int(opening_story.total) == GameData.QUESTS.size() and str(opening_story.chapter) == "序章·失去的名字", "任务系统必须返回总进度与当前章节")
 	var gear_state = TestState.new()

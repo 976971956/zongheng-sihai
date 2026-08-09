@@ -64,9 +64,23 @@ func _run():
 	_check(is_instance_valid(scene.modal_layer), "手机端必须能打开货物贸易页面")
 	_check(_has_button_text(scene.modal_layer, "买1"), "货物贸易页面必须显示买入操作")
 	_check(_has_button_text(scene.modal_layer, "拉古萨"), "货物贸易页面必须显示跨港航线")
+	scene._close_modal()
+
+	var world_scene = load("res://scenes/world_2d.tscn").instantiate()
+	world_scene.state = TestState.new()
+	world_scene.state.quest_index = GameData.QUESTS.size()
+	world_scene.state.player.location = "venice_dock"
+	root.add_child(world_scene)
+	await process_frame
+	await process_frame
+	world_scene._open_sailing_map()
+	await process_frame
+	_check(is_instance_valid(world_scene.overlay) and is_instance_valid(world_scene.sailing_map), "手机2D模式必须能打开九港可视化航海图")
+	_check(world_scene.sailing_map.custom_minimum_size.x <= 620.0 and world_scene.sailing_map.custom_minimum_size.y <= 520.0, "九港航海图必须保持在竖屏触控区域内")
+	_check(world_scene.sailing_map.port_buttons.size() == 9, "手机航海图必须显示九座可点击港口")
 
 	if failures.is_empty():
-		print("MOBILE_OK: 竖屏单栏、任务领奖弹窗、触控战斗与货物贸易页面全部通过")
+		print("MOBILE_OK: 竖屏单栏、任务领奖弹窗、触控战斗、九港航海图与货物贸易页面全部通过")
 		quit(0)
 	else:
 		for failure in failures:

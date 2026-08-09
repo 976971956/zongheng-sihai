@@ -12,6 +12,7 @@ const MUTED = Color("9ab3b8")
 const RED = Color("ef6f73")
 const PANEL = Color(0.025, 0.08, 0.105, 0.94)
 const WorldMapScript = preload("res://scripts/world_map_2d.gd")
+const SailingMapScript = preload("res://scripts/sailing_map_2d.gd")
 const ActorScript = preload("res://scripts/actor_2d.gd")
 const BattleStageScript = preload("res://scripts/battle_stage_2d.gd")
 const JoystickScript = preload("res://scripts/virtual_joystick.gd")
@@ -107,6 +108,11 @@ var task_navigation_portal = {}
 var task_navigation_path = PackedVector2Array()
 var task_navigation_path_index = 0
 var task_navigation_open_service = ""
+var sailing_map
+var sailing_destination = ""
+var sailing_route_label
+var sailing_confirm_button
+var sailing_result = {}
 
 var region_by_location = {
 	"alisa_hut": "city", "venice_tavern": "city", "venice_square": "city",
@@ -268,30 +274,31 @@ func _spawn_world_actors():
 	nearest_actor = {}
 	if current_region == "city":
 		var active_port = str(state.player.location)
-		if active_port == "ragusa_dock":
-			_add_actor("npc", "ragusa_broker", "拉古萨经纪人", Vector2(205, 870), Color("665044"), GOLD, "ragusa_dock")
-		elif active_port == "alexandria_dock":
-			_add_actor("npc", "alexandria_merchant", "香料商萨米尔", Vector2(205, 870), Color("6d563e"), GOLD, "alexandria_dock")
-		elif active_port == "malta_dock":
-			_add_actor("npc", "malta_keeper", "守钟人伊莎贝拉", Vector2(205, 870), Color("49697a"), GOLD, "malta_dock")
-			if state.quest_index >= 32:
-				_add_actor("travel", "white_whale", "白鲸号残骸", Vector2(520, 910), Color("315d66"), TEAL, "white_whale_1")
-		elif active_port in GameData.TRADE_PORTS and active_port != "venice_dock":
-			var remote_port = GameData.TRADE_PORTS[active_port]
-			var remote_npc_id = str(remote_port.get("npc", ""))
-			if remote_npc_id != "" and GameData.NPCS.has(remote_npc_id):
-				_add_actor("npc", remote_npc_id, str(GameData.NPCS[remote_npc_id].name), Vector2(205, 870), Color("496478"), GOLD, active_port)
+		if active_port in GameData.TRADE_PORTS and active_port != "venice_dock":
+			var port_npc_positions = [Vector2(145, 790), Vector2(350, 850), Vector2(555, 790)]
+			var port_npc_colors = [Color("49697a"), Color("7b5944"), Color("506f61")]
+			var port_npcs = GameData.LOCATIONS[active_port].npcs
+			for npc_index in range(port_npcs.size()):
+				var remote_npc_id = str(port_npcs[npc_index])
+				if GameData.NPCS.has(remote_npc_id):
+					_add_actor("npc", remote_npc_id, str(GameData.NPCS[remote_npc_id].name), port_npc_positions[npc_index % port_npc_positions.size()], port_npc_colors[npc_index % port_npc_colors.size()], GOLD, active_port)
+			if active_port == "malta_dock" and state.quest_index >= 32:
+				_add_actor("travel", "white_whale", "白鲸号残骸", Vector2(520, 950), Color("315d66"), TEAL, "white_whale_1")
 		else:
 			_add_actor("npc", "alisa", "艾丽莎", Vector2(150, 365), Color("628ec6"), Color("f2d58b"), "alisa_hut")
 			_add_actor("npc", "tavern_keeper", "酒馆老板", Vector2(180, 675), Color("8c6750"), Color("c78d52"), "venice_tavern")
-			_add_actor("npc", "ship_owner", "船老板", Vector2(205, 870), Color("3d7287"), Color("d6b35c"), "venice_dock")
+			_add_actor("npc", "guard_captain", "守卫队长", Vector2(360, 690), Color("59677b"), Color("b7c6d5"), "venice_square")
+			_add_actor("npc", "jeweler", "珠宝商", Vector2(555, 665), Color("76566c"), Color("ead58c"), "venice_market")
+			_add_actor("npc", "venice_quartermaster", "蕾娜", Vector2(510, 780), Color("487169"), GOLD, "venice_market")
+			_add_actor("npc", "ship_owner", "船老板", Vector2(225, 870), Color("3d7287"), Color("d6b35c"), "venice_dock")
+			_add_actor("npc", "venice_shipwright", "洛伦佐", Vector2(410, 900), Color("755b44"), GOLD, "venice_dock")
 			_spawn_enemy_if_ready("drunk_sailor")
 			_add_actor("travel", "field", "前往城外", Vector2(455, 285), Color("547b61"), GOLD, "residential_quarter")
 		if (active_port == "venice_dock" or active_port not in GameData.TRADE_PORTS) and state.quest_index >= 12:
-			_add_actor("travel", "black_sail", "黑帆据点", Vector2(520, 910), Color("493b45"), RED, "black_sail_1")
+			_add_actor("travel", "black_sail", "黑帆据点", Vector2(550, 950), Color("493b45"), RED, "black_sail_1")
 		var active_expedition = _current_story_expedition()
 		if not active_expedition.is_empty() and str(active_expedition.port) == active_port and state.quest_index >= int(active_expedition.quest_start) + 3:
-			_add_actor("travel", "legacy", str(active_expedition.name), Vector2(520, 910), Color("40556f"), GOLD, str(active_expedition.location))
+			_add_actor("travel", "legacy", str(active_expedition.name), Vector2(550, 950), Color("40556f"), GOLD, str(active_expedition.location))
 	elif current_region == "field":
 		_spawn_enemy_if_ready("sewer_rat")
 		_spawn_enemy_if_ready("mine_thief")
@@ -726,8 +733,11 @@ func _update_nearest_actor():
 			action_button.text = "进入 · %s" % nearest_actor.name
 		elif nearest_actor.kind == "discovery":
 			action_button.text = "调查 · %s" % nearest_actor.name
-		elif str(nearest_actor.id) in ["ship_owner", "ragusa_broker", "alexandria_merchant", "malta_keeper", "cape_keeper", "quanzhou_scholar", "athens_oracle", "yangzhou_weaver", "amsterdam_cartographer"] and state.is_trade_unlocked() and not _is_current_talk_target(str(nearest_actor.id)):
-			action_button.text = "港口贸易 · %s" % str(nearest_actor.name)
+		elif nearest_actor.kind == "npc" and state.is_trade_unlocked() and not _is_current_talk_target(str(nearest_actor.id)) and _npc_service(str(nearest_actor.id)) in ["harbor", "shipyard", "cook"]:
+			var service_title = {"harbor": "港口贸易", "shipyard": "船坞改造", "cook": "港口厨房"}.get(_npc_service(str(nearest_actor.id)), "港口服务")
+			action_button.text = "%s · %s" % [service_title, str(nearest_actor.name)]
+		elif nearest_actor.kind == "npc" and _npc_service(str(nearest_actor.id)) == "rest" and not _is_current_talk_target(str(nearest_actor.id)):
+			action_button.text = "住宿休息 · %s" % str(nearest_actor.name)
 		else:
 			action_button.text = ("交谈 · " if nearest_actor.kind == "npc" else "挑战 · ") + nearest_actor.name
 
@@ -826,12 +836,19 @@ func _interact():
 			_show_message("无法调查", str(discovery_result.get("message", "这里什么也没有。")))
 		return
 	if nearest_actor.kind == "npc":
-		if str(nearest_actor.id) in ["ship_owner", "ragusa_broker", "alexandria_merchant", "malta_keeper", "cape_keeper", "quanzhou_scholar", "athens_oracle", "yangzhou_weaver", "amsterdam_cartographer"] and state.is_trade_unlocked() and not _is_current_talk_target(str(nearest_actor.id)):
+		var npc_id = str(nearest_actor.id)
+		var service = _npc_service(npc_id)
+		if service in ["harbor", "shipyard", "cook"] and state.is_trade_unlocked() and not _is_current_talk_target(npc_id):
 			_open_trade_2d()
 			return
-		var result = state.talk_to(nearest_actor.id)
+		if service == "rest" and not _is_current_talk_target(npc_id):
+			var rest_result = state.rest()
+			_refresh_hud()
+			_show_message("旅店休息", str(rest_result.message))
+			return
+		var result = state.talk_to(npc_id)
 		_refresh_hud()
-		_show_dialog(nearest_actor.id, result)
+		_show_dialog(npc_id, result)
 	else:
 		active_enemy_actor = nearest_actor
 		var result = state.start_battle(nearest_actor.id)
@@ -844,6 +861,9 @@ func _interact():
 func _is_current_talk_target(npc_id):
 	var quest = state.get_current_quest()
 	return not quest.is_empty() and str(quest.objective.type) == "talk" and str(quest.objective.target) == str(npc_id)
+
+func _npc_service(npc_id):
+	return str(GameData.NPCS.get(str(npc_id), {}).get("service", ""))
 
 func _switch_region(region_id, entrance_location):
 	if region_id == "dungeon" and int(state.player.level) < 3:
@@ -1744,6 +1764,10 @@ func _open_world_map():
 	var guide = _label("所有主线地点都可以从这里进入。带锁的副本楼层需要逐层击败守卫。", 15, MUTED)
 	guide.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.add_child(guide)
+	if state.is_trade_unlocked():
+		var sea_map_button = _button("打开九港航海图 · 查看航线与港口", "gold")
+		sea_map_button.pressed.connect(_open_sailing_map)
+		content.add_child(sea_map_button)
 	var scroll = ScrollContainer.new()
 	scroll.custom_minimum_size.y = 520
 	content.add_child(scroll)
@@ -1794,6 +1818,93 @@ func _region_name(region_id):
 		"legacy": return "终局潮汐远征"
 		_: return "威尼斯城内"
 
+func _open_sailing_map(preselect = ""):
+	if not state.is_trade_unlocked():
+		_show_message("航海图尚未开放", "完成威尼斯四层试炼后，船老板会交给你海燕号与第一张航线图。")
+		return
+	var content = VBoxContainer.new()
+	content.add_theme_constant_override("separation", 10)
+	content.add_child(_label("九港航海图", 26, GOLD))
+	var at_port = GameData.TRADE_PORTS.has(str(state.player.location))
+	var current_name = GameData.TRADE_PORTS[str(state.player.location)].name if at_port else GameData.LOCATIONS.get(str(state.player.location), GameData.LOCATIONS.venice_square).name
+	var guide_text = "当前停泊：%s · 点击已解锁港口比较航期、费用与风险。" % current_name if at_port else "你正在%s。可以查看海图，但启航前需要先走到港口。" % current_name
+	var guide = _label(guide_text, 14, MUTED)
+	guide.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(guide)
+	sailing_map = SailingMapScript.new()
+	sailing_map.game_state = state
+	sailing_map.custom_minimum_size = Vector2(610, 500)
+	sailing_map.port_selected.connect(_select_sailing_destination)
+	sailing_map.voyage_finished.connect(_finish_sailing_voyage)
+	content.add_child(sailing_map)
+	sailing_route_label = _label("选择一座亮起的港口，查看直达航线。灰色港口会随主线章节逐步解锁。", 15, INK)
+	sailing_route_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sailing_route_label.custom_minimum_size.y = 70
+	sailing_route_label.add_theme_stylebox_override("normal", _style(Color(0.03, 0.14, 0.17, 0.94), 10, Color(TEAL, 0.45), 1, 10))
+	content.add_child(sailing_route_label)
+	sailing_confirm_button = _button("选择目的港", "gold")
+	sailing_confirm_button.disabled = true
+	sailing_confirm_button.pressed.connect(_start_sailing_voyage)
+	content.add_child(sailing_confirm_button)
+	var close = _button("返回港口", "primary")
+	close.pressed.connect(_close_overlay)
+	content.add_child(close)
+	_open_overlay(content, false, Vector2(666, 1040))
+	sailing_map.configure(state)
+	if str(preselect) != "":
+		sailing_map.select_port(str(preselect))
+
+func _select_sailing_destination(port_id):
+	sailing_destination = str(port_id)
+	if not GameData.TRADE_PORTS.has(str(state.player.location)):
+		sailing_route_label.text = "这里不是港口。请关闭海图，按照任务导航步行前往码头后再启航。"
+		sailing_confirm_button.disabled = true
+		return
+	if sailing_destination == str(state.player.location):
+		sailing_route_label.text = "海燕号当前就停泊在%s。请选择另一座港口。" % GameData.TRADE_PORTS[sailing_destination].name
+		sailing_confirm_button.disabled = true
+		return
+	var route = GameData.trade_route(str(state.player.location), sailing_destination)
+	if route.is_empty():
+		sailing_route_label.text = "%s与%s之间没有直达航线，需要先在相邻港口中转。" % [GameData.TRADE_PORTS[str(state.player.location)].name, GameData.TRADE_PORTS[sailing_destination].name]
+		sailing_confirm_button.disabled = true
+		return
+	var days = max(1, int(route.days) - (int(state.ship.speed) - 1))
+	var risk = state.voyage_risk(sailing_destination)
+	var destination = GameData.TRADE_PORTS[sailing_destination]
+	sailing_route_label.text = "%s → %s｜%d日｜航费%d银币｜风险%d%%\n港口特产：%s · %s" % [GameData.TRADE_PORTS[str(state.player.location)].name, destination.name, days, int(route.fee), risk, destination.specialty, destination.note]
+	sailing_confirm_button.text = "驾驶海燕号启航前往%s" % destination.name
+	sailing_confirm_button.disabled = int(state.player.silver) < int(route.fee)
+	if sailing_confirm_button.disabled:
+		sailing_route_label.text += "\n银币不足，还差%d。" % (int(route.fee) - int(state.player.silver))
+
+func _start_sailing_voyage(duration = 2.2):
+	if sailing_destination == "" or not is_instance_valid(sailing_map):
+		return
+	var origin = str(state.player.location)
+	sailing_result = state.sail_to(sailing_destination)
+	if not bool(sailing_result.get("ok", false)):
+		_show_message("无法启航", str(sailing_result.get("message", "航线不可用")))
+		return
+	AudioDirector.play_sfx("sail")
+	sailing_confirm_button.disabled = true
+	sailing_route_label.text = "海燕号正在穿越洋流……\n航程结束后将抵达%s。" % GameData.TRADE_PORTS[sailing_destination].name
+	sailing_map.play_voyage(origin, sailing_destination, duration)
+	_refresh_hud()
+
+func _finish_sailing_voyage():
+	var result = sailing_result.duplicate(true)
+	_close_overlay()
+	_spawn_world_actors()
+	player_actor.position = _spawn_for_location(str(state.player.location))
+	_update_camera(0.0, true)
+	_refresh_hud()
+	if bool(result.get("quest_completed", false)):
+		hint_label.text = str(result.get("message", "航行抵达"))
+		call_deferred("_show_quest_claim")
+	else:
+		_show_message("航行抵达", str(result.get("message", "海燕号平安抵港。")))
+
 func _open_trade_2d():
 	if not state.is_trade_unlocked():
 		_show_message("港口尚未开放", "完成威尼斯四层试炼后，船老板会将贸易船海燕号交给你。")
@@ -1818,6 +1929,9 @@ func _open_trade_2d():
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	list.add_theme_constant_override("separation", 8)
 	scroll.add_child(list)
+	var chart = _button("打开九港航海图 · 规划下一段航程", "gold")
+	chart.pressed.connect(_open_sailing_map)
+	list.add_child(chart)
 	var event_copy = _label("今日行情｜%s\n%s" % [market_event.name, market_event.description], 14, GOLD)
 	event_copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	event_copy.add_theme_stylebox_override("normal", _style(Color(0.18, 0.12, 0.03, 0.92), 10, Color(GOLD, 0.55), 1, 10))
@@ -1922,7 +2036,7 @@ func _open_trade_2d():
 		card.add_theme_stylebox_override("panel", _style(Color(0.04, 0.13, 0.16, 0.92), 10, Color(TEAL, 0.3), 1, 10))
 		card.add_child(stack)
 		list.add_child(card)
-	list.add_child(_label("选择航线", 16, GOLD))
+	list.add_child(_label("直达航线预览", 16, GOLD))
 	for destination in GameData.TRADE_PORTS:
 		if destination == port_id:
 			continue
@@ -2025,21 +2139,8 @@ func _buy_voyage_protection_2d():
 		_show_message("无法购买", str(result.message))
 
 func _trade_sail_2d(destination):
-	var result = state.sail_to(destination)
-	if bool(result.get("ok", false)):
-		AudioDirector.play_sfx("sail")
-		_spawn_world_actors()
-		player_actor.position = _spawn_for_location(str(state.player.location))
-		_update_camera(0.0, true)
-	_refresh_hud()
 	_close_overlay()
-	if bool(result.get("quest_completed", false)):
-		hint_label.text = str(result.get("message", "航行抵达"))
-		call_deferred("_show_quest_claim")
-	elif result.ok:
-		_show_message("航行抵达", result.message)
-	else:
-		_show_message("无法启航", result.message)
+	call_deferred("_open_sailing_map", destination)
 
 func _open_full_journal():
 	state.save_game()
@@ -2105,6 +2206,11 @@ func _close_overlay():
 	battle_stance_buttons = {}
 	battle_heal_button = null
 	battle_cure_button = null
+	sailing_map = null
+	sailing_destination = ""
+	sailing_route_label = null
+	sailing_confirm_button = null
+	sailing_result = {}
 
 func _label(text, font_size, color):
 	var label = Label.new()
