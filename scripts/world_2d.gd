@@ -81,6 +81,8 @@ var waypoint_label
 var waypoint_world_target = Vector2.ZERO
 var navigation_button
 var inventory_notice = ""
+var audio_button
+var footstep_timer = 0.0
 
 var region_by_location = {
 	"alisa_hut": "city", "venice_tavern": "city", "venice_square": "city",
@@ -149,6 +151,7 @@ func _ready():
 	_update_zone(true)
 	_refresh_hud()
 	_refresh_waypoint()
+	AudioDirector.set_region(current_region)
 	if not state.active_battle.is_empty():
 		call_deferred("_open_battle", state.get_battle_view())
 	if capture_battle:
@@ -419,6 +422,11 @@ func _build_hud():
 	row.add_child(location_label)
 	stats_label = _label("", 14, INK)
 	row.add_child(stats_label)
+	audio_button = _button("♪ 开" if AudioDirector.is_audio_enabled() else "♪ 关", "ghost")
+	audio_button.custom_minimum_size = Vector2(66, 42)
+	audio_button.add_theme_font_size_override("font_size", 13)
+	audio_button.pressed.connect(_toggle_audio)
+	row.add_child(audio_button)
 	quest_label = _label("", 13, MUTED)
 	quest_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	top_box.add_child(quest_label)
@@ -480,6 +488,12 @@ func _build_hud():
 	waypoint_label.add_theme_stylebox_override("normal", _style(Color(0.28, 0.20, 0.05, 0.88), 11, Color(GOLD, 0.75), 2, 7))
 	add_child(waypoint_label)
 
+func _toggle_audio():
+	var is_enabled = AudioDirector.toggle_audio()
+	if is_instance_valid(audio_button):
+		audio_button.text = "♪ 开" if is_enabled else "♪ 关"
+	hint_label.text = "背景音乐与音效已开启。" if is_enabled else "背景音乐与音效已关闭。"
+
 func _process(delta):
 	if is_instance_valid(overlay):
 		return
@@ -493,6 +507,7 @@ func _process(delta):
 			direction = difference.normalized()
 	elif direction.length() > 0.1:
 		has_move_target = false
+	var previous_position = player_actor.position
 	if direction.length() > 0.05:
 		var movement = direction.normalized() * 245.0 * delta
 		var next_position = player_actor.position + movement
@@ -510,6 +525,13 @@ func _process(delta):
 				player_actor.position = vertical
 			elif _is_walkable(horizontal):
 				player_actor.position = horizontal
+	if player_actor.position.distance_to(previous_position) > 0.5:
+		footstep_timer -= delta
+		if footstep_timer <= 0.0:
+			AudioDirector.play_sfx("step")
+			footstep_timer = 0.34
+	else:
+		footstep_timer = min(footstep_timer, 0.08)
 	player_actor.set_motion(direction if direction.length() > 0.05 else Vector2.ZERO)
 	_update_camera(delta)
 	_update_nearest_actor()
@@ -646,6 +668,7 @@ func _refresh_hud():
 func _interact():
 	if nearest_actor.is_empty():
 		return
+	AudioDirector.play_sfx("interact")
 	if nearest_actor.kind == "travel":
 		_switch_region(str(nearest_actor.id), str(nearest_actor.location))
 		return
@@ -697,6 +720,7 @@ func _switch_region(region_id, entrance_location):
 	if previous_region != region_id and (previous_region in dungeon_regions or region_id in dungeon_regions):
 		state.dungeon_cleared = {}
 	current_region = region_id
+	AudioDirector.set_region(current_region)
 	current_zone = ""
 	var target_location = entrance_location
 	if current_region == "dungeon" and _dungeon_floor_lock(target_location) != "":
@@ -766,6 +790,7 @@ func _claim_quest_2d():
 	if not result.ok:
 		_show_message("领取失败", result.message)
 		return
+	AudioDirector.play_sfx("reward")
 	var content = VBoxContainer.new()
 	content.add_theme_constant_override("separation", 16)
 	content.add_child(_label("奖励已领取", 27, GOLD))
@@ -786,6 +811,7 @@ func _claim_quest_2d():
 func _open_battle(view):
 	battle_result = {}
 	auto_battle_running = false
+	AudioDirector.enter_battle()
 	var content = VBoxContainer.new()
 	content.add_theme_constant_override("separation", 12)
 	var heading = HBoxContainer.new()
@@ -930,9 +956,11 @@ func _battle_attack():
 		_finish_battle_overlay()
 		return
 	var player_hp_before = int(state.player.hp)
+	AudioDirector.play_sfx("attack")
 	var result = state.attack_once()
 	battle_stage.animate_attack(true)
 	if int(result.get("player_hp", player_hp_before)) < player_hp_before:
+		AudioDirector.play_sfx("hit")
 		battle_stage.animate_attack(false)
 	battle_stage.set_battle_values(result)
 	_update_battle_result(result)
@@ -941,12 +969,14 @@ func _battle_skill():
 	if auto_battle_running or not battle_result.is_empty():
 		return
 	var player_hp_before = int(state.player.hp)
+	AudioDirector.play_sfx("skill")
 	var result = state.skill_attack()
 	if not bool(result.get("ok", false)):
 		battle_log_label.text = str(result.get("message", "潮势不足。"))
 		return
 	battle_stage.animate_attack(true)
 	if int(result.get("player_hp", player_hp_before)) < player_hp_before:
+		AudioDirector.play_sfx("hit")
 		battle_stage.animate_attack(false)
 	battle_stage.set_battle_values(result)
 	_update_battle_result(result)
@@ -966,11 +996,13 @@ func _battle_auto():
 	while auto_battle_running and not state.active_battle.is_empty() and safety_rounds < 40 and is_instance_valid(overlay):
 		var supply_result = state.auto_use_battle_supplies()
 		if bool(supply_result.get("used", false)):
+			AudioDirector.play_sfx("heal")
 			battle_log_label.text = "\n".join(supply_result.get("logs", []))
 			_refresh_battle_info(state.get_battle_view())
 			await get_tree().create_timer(AUTO_BATTLE_READ_DELAY).timeout
 		var player_hp_before = int(state.player.hp)
 		var should_counter = state.battle_focus() >= 3 and str(state.get_enemy_intent()).begins_with("⚠")
+		AudioDirector.play_sfx("skill" if should_counter else "attack")
 		var result = state.skill_attack() if should_counter else state.attack_once()
 		if not bool(result.get("ok", false)):
 			battle_log_label.text = str(result.get("message", "自动战斗中断。"))
@@ -978,6 +1010,7 @@ func _battle_auto():
 		battle_stage.animate_attack(true)
 		await get_tree().create_timer(AUTO_BATTLE_HIT_DELAY).timeout
 		if int(result.get("player_hp", player_hp_before)) < player_hp_before and is_instance_valid(battle_stage):
+			AudioDirector.play_sfx("hit")
 			battle_stage.animate_attack(false)
 			await get_tree().create_timer(AUTO_BATTLE_HIT_DELAY).timeout
 		if not is_instance_valid(battle_stage):
@@ -1002,14 +1035,18 @@ func _update_battle_result(result):
 		battle_log_label.text = "\n".join(logs.slice(max(0, logs.size() - 2)))
 	if bool(result.get("battle_over", false)):
 		battle_result = result
-		if bool(result.get("won", false)):
+		var won = bool(result.get("won", false))
+		var fled = bool(result.get("fled", false))
+		var resume_region = "city" if not won and not fled else current_region
+		AudioDirector.end_battle(won, fled, resume_region)
+		if won:
 			if bool(result.get("quest_completed", false)):
 				battle_action_button.text = "返回并领取主线奖励"
 			elif bool(result.get("bounty_completed", false)):
 				battle_action_button.text = "返回并领取悬赏"
 			else:
 				battle_action_button.text = "返回地图"
-		elif bool(result.get("fled", false)):
+		elif fled:
 			battle_action_button.text = "返回地图"
 		else:
 			battle_action_button.text = "返回威尼斯酒馆"
@@ -1058,6 +1095,7 @@ func _claim_bounty_2d():
 	if not bool(result.get("ok", false)):
 		_show_message("领取失败", str(result.get("message", "悬赏尚未完成。")))
 		return
+	AudioDirector.play_sfx("reward")
 	var next_bounty = state.get_bounty()
 	_show_message("悬赏奖励已领取", "%s\n\n新悬赏｜%s\n%s" % [str(result.message), str(next_bounty.title), str(next_bounty.description)])
 
@@ -1201,6 +1239,8 @@ func _equip_item_2d(item_id):
 
 func _use_item_2d(item_id):
 	var result = state.use_item(item_id)
+	if bool(result.ok):
+		AudioDirector.play_sfx("heal")
 	inventory_notice = ("✓ " if bool(result.ok) else "！") + str(result.message)
 	_refresh_hud()
 	_close_overlay()
@@ -1543,6 +1583,8 @@ func _trade_upgrade_2d(kind):
 
 func _claim_trade_contract_2d():
 	var result = state.claim_trade_contract()
+	if bool(result.get("ok", false)):
+		AudioDirector.play_sfx("reward")
 	_refresh_hud()
 	_close_overlay()
 	_show_message("商会委托", str(result.get("message", "领取失败")))
@@ -1550,6 +1592,7 @@ func _claim_trade_contract_2d():
 func _trade_sail_2d(destination):
 	var result = state.sail_to(destination)
 	if bool(result.get("ok", false)):
+		AudioDirector.play_sfx("sail")
 		_spawn_world_actors()
 		player_actor.position = _spawn_for_location(str(state.player.location))
 		_update_camera(0.0, true)
@@ -1637,6 +1680,7 @@ func _label(text, font_size, color):
 
 func _button(text, kind = "primary"):
 	var button = Button.new()
+	button.pressed.connect(func(): AudioDirector.play_sfx("ui"))
 	button.text = text
 	button.custom_minimum_size.y = 62
 	button.add_theme_font_size_override("font_size", 16)

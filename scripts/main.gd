@@ -617,6 +617,7 @@ func _build_navigation():
 func refresh_ui():
 	var stats = state.get_stats()
 	var location = GameData.LOCATIONS[state.player.location]
+	AudioDirector.set_region(_audio_region_for_location(str(state.player.location)))
 	chapter_label.text = location.chapter
 	location_name_label.text = location.name
 	location_tag_label.text = "  %s  " % location.tag
@@ -671,6 +672,15 @@ func refresh_ui():
 func _open_2d_world():
 	state.save_game()
 	get_tree().change_scene_to_file("res://scenes/world_2d.tscn")
+
+func _audio_region_for_location(location_id):
+	if location_id.begins_with("training_dungeon_"):
+		return "dungeon"
+	if location_id.begins_with("black_sail_"):
+		return "black_sail"
+	if location_id in ["residential_quarter", "venice_mine", "venice_back_hill", "venice_wildwood", "venice_north_gate"]:
+		return "field"
+	return "city"
 
 func _refresh_actions(location):
 	_clear_children(action_list)
@@ -854,11 +864,14 @@ func _on_move(destination):
 
 func _on_rest():
 	var result = state.rest()
+	if bool(result.ok):
+		AudioDirector.play_sfx("heal")
 	_show_toast(result.message, result.ok)
 	refresh_ui()
 
 func _on_talk(npc_id):
 	var result = state.talk_to(npc_id)
+	AudioDirector.play_sfx("interact")
 	refresh_ui()
 	if not result.ok:
 		_show_toast(result.message, false)
@@ -896,6 +909,8 @@ func _start_fight(enemy_id):
 
 func _on_claim_quest():
 	var result = state.claim_quest()
+	if bool(result.ok):
+		AudioDirector.play_sfx("reward")
 	refresh_ui()
 	_show_toast(result.message, result.ok)
 	if result.ok:
@@ -925,6 +940,8 @@ func _show_quest_completion_prompt():
 func _claim_from_completion_prompt():
 	_close_modal()
 	var result = state.claim_quest()
+	if bool(result.ok):
+		AudioDirector.play_sfx("reward")
 	refresh_ui()
 	_show_toast(result.message, result.ok)
 	if result.ok:
@@ -1108,6 +1125,11 @@ func _show_battle_screen(result = {}):
 		current = fresh
 	var won = bool(current.get("won", false))
 	var fled = bool(current.get("fled", false))
+	if battle_over:
+		var resume_region = "city" if not won and not fled else _audio_region_for_location(str(state.player.location))
+		AudioDirector.end_battle(won, fled, resume_region)
+	else:
+		AudioDirector.enter_battle()
 	var color = TEAL if (not battle_over or won) else RED
 	var content = VBoxContainer.new()
 	content.add_theme_constant_override("separation", 11)
@@ -1227,7 +1249,11 @@ func _battle_health_block(title, value, maximum, color):
 	return box
 
 func _battle_attack_once():
+	var player_hp_before = int(state.player.hp)
+	AudioDirector.play_sfx("attack")
 	var result = state.attack_once()
+	if int(result.get("player_hp", player_hp_before)) < player_hp_before:
+		AudioDirector.play_sfx("hit")
 	_close_modal()
 	refresh_ui()
 	_show_battle_screen(result)
@@ -1238,8 +1264,14 @@ func _battle_auto_attack():
 	journal_auto_battle_running = true
 	var safety_rounds = 0
 	while not state.active_battle.is_empty() and safety_rounds < 40:
-		state.auto_use_battle_supplies()
+		var supply_result = state.auto_use_battle_supplies()
+		if bool(supply_result.get("used", false)):
+			AudioDirector.play_sfx("heal")
+		var player_hp_before = int(state.player.hp)
+		AudioDirector.play_sfx("attack")
 		var result = state.attack_once()
+		if int(result.get("player_hp", player_hp_before)) < player_hp_before:
+			AudioDirector.play_sfx("hit")
 		if not bool(result.get("ok", false)):
 			break
 		_close_modal()
@@ -1257,6 +1289,8 @@ func _battle_auto_attack():
 
 func _battle_use_item(item_id):
 	var result = state.use_item(item_id)
+	if bool(result.ok):
+		AudioDirector.play_sfx("heal")
 	_close_modal()
 	refresh_ui()
 	_show_toast(result.message, result.ok)
@@ -1518,6 +1552,8 @@ func _open_quest_detail():
 
 func _claim_bounty_from_journal():
 	var result = state.claim_bounty()
+	if bool(result.ok):
+		AudioDirector.play_sfx("reward")
 	_close_modal()
 	refresh_ui()
 	_show_toast(result.message, result.ok)
@@ -1740,6 +1776,8 @@ func _trade_sell(good_id):
 
 func _trade_sail(destination):
 	var result = state.sail_to(destination)
+	if bool(result.ok):
+		AudioDirector.play_sfx("sail")
 	_close_modal()
 	refresh_ui()
 	_show_toast(result.message, result.ok)
@@ -1754,6 +1792,8 @@ func _trade_upgrade(kind):
 
 func _claim_trade_contract_from_journal():
 	var result = state.claim_trade_contract()
+	if bool(result.get("ok", false)):
+		AudioDirector.play_sfx("reward")
 	_close_modal()
 	refresh_ui()
 	_show_toast(result.message, result.ok)
@@ -1903,6 +1943,7 @@ func _label(text, font_size, color):
 
 func _button(text, kind = "primary"):
 	var button = Button.new()
+	button.pressed.connect(func(): AudioDirector.play_sfx("ui"))
 	button.text = text
 	button.custom_minimum_size.y = 52 if mobile_mode else 36
 	button.add_theme_font_size_override("font_size", 14 if mobile_mode else 12)
