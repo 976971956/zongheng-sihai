@@ -11,6 +11,13 @@ func _init():
 	state.rng.seed = 424242
 	_check(state.player.location == "alisa_hut", "新游戏应从海边小屋开始")
 	_check(state.get_current_quest().objective.type == "talk", "首个任务应为交谈任务")
+	var opening_story = state.story_progress()
+	_check(int(opening_story.total) == GameData.QUESTS.size() and str(opening_story.chapter) == "序章·失去的名字", "任务系统必须返回总进度与当前章节")
+	var gear_state = TestState.new()
+	gear_state.inventory["warrior_blade"] = 1
+	var power_before_recommend = gear_state.get_power()
+	var recommend_result = gear_state.equip_recommended()
+	_check(bool(recommend_result.ok) and str(gear_state.equipment.weapon) == "warrior_blade" and gear_state.get_power() > power_before_recommend, "一键推荐必须自动换上背包中更强的装备")
 
 	var first_talk = state.talk_to("alisa")
 	_check(bool(first_talk.get("quest_completed", false)), "任务首次达成时必须返回自动领奖触发标记")
@@ -62,16 +69,18 @@ func _init():
 
 	state.player.location = "venice_dock"
 	var trade_silver_before = int(state.player.silver)
-	for _index in range(4):
-		_check(state.buy_cargo("venetian_glass").ok, "威尼斯港应能买入玻璃")
+	var batch_buy = state.buy_cargo("venetian_glass", 4)
+	_check(batch_buy.ok and int(batch_buy.amount) == 4, "威尼斯港应能批量买入玻璃")
 	_check(state.cargo_used() == 8, "四箱玻璃应占用8格货舱")
+	_check(state.cargo_average_cost("venetian_glass") == int(batch_buy.price), "贸易系统必须记录货物的真实买入均价")
 	_claim(state, "first_cargo")
 	var voyage = state.sail_to("ragusa_dock")
 	_check(voyage.ok and state.player.location == "ragusa_dock" and state.trade_day > 1, "贸易船应能扣除航费并推进日期抵达拉古萨")
 	_claim(state, "sail_ragusa")
-	for _index in range(4):
-		_check(state.sell_cargo("venetian_glass").ok, "拉古萨港应能卖出玻璃")
+	var batch_sell = state.sell_all_cargo("venetian_glass")
+	_check(batch_sell.ok and int(batch_sell.amount) == 4 and batch_sell.has("realized_profit"), "拉古萨港应能全卖并结算实际盈亏")
 	_check(state.cargo_used() == 0, "卖完货物后货舱应清空")
+	_check(not state.cargo_costs.has("venetian_glass"), "清仓后必须同步清除货物成本")
 	_check(int(state.player.silver) > trade_silver_before, "批量跨港贸易扣除航费后应产生正收益")
 	_claim(state, "sell_glass")
 	_check(state.upgrade_equipped("weapon").ok, "远洋主线必须能使用贸易银币强化武器")

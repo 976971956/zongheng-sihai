@@ -330,6 +330,13 @@ const QUESTS = [
 	,{"id": "alisa_truth", "title": "潮汐中的名字", "story": "回到海边小屋见艾丽莎，听她说出一直隐瞒的真相。", "objective": {"type": "talk", "target": "alisa", "need": 1}, "reward": {"exp": 0, "silver": 320, "item": "tide_seal", "title": "潮汐追迹者"}}
 ]
 
+const STORY_CHAPTERS = [
+	{"title": "序章·失去的名字", "start": 0, "end": 2, "summary": "你被艾丽莎一家从海难中救起，发光鳞片把线索引向威尼斯酒馆。"},
+	{"title": "第一章·威尼斯试炼", "start": 3, "end": 6, "summary": "你替城市清理危机、集结伙伴，并在四层副本中证明了自己。"},
+	{"title": "第二章·海燕号商路", "start": 7, "end": 11, "summary": "海燕号启航。贸易、强化与船只改造让你获得追查黑帆的力量。"},
+	{"title": "第三章·黑帆之谜", "start": 12, "end": 18, "summary": "你潜入黑帆据点夺回海图，并循着潮声找回被隐藏的名字。"}
+]
+
 const SLOT_NAMES = {"weapon": "手持", "head": "头戴", "body": "身穿", "waist": "腰部", "boots": "脚穿", "charm": "配饰"}
 
 const MAX_LEVEL = 15

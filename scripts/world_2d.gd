@@ -55,6 +55,7 @@ var nearest_actor = {}
 var action_button
 var location_label
 var stats_label
+var currency_label
 var quest_label
 var hint_label
 var overlay
@@ -448,6 +449,12 @@ func _build_hud():
 	row.add_child(location_label)
 	stats_label = _label("", 14, INK)
 	row.add_child(stats_label)
+	currency_label = _label("", 14, GOLD)
+	currency_label.custom_minimum_size = Vector2(104, 42)
+	currency_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	currency_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	currency_label.add_theme_stylebox_override("normal", _style(Color(0.18, 0.13, 0.03, 0.92), 11, Color(GOLD, 0.62), 1, 8))
+	row.add_child(currency_label)
 	audio_button = _button("♪ 开" if AudioDirector.is_audio_enabled() else "♪ 关", "ghost")
 	audio_button.custom_minimum_size = Vector2(66, 42)
 	audio_button.add_theme_font_size_override("font_size", 13)
@@ -681,7 +688,8 @@ func _refresh_hud():
 	var location_id = str(state.player.location)
 	var location_name = GameData.LOCATIONS.get(location_id, GameData.LOCATIONS.venice_square).name
 	location_label.text = "◆ %s" % location_name
-	stats_label.text = "Lv.%d  ♥%d  ◈%d" % [int(state.player.level), int(state.player.hp), int(state.player.silver)]
+	stats_label.text = "Lv.%d  体力%d" % [int(state.player.level), int(state.player.hp)]
+	currency_label.text = "银币 %d" % int(state.player.silver)
 	var quest = state.get_current_quest()
 	if quest.is_empty():
 		var bounty = state.get_bounty()
@@ -1134,6 +1142,7 @@ func _open_inventory():
 	var content = VBoxContainer.new()
 	content.add_theme_constant_override("separation", 12)
 	content.add_child(_label("冒险背包", 26, GOLD))
+	content.add_child(_label("持有银币：%d｜装备可强化，也可自动换上更高战力" % int(state.player.silver), 14, GOLD))
 	var stats = state.get_stats()
 	content.add_child(_label("战力%d  攻击%d  防御%d  速度%d" % [state.get_power(), int(stats.attack), int(stats.defense), int(stats.speed)], 15, TEAL))
 	var equipped_names = []
@@ -1145,6 +1154,9 @@ func _open_inventory():
 	var equipped_line = _label(equipped_text, 14, MUTED)
 	equipped_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.add_child(equipped_line)
+	var recommend = _button("一键穿戴推荐装备", "gold")
+	recommend.pressed.connect(_equip_recommended_2d)
+	content.add_child(recommend)
 	var card_name = "未启用"
 	if state.active_card != "" and GameData.ITEMS.has(state.active_card):
 		card_name = str(GameData.ITEMS[state.active_card].name)
@@ -1227,6 +1239,9 @@ func _inventory_item_card_2d(item_id, item, count):
 	text_stack.add_child(description)
 	if str(item.type) == "equipment":
 		text_stack.add_child(_label(_item_stats_text_2d(item.get("stats", {})), 12, TEAL))
+		var delta = state.equipment_score_delta(item_id)
+		var comparison = "较当前战力 %+d" % delta if delta != 0 else "与当前装备战力相当"
+		text_stack.add_child(_label(comparison, 12, GOLD if delta > 0 else MUTED))
 	var action = _button("收藏", "ghost")
 	action.custom_minimum_size = Vector2(94, 58)
 	match str(item.type):
@@ -1263,6 +1278,13 @@ func _equip_item_2d(item_id):
 	_close_overlay()
 	call_deferred("_open_inventory")
 
+func _equip_recommended_2d():
+	var result = state.equip_recommended()
+	inventory_notice = ("✓ " if bool(result.get("ok", false)) else "· ") + str(result.get("message", ""))
+	_refresh_hud()
+	_close_overlay()
+	call_deferred("_open_inventory")
+
 func _use_item_2d(item_id):
 	var result = state.use_item(item_id)
 	if bool(result.ok):
@@ -1295,6 +1317,15 @@ func _open_quest():
 	var content = VBoxContainer.new()
 	content.add_theme_constant_override("separation", 14)
 	content.add_child(_label("航海任务", 26, GOLD))
+	var progress = state.story_progress()
+	content.add_child(_label("第一卷进度 %d/%d｜%s %d/%d" % [int(progress.completed), int(progress.total), str(progress.chapter), int(progress.chapter_completed), int(progress.chapter_total)], 15, TEAL))
+	content.add_child(_label("持有银币：%d" % int(state.player.silver), 14, GOLD))
+	var recap_titles = state.completed_story_titles(3)
+	if not recap_titles.is_empty():
+		var recap = _label("剧情回顾｜已完成：%s\n%s" % [" → ".join(recap_titles), str(progress.summary)], 14, MUTED)
+		recap.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		recap.add_theme_stylebox_override("normal", _style(Color(0.04, 0.13, 0.16, 0.92), 10, Color(TEAL, 0.28), 1, 10))
+		content.add_child(recap)
 	var quest = state.get_current_quest()
 	if quest.is_empty():
 		content.add_child(_label("第一卷·黑帆之谜已完成", 22, GOLD))
@@ -1308,10 +1339,15 @@ func _open_quest():
 		story.custom_minimum_size.y = 130
 		content.add_child(story)
 		content.add_child(_label("当前进度  %d / %d" % [state.quest_progress, int(quest.objective.need)], 18, TEAL))
+		content.add_child(_label("下一步｜%s" % GameData.objective_name(quest.objective), 15, GOLD))
 		if state.quest_can_claim():
 			var claim = _button("领取任务奖励", "gold")
 			claim.pressed.connect(_claim_quest_2d)
 			content.add_child(claim)
+		else:
+			var navigate = _button("导航到当前任务", "primary")
+			navigate.pressed.connect(_navigate_to_quest)
+			content.add_child(navigate)
 	if state.quest_index >= 3:
 		var bounty = state.get_bounty()
 		content.add_child(_label("城市悬赏｜%s" % bounty.title, 19, GOLD))
@@ -1499,7 +1535,10 @@ func _open_trade_2d():
 	var content = VBoxContainer.new()
 	content.add_theme_constant_override("separation", 10)
 	content.add_child(_label("%s港口市场" % port.name, 25, GOLD))
-	content.add_child(_label("第%d日 · 银币%d · 货舱%d/%d · 船速Lv.%d · 护甲Lv.%d" % [state.trade_day, int(state.player.silver), state.cargo_used(), state.cargo_capacity(), int(state.ship.speed), int(state.ship.get("armor", 0))], 14, TEAL))
+	var wallet = _label("持有银币：%d" % int(state.player.silver), 20, GOLD)
+	wallet.add_theme_stylebox_override("normal", _style(Color(0.18, 0.13, 0.03, 0.94), 11, Color(GOLD, 0.66), 1, 11))
+	content.add_child(wallet)
+	content.add_child(_label("第%d日 · 货舱%d/%d · 货值%d · 浮动盈亏%+d · 船速Lv.%d · 护甲Lv.%d" % [state.trade_day, state.cargo_used(), state.cargo_capacity(), state.cargo_market_value(), state.cargo_unrealized_profit(), int(state.ship.speed), int(state.ship.get("armor", 0))], 14, TEAL))
 	var scroll = ScrollContainer.new()
 	scroll.custom_minimum_size.y = 560
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -1534,22 +1573,38 @@ func _open_trade_2d():
 	list.add_child(contract)
 	for good_id in GameData.TRADE_GOODS:
 		var good = GameData.TRADE_GOODS[good_id]
+		var stack = VBoxContainer.new()
+		stack.add_theme_constant_override("separation", 7)
+		var held = int(state.cargo.get(good_id, 0))
+		var average = state.cargo_average_cost(good_id)
+		var estimate = state.trade_sell_price(good_id) - average if held > 0 else 0
+		stack.add_child(_label("%s｜买%d / 卖%d · 持有%d · 均价%d · 单件预估%+d" % [good.name, state.trade_buy_price(good_id), state.trade_sell_price(good_id), held, average, estimate], 14, INK))
 		var row = HBoxContainer.new()
 		row.add_theme_constant_override("separation", 7)
-		var info = _label("%s\n买%d / 卖%d · 持有%d" % [good.name, state.trade_buy_price(good_id), state.trade_sell_price(good_id), int(state.cargo.get(good_id, 0))], 14, INK)
-		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(info)
+		stack.add_child(row)
 		var buy = _button("买1", "primary")
-		buy.disabled = state.cargo_used() + int(good.space) > state.cargo_capacity() or int(state.player.silver) < state.trade_buy_price(good_id)
+		buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		buy.disabled = state.max_buyable_cargo(good_id) <= 0
 		buy.pressed.connect(_trade_buy_2d.bind(good_id))
 		row.add_child(buy)
+		var buy_max = _button("买满", "gold")
+		buy_max.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		buy_max.disabled = state.max_buyable_cargo(good_id) <= 0
+		buy_max.pressed.connect(_trade_buy_2d.bind(good_id, true))
+		row.add_child(buy_max)
 		var sell = _button("卖1", "ghost")
-		sell.disabled = int(state.cargo.get(good_id, 0)) <= 0
+		sell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		sell.disabled = held <= 0
 		sell.pressed.connect(_trade_sell_2d.bind(good_id))
 		row.add_child(sell)
+		var sell_all = _button("全卖", "ghost")
+		sell_all.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		sell_all.disabled = held <= 0
+		sell_all.pressed.connect(_trade_sell_2d.bind(good_id, true))
+		row.add_child(sell_all)
 		var card = PanelContainer.new()
 		card.add_theme_stylebox_override("panel", _style(Color(0.04, 0.13, 0.16, 0.92), 10, Color(TEAL, 0.3), 1, 10))
-		card.add_child(row)
+		card.add_child(stack)
 		list.add_child(card)
 	list.add_child(_label("选择航线", 16, GOLD))
 	for destination in GameData.TRADE_PORTS:
@@ -1578,8 +1633,8 @@ func _open_trade_2d():
 	content.add_child(close)
 	_open_overlay(content, true, Vector2(666, 980))
 
-func _trade_buy_2d(good_id):
-	var result = state.buy_cargo(good_id)
+func _trade_buy_2d(good_id, buy_max = false):
+	var result = state.buy_max_cargo(good_id) if buy_max else state.buy_cargo(good_id)
 	_refresh_hud()
 	_close_overlay()
 	if bool(result.get("quest_completed", false)):
@@ -1587,8 +1642,8 @@ func _trade_buy_2d(good_id):
 	else:
 		call_deferred("_open_trade_2d")
 
-func _trade_sell_2d(good_id):
-	var result = state.sell_cargo(good_id)
+func _trade_sell_2d(good_id, sell_all = false):
+	var result = state.sell_all_cargo(good_id) if sell_all else state.sell_cargo(good_id)
 	_refresh_hud()
 	_close_overlay()
 	if bool(result.get("quest_completed", false)):

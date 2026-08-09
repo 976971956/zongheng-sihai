@@ -201,7 +201,7 @@ func _run():
 	_check(bool(equipment_upgrade.get("ok", false)) and scene.state.equipment_upgrade_level("warrior_blade") == 1 and int(scene.state.get_stats().attack) > attack_before_upgrade, "贸易银币必须可以用于强化已装备武器并提升属性")
 	scene._open_trade_2d()
 	_check(is_instance_valid(scene.overlay), "主线完成后必须能从2D地图打开港口市场")
-	_check(_has_button_text(scene.overlay, "买1") and _has_button_text(scene.overlay, "拉古萨") and _has_label_text(scene.overlay, "今日行情"), "2D港口市场必须包含买卖、跨港航线和动态行情")
+	_check(_has_button_text(scene.overlay, "买1") and _has_button_text(scene.overlay, "买满") and _has_button_text(scene.overlay, "全卖") and _has_button_text(scene.overlay, "拉古萨") and _has_label_text(scene.overlay, "持有银币") and _has_label_text(scene.overlay, "浮动盈亏") and _has_label_text(scene.overlay, "今日行情"), "2D港口市场必须包含资产、成本盈亏、批量买卖、跨港航线和动态行情")
 	var silver_before = int(scene.state.player.silver)
 	scene._trade_buy_2d("venetian_glass")
 	_check(int(scene.state.cargo.get("venetian_glass", 0)) == 1 and int(scene.state.player.silver) < silver_before, "2D市场买货必须同步货舱和银币")
@@ -232,7 +232,7 @@ func _run():
 	scene.state.bounty_index = 0
 	scene.state.bounty_progress = 3
 	scene._open_quest()
-	_check(_has_label_text(scene.overlay, "第一卷") and _has_button_text(scene.overlay, "领取悬赏奖励"), "主线结束后任务页必须显示结局和可持续领取的悬赏")
+	_check(_has_label_text(scene.overlay, "第一卷进度") and _has_label_text(scene.overlay, "剧情回顾") and _has_button_text(scene.overlay, "领取悬赏奖励"), "主线结束后任务页必须显示章节进度、剧情回顾和可持续领取的悬赏")
 
 	if failures.is_empty():
 		print("WORLD_2D_OK: 移动、背包、任务、副本、逐回合自动战斗、战败回酒馆、怪物刷新与贸易全部通过")

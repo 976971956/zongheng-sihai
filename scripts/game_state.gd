@@ -20,6 +20,7 @@ var companion_unlocked = false
 var pet = {}
 var dungeon_cleared = {}
 var cargo = {}
+var cargo_costs = {}
 var ship = {}
 var trade_day = 1
 var trade_profit = 0
@@ -58,6 +59,7 @@ func new_game():
 	pet = {}
 	dungeon_cleared = {}
 	cargo = {}
+	cargo_costs = {}
 	ship = {"name": "海燕号", "capacity": 12, "speed": 1, "armor": 0}
 	trade_day = 1
 	trade_profit = 0
@@ -286,6 +288,79 @@ func equip_item(item_id):
 	_trim_history()
 	save_game()
 	return {"ok": true, "message": "已装备 %s" % item.name}
+
+func equipment_item_score(item_id):
+	if not GameData.ITEMS.has(item_id):
+		return 0
+	var item = GameData.ITEMS[item_id]
+	if str(item.get("type", "")) != "equipment":
+		return 0
+	var item_stats = item.get("stats", {})
+	var level = equipment_upgrade_level(item_id)
+	var score = 0.0
+	for key in item_stats:
+		var value = int(item_stats[key])
+		if level > 0:
+			var bonus_rate = 0.10 if key == "max_hp" else 0.14
+			value += max(1, int(round(float(value) * bonus_rate))) * level
+		match str(key):
+			"max_hp": score += float(value) * 0.35
+			"attack": score += float(value) * 2.2
+			"defense": score += float(value) * 1.8
+			"speed": score += float(value) * 1.2
+	score += float(item.get("drop_bonus", 0.0)) * 100.0
+	return int(round(score))
+
+func equipment_score_delta(item_id):
+	if not GameData.ITEMS.has(item_id):
+		return 0
+	var slot = str(GameData.ITEMS[item_id].get("slot", ""))
+	var current_id = str(equipment.get(slot, ""))
+	return equipment_item_score(item_id) - equipment_item_score(current_id)
+
+func equip_recommended():
+	var choices = {}
+	for slot in GameData.SLOT_NAMES:
+		var current_id = str(equipment.get(slot, ""))
+		choices[slot] = current_id
+	for item_id in inventory:
+		if int(inventory[item_id]) <= 0 or not GameData.ITEMS.has(item_id):
+			continue
+		var item = GameData.ITEMS[item_id]
+		if str(item.get("type", "")) != "equipment":
+			continue
+		var slot = str(item.get("slot", ""))
+		if equipment_item_score(item_id) > equipment_item_score(str(choices.get(slot, ""))):
+			choices[slot] = str(item_id)
+	var equipped_names = []
+	for slot in GameData.SLOT_NAMES:
+		var chosen_id = str(choices.get(slot, ""))
+		if chosen_id != "" and chosen_id != str(equipment.get(slot, "")):
+			var result = equip_item(chosen_id)
+			if bool(result.get("ok", false)):
+				equipped_names.append(str(GameData.ITEMS[chosen_id].name))
+	if equipped_names.is_empty():
+		return {"ok": false, "message": "当前已穿戴背包中战力最高的装备。", "count": 0}
+	return {"ok": true, "message": "已自动换上：%s" % "、".join(equipped_names), "count": equipped_names.size()}
+
+func story_progress():
+	var total = GameData.QUESTS.size()
+	var completed = clamp(quest_index, 0, total)
+	var chapter = GameData.STORY_CHAPTERS.back()
+	for entry in GameData.STORY_CHAPTERS:
+		if completed <= int(entry.end):
+			chapter = entry
+			break
+	var chapter_total = int(chapter.end) - int(chapter.start) + 1
+	var chapter_completed = clamp(completed - int(chapter.start), 0, chapter_total)
+	return {"completed": completed, "total": total, "chapter": str(chapter.title), "chapter_completed": chapter_completed, "chapter_total": chapter_total, "summary": str(chapter.summary)}
+
+func completed_story_titles(limit = 3):
+	var titles = []
+	var first = max(0, quest_index - int(limit))
+	for index in range(first, min(quest_index, GameData.QUESTS.size())):
+		titles.append(str(GameData.QUESTS[index].title))
+	return titles
 
 func equip_card(item_id):
 	if int(inventory.get(item_id, 0)) <= 0:
@@ -865,53 +940,97 @@ func cargo_used():
 func cargo_capacity():
 	return int(ship.get("capacity", 12))
 
+func cargo_average_cost(good_id):
+	var count = int(cargo.get(good_id, 0))
+	if count <= 0:
+		return 0
+	return int(round(float(cargo_costs.get(good_id, 0)) / float(count)))
+
+func cargo_market_value():
+	var value = 0
+	for good_id in cargo:
+		if GameData.TRADE_GOODS.has(good_id):
+			value += trade_sell_price(good_id) * int(cargo[good_id])
+	return value
+
+func cargo_unrealized_profit():
+	var profit = 0
+	for good_id in cargo:
+		if GameData.TRADE_GOODS.has(good_id):
+			profit += trade_sell_price(good_id) * int(cargo[good_id]) - int(cargo_costs.get(good_id, 0))
+	return profit
+
+func max_buyable_cargo(good_id):
+	if not GameData.TRADE_GOODS.has(good_id) or not GameData.TRADE_PORTS.has(player.location):
+		return 0
+	var good = GameData.TRADE_GOODS[good_id]
+	var by_space = int(floor(float(cargo_capacity() - cargo_used()) / float(good.space)))
+	var price = trade_buy_price(good_id)
+	var by_silver = int(floor(float(player.silver) / float(max(1, price))))
+	return max(0, min(by_space, by_silver))
+
 func trade_buy_price(good_id):
 	return GameData.trade_market_price(str(player.location), good_id, trade_day)
 
 func trade_sell_price(good_id):
 	return int(floor(float(trade_buy_price(good_id)) * 0.90))
 
-func buy_cargo(good_id):
+func buy_cargo(good_id, amount = 1):
 	if not is_trade_unlocked():
 		return {"ok": false, "message": "完成威尼斯四层试炼后才会获得贸易船。"}
 	if not GameData.TRADE_PORTS.has(player.location) or not GameData.TRADE_GOODS.has(good_id):
 		return {"ok": false, "message": "这里不能购买这种货物。"}
 	var good = GameData.TRADE_GOODS[good_id]
-	if cargo_used() + int(good.space) > cargo_capacity():
-		return {"ok": false, "message": "货舱空间不足，需要%d格空位。" % int(good.space)}
 	var price = trade_buy_price(good_id)
-	if int(player.silver) < price:
-		return {"ok": false, "message": "银币不足，购买需要%d银币。" % price}
-	player.silver -= price
-	cargo[good_id] = int(cargo.get(good_id, 0)) + 1
-	trade_profit -= price
-	trade_volume += 1
-	var quest_completed = _advance_quest("trade_buy", str(good_id))
-	message_history.push_front("在%s买入1%s%s。" % [GameData.TRADE_PORTS[player.location].name, good.unit, good.name])
+	var actual_amount = min(max(1, int(amount)), max_buyable_cargo(good_id))
+	if actual_amount <= 0:
+		return {"ok": false, "message": "银币或货舱空间不足，无法继续买入。"}
+	var total = price * actual_amount
+	player.silver -= total
+	cargo[good_id] = int(cargo.get(good_id, 0)) + actual_amount
+	cargo_costs[good_id] = int(cargo_costs.get(good_id, 0)) + total
+	trade_profit -= total
+	trade_volume += actual_amount
+	var quest_completed = _advance_quest("trade_buy", str(good_id), actual_amount)
+	message_history.push_front("在%s买入%d%s%s。" % [GameData.TRADE_PORTS[player.location].name, actual_amount, good.unit, good.name])
 	_trim_history()
 	save_game()
-	return {"ok": true, "message": "买入%s -%d银币" % [good.name, price], "price": price, "quest_completed": quest_completed}
+	return {"ok": true, "message": "买入%s×%d，支出%d银币" % [good.name, actual_amount, total], "price": price, "amount": actual_amount, "total": total, "quest_completed": quest_completed}
 
-func sell_cargo(good_id):
+func sell_cargo(good_id, amount = 1):
 	if not is_trade_unlocked() or not GameData.TRADE_PORTS.has(player.location):
 		return {"ok": false, "message": "当前不在可交易港口。"}
 	if int(cargo.get(good_id, 0)) <= 0 or not GameData.TRADE_GOODS.has(good_id):
 		return {"ok": false, "message": "货舱中没有这种货物。"}
 	var good = GameData.TRADE_GOODS[good_id]
 	var price = trade_sell_price(good_id)
-	player.silver += price
-	trade_profit += price
-	var quest_completed = _advance_quest("trade_sell", str(good_id))
-	var left = int(cargo[good_id]) - 1
+	var old_count = int(cargo[good_id])
+	var actual_amount = min(max(1, int(amount)), old_count)
+	var total = price * actual_amount
+	var old_cost = int(cargo_costs.get(good_id, 0))
+	var removed_cost = int(round(float(old_cost) * float(actual_amount) / float(old_count)))
+	var realized_profit = total - removed_cost
+	player.silver += total
+	trade_profit += total
+	var quest_completed = _advance_quest("trade_sell", str(good_id), actual_amount)
+	var left = old_count - actual_amount
 	if left <= 0:
 		cargo.erase(good_id)
+		cargo_costs.erase(good_id)
 	else:
 		cargo[good_id] = left
-	trade_volume += 1
-	message_history.push_front("在%s卖出1%s%s。" % [GameData.TRADE_PORTS[player.location].name, good.unit, good.name])
+		cargo_costs[good_id] = max(0, old_cost - removed_cost)
+	trade_volume += actual_amount
+	message_history.push_front("在%s卖出%d%s%s。" % [GameData.TRADE_PORTS[player.location].name, actual_amount, good.unit, good.name])
 	_trim_history()
 	save_game()
-	return {"ok": true, "message": "卖出%s +%d银币" % [good.name, price], "price": price, "quest_completed": quest_completed}
+	return {"ok": true, "message": "卖出%s×%d，收入%d银币｜实际盈亏%+d" % [good.name, actual_amount, total, realized_profit], "price": price, "amount": actual_amount, "total": total, "realized_profit": realized_profit, "quest_completed": quest_completed}
+
+func buy_max_cargo(good_id):
+	return buy_cargo(good_id, max_buyable_cargo(good_id))
+
+func sell_all_cargo(good_id):
+	return sell_cargo(good_id, int(cargo.get(good_id, 0)))
 
 func sail_to(port_id):
 	if not is_trade_unlocked():
@@ -959,11 +1078,17 @@ func sail_to(port_id):
 	return {"ok": true, "message": "抵达%s · 航费%d · 用时%d日\n%s" % [GameData.TRADE_PORTS[port_id].name, fee, days, event_message], "days": days, "fee": fee, "risk": risk, "event": event_message, "from": from_port, "quest_completed": quest_completed}
 
 func _remove_item_from_cargo(good_id, count):
-	var left = int(cargo.get(good_id, 0)) - int(count)
+	var old_count = int(cargo.get(good_id, 0))
+	var removed = min(old_count, int(count))
+	var old_cost = int(cargo_costs.get(good_id, 0))
+	var removed_cost = int(round(float(old_cost) * float(removed) / float(max(1, old_count))))
+	var left = old_count - removed
 	if left <= 0:
 		cargo.erase(good_id)
+		cargo_costs.erase(good_id)
 	else:
 		cargo[good_id] = left
+		cargo_costs[good_id] = max(0, old_cost - removed_cost)
 
 func upgrade_ship(kind):
 	if not is_trade_unlocked():
@@ -1022,7 +1147,7 @@ func save_game():
 		"quest_index": quest_index, "quest_progress": quest_progress, "defeated": defeated,
 		"message_history": message_history, "active_battle": active_battle, "statuses": statuses,
 		"party_members": party_members, "companion_unlocked": companion_unlocked, "pet": pet,
-		"dungeon_cleared": dungeon_cleared, "cargo": cargo, "ship": ship,
+		"dungeon_cleared": dungeon_cleared, "cargo": cargo, "cargo_costs": cargo_costs, "ship": ship,
 		"trade_day": trade_day, "trade_profit": trade_profit, "trade_volume": trade_volume,
 		"battle_stance": battle_stance, "auto_heal_threshold": auto_heal_threshold, "auto_cure_status": auto_cure_status,
 		"equipment_upgrades": equipment_upgrades, "trade_contract_claimed": trade_contract_claimed,
@@ -1076,6 +1201,9 @@ func load_game():
 	pet = parsed.get("pet", {})
 	dungeon_cleared = parsed.get("dungeon_cleared", {})
 	cargo = parsed.get("cargo", {})
+	cargo_costs = parsed.get("cargo_costs", {})
+	if typeof(cargo_costs) != TYPE_DICTIONARY:
+		cargo_costs = {}
 	ship = parsed.get("ship", {"name": "海燕号", "capacity": 12, "speed": 1, "armor": 0})
 	trade_day = max(1, int(parsed.get("trade_day", 1)))
 	trade_profit = int(parsed.get("trade_profit", 0))
@@ -1113,6 +1241,9 @@ func load_game():
 	for good_id in cargo.keys():
 		if not GameData.TRADE_GOODS.has(good_id) or int(cargo[good_id]) <= 0:
 			cargo.erase(good_id)
+			cargo_costs.erase(good_id)
+		elif not cargo_costs.has(good_id):
+			cargo_costs[good_id] = trade_buy_price(good_id) * int(cargo[good_id])
 	if not GameData.LOCATIONS.has(player.get("location", "")):
 		player.location = "alisa_hut"
 		active_battle = {}
