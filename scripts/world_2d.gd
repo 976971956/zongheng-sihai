@@ -20,6 +20,8 @@ const MONSTER_RESPAWN_RETRY_SECONDS = 1.5
 const MONSTER_RESPAWN_SAFE_DISTANCE = 170.0
 const AUTO_BATTLE_HIT_DELAY = 0.16
 const AUTO_BATTLE_READ_DELAY = 0.30
+const NAVIGATION_GRID_SIZE = 42.0
+const NAVIGATION_REACH_DISTANCE = 12.0
 
 const ENEMY_SPAWNS = {
 	"drunk_sailor": {"region": "city", "name": "喝醉的水手", "position": Vector2(360, 300), "color": Color("99484c"), "accent": Color("4a3e49"), "location": "venice_north_gate"},
@@ -85,6 +87,12 @@ var navigation_button
 var inventory_notice = ""
 var audio_button
 var footstep_timer = 0.0
+var task_navigation_active = false
+var task_navigation_target = {}
+var task_navigation_portal = {}
+var task_navigation_path = PackedVector2Array()
+var task_navigation_path_index = 0
+var task_navigation_open_service = ""
 
 var region_by_location = {
 	"alisa_hut": "city", "venice_tavern": "city", "venice_square": "city",
@@ -534,12 +542,19 @@ func _process(delta):
 	var direction = joystick_direction if joystick_direction.length() > 0.08 else keyboard
 	if direction.length() < 0.1 and has_move_target:
 		var difference = move_target - player_actor.position
-		if difference.length() < 8:
-			has_move_target = false
+		if difference.length() < NAVIGATION_REACH_DISTANCE:
+			if task_navigation_active and _advance_task_navigation_waypoint():
+				difference = move_target - player_actor.position
+				direction = difference.normalized()
+			else:
+				has_move_target = false
+				if task_navigation_active:
+					_finish_task_navigation_leg()
 		else:
 			direction = difference.normalized()
 	elif direction.length() > 0.1:
 		has_move_target = false
+		_cancel_task_navigation()
 	var previous_position = player_actor.position
 	if direction.length() > 0.05:
 		var movement = direction.normalized() * 245.0 * delta
@@ -595,6 +610,7 @@ func _set_move_target(position):
 		return
 	move_target = world_layer.to_local(position)
 	has_move_target = true
+	_cancel_task_navigation()
 
 func _update_camera(delta, snap = false):
 	if not is_instance_valid(world_layer) or not is_instance_valid(player_actor):
@@ -611,6 +627,7 @@ func _on_joystick_direction(value):
 	joystick_direction = value
 	if value.length() > 0.08:
 		has_move_target = false
+		_cancel_task_navigation()
 
 func _is_walkable(position):
 	for rect in region_obstacles.get(current_region, []):
@@ -668,6 +685,8 @@ func _update_zone(force):
 		current_zone = best_id
 	_refresh_hud()
 	if bool(result.get("quest_completed", false)):
+		_cancel_task_navigation()
+		has_move_target = false
 		call_deferred("_show_quest_claim")
 
 func _dungeon_floor_lock(location_id):
@@ -702,6 +721,7 @@ func _refresh_hud():
 func _interact():
 	if nearest_actor.is_empty():
 		return
+	_cancel_task_navigation()
 	AudioDirector.play_sfx("interact")
 	if nearest_actor.kind == "travel":
 		_switch_region(str(nearest_actor.id), str(nearest_actor.location))
@@ -773,6 +793,8 @@ func _switch_region(region_id, entrance_location):
 	_refresh_hud()
 	_refresh_waypoint()
 	if bool(arrival.get("quest_completed", false)):
+		_cancel_task_navigation()
+		has_move_target = false
 		call_deferred("_show_quest_claim")
 
 func _show_dialog(npc_id, result):
@@ -1416,11 +1438,11 @@ func _refresh_waypoint():
 	if not is_instance_valid(waypoint_label) or not is_instance_valid(navigation_button):
 		return
 	var target = _quest_navigation_target()
-	navigation_button.text = "◆ 导航 · %s" % target.name
+	navigation_button.text = "◆ 步行导航 · %s" % target.name
 	if str(target.region) != current_region:
 		waypoint_world_target = Vector2.ZERO
 		waypoint_label.visible = false
-		hint_label.text = "任务目标在%s，点击“任务导航”快速前往" % _region_name(str(target.region))
+		hint_label.text = "任务目标在%s，点击“步行导航”自动沿路前往" % _region_name(str(target.region))
 		return
 	var target_position = Vector2.ZERO
 	for entry in actors:
@@ -1456,25 +1478,161 @@ func _navigate_to_quest():
 		_open_inventory()
 		return
 	if not quest.is_empty() and str(quest.objective.type) in ["trade_buy", "trade_sell", "upgrade_ship"]:
-		_open_trade_2d()
-		return
-	var target = _quest_navigation_target()
-	_switch_region(str(target.region), str(target.location))
+		if str(state.player.location) in GameData.TRADE_PORTS:
+			_open_trade_2d()
+			return
+		task_navigation_open_service = "trade"
+	else:
+		task_navigation_open_service = ""
 	if is_instance_valid(overlay):
+		_close_overlay()
+	task_navigation_target = _quest_navigation_target()
+	task_navigation_active = true
+	_continue_task_navigation()
+
+func _continue_task_navigation():
+	if not task_navigation_active or task_navigation_target.is_empty():
 		return
+	if str(task_navigation_target.region) == current_region:
+		task_navigation_portal = {}
+		var target_position = _task_target_position(task_navigation_target)
+		if target_position == Vector2.ZERO:
+			_cancel_task_navigation()
+			hint_label.text = "暂时无法找到%s，请查看区域地图。" % str(task_navigation_target.name)
+			return
+		_set_task_navigation_destination(target_position)
+		hint_label.text = "正在沿道路前往：%s" % str(task_navigation_target.name)
+		return
+	var next_region = _task_navigation_next_region(current_region, str(task_navigation_target.region))
+	var portal = _task_navigation_portal_to(next_region)
+	if portal.is_empty():
+		_cancel_task_navigation()
+		hint_label.text = "当前区域没有通往%s的道路入口。" % _region_name(next_region)
+		return
+	task_navigation_portal = portal
+	_set_task_navigation_destination(portal.node.position)
+	hint_label.text = "正在步行前往%s，再去%s" % [str(portal.name), str(task_navigation_target.name)]
+
+func _task_target_position(target):
 	var target_position = Vector2.ZERO
 	for entry in actors:
-		if str(entry.id) == str(target.actor_id) and target.actor_id != "":
+		if str(entry.id) == str(target.actor_id) and str(target.actor_id) != "":
 			target_position = entry.node.position
 			break
 	if target_position == Vector2.ZERO:
-		var zone = region_zones.get(current_region, {}).get(str(target.location), {})
+		var location_id = str(target.location)
+		if location_id in GameData.TRADE_PORTS:
+			location_id = "venice_dock"
+		var zone = region_zones.get(current_region, {}).get(location_id, {})
 		if not zone.is_empty():
 			target_position = zone.point
-	if target_position != Vector2.ZERO:
-		move_target = target_position
-		has_move_target = true
-		hint_label.text = "正在前往：%s" % target.name
+	return target_position
+
+func _task_navigation_next_region(from_region, target_region):
+	if str(from_region) == str(target_region):
+		return str(target_region)
+	match str(from_region):
+		"city":
+			return "black_sail" if str(target_region) == "black_sail" else "field"
+		"field":
+			return "dungeon" if str(target_region) == "dungeon" else "city"
+		"dungeon":
+			return "field"
+		"black_sail":
+			return "city"
+		_:
+			return str(target_region)
+
+func _task_navigation_portal_to(region_id):
+	for entry in actors:
+		if str(entry.kind) == "travel" and str(entry.id) == str(region_id):
+			return entry
+	return {}
+
+func _set_task_navigation_destination(destination):
+	task_navigation_path = _build_task_navigation_path(player_actor.position, Vector2(destination))
+	task_navigation_path_index = 0
+	if task_navigation_path.is_empty():
+		task_navigation_path.append(Vector2(destination))
+	move_target = task_navigation_path[0]
+	has_move_target = true
+
+func _advance_task_navigation_waypoint():
+	task_navigation_path_index += 1
+	if task_navigation_path_index >= task_navigation_path.size():
+		return false
+	move_target = task_navigation_path[task_navigation_path_index]
+	return true
+
+func _finish_task_navigation_leg():
+	if not task_navigation_active:
+		return
+	if not task_navigation_portal.is_empty():
+		var portal = task_navigation_portal
+		task_navigation_portal = {}
+		_switch_region(str(portal.id), str(portal.location))
+		if task_navigation_active:
+			_continue_task_navigation()
+		return
+	var target_name = str(task_navigation_target.get("name", "任务目标"))
+	var open_service = task_navigation_open_service
+	task_navigation_active = false
+	task_navigation_target = {}
+	task_navigation_path = PackedVector2Array()
+	task_navigation_path_index = 0
+	task_navigation_open_service = ""
+	_update_nearest_actor()
+	hint_label.text = "已步行到达：%s｜靠近后点击互动" % target_name
+	if open_service == "trade":
+		call_deferred("_open_trade_2d")
+
+func _cancel_task_navigation():
+	task_navigation_active = false
+	task_navigation_target = {}
+	task_navigation_portal = {}
+	task_navigation_path = PackedVector2Array()
+	task_navigation_path_index = 0
+	task_navigation_open_service = ""
+
+func _build_task_navigation_path(from_position, destination):
+	var columns = int(ceil(WORLD_SIZE.x / NAVIGATION_GRID_SIZE))
+	var rows = int(ceil(WORLD_SIZE.y / NAVIGATION_GRID_SIZE))
+	var grid = AStarGrid2D.new()
+	grid.region = Rect2i(0, 0, columns, rows)
+	grid.cell_size = Vector2.ONE * NAVIGATION_GRID_SIZE
+	grid.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
+	grid.update()
+	for y in range(rows):
+		for x in range(columns):
+			var point = Vector2(x * NAVIGATION_GRID_SIZE, y * NAVIGATION_GRID_SIZE)
+			if not _is_walkable(point):
+				grid.set_point_solid(Vector2i(x, y), true)
+	var start_id = _nearest_open_navigation_cell(grid, _navigation_cell(from_position, columns, rows), columns, rows)
+	var end_id = _nearest_open_navigation_cell(grid, _navigation_cell(destination, columns, rows), columns, rows)
+	if grid.is_point_solid(start_id) or grid.is_point_solid(end_id):
+		return PackedVector2Array([destination])
+	var raw_path = grid.get_point_path(start_id, end_id)
+	var path = PackedVector2Array()
+	for point in raw_path:
+		if Vector2(point).distance_to(from_position) > NAVIGATION_GRID_SIZE * 0.45:
+			path.append(Vector2(point))
+	if path.is_empty() or path[path.size() - 1].distance_to(destination) > NAVIGATION_REACH_DISTANCE:
+		path.append(destination)
+	return path
+
+func _navigation_cell(position, columns, rows):
+	return Vector2i(clamp(int(round(float(position.x) / NAVIGATION_GRID_SIZE)), 0, columns - 1), clamp(int(round(float(position.y) / NAVIGATION_GRID_SIZE)), 0, rows - 1))
+
+func _nearest_open_navigation_cell(grid, origin, columns, rows):
+	if not grid.is_point_solid(origin):
+		return origin
+	for radius in range(1, 7):
+		for y in range(origin.y - radius, origin.y + radius + 1):
+			for x in range(origin.x - radius, origin.x + radius + 1):
+				var candidate = Vector2i(x, y)
+				if x >= 0 and x < columns and y >= 0 and y < rows and not grid.is_point_solid(candidate):
+					return candidate
+	return origin
 
 func _open_world_map():
 	var content = VBoxContainer.new()

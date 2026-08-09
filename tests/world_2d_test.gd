@@ -22,6 +22,16 @@ func _run():
 	_check(is_instance_valid(scene.world_layer), "2D世界地图必须成功创建")
 	_check(is_instance_valid(scene.player_actor), "2D玩家角色必须成功创建")
 	_check(scene.player_actor.display_id == "player", "主角必须使用独立的新版角色模型")
+	_check(scene.player_actor.art_sprite.hframes == 4 and scene.player_actor.art_sprite.vframes == 2, "主角必须使用多帧2D行走图集")
+	scene.player_actor.set_motion(Vector2.RIGHT)
+	scene.player_actor._process(0.16)
+	var first_walk_frame = scene.player_actor.art_sprite.frame
+	scene.player_actor._process(0.16)
+	_check(scene.player_actor.art_sprite.frame != first_walk_frame, "主角移动时必须循环播放迈步帧而不是整图平移")
+	scene.player_actor.set_motion(Vector2.UP)
+	scene.player_actor._process(0.16)
+	_check("player_walk_back_v1" in str(scene.player_actor.art_sprite.texture.resource_path), "主角向上走时必须切换为背面步态")
+	scene.player_actor.set_motion(Vector2.ZERO)
 	_check(scene.actors.size() >= 4, "地图必须包含NPC和可见敌人")
 	_check(scene.player_actor.position.x > 0 and scene.player_actor.position.y > 0, "玩家必须出生在可行走地图内")
 	var saved_respawn_key = scene._enemy_spawn_key("drunk_sailor")
@@ -96,7 +106,10 @@ func _run():
 	scene.state.quest_index = 4
 	scene.state.quest_progress = 0
 	scene.state.player.level = 3
+	var navigation_start_position = scene.player_actor.position
 	scene._navigate_to_quest()
+	_check(scene.task_navigation_active and scene.current_region == "city" and scene.player_actor.position.distance_to(navigation_start_position) < 1.0, "点击任务导航后必须从当前位置开始走，不能直接跳到目标区域")
+	await _walk_task_navigation(scene)
 	_check(scene.current_region == "field" and scene.state.player.location == "venice_mine", "失窃矿石任务导航必须进入城外废矿山")
 	_check(_has_actor(scene, "mine_thief"), "城外2D地图必须实际生成偷矿者")
 	_check(_actor_model_id(scene, "mine_thief") == "mine_thief", "不同敌人必须绑定各自的新版人物或怪物模型")
@@ -108,6 +121,8 @@ func _run():
 	scene.state.player.level = 4
 	scene.state.dungeon_cleared = {}
 	scene._navigate_to_quest()
+	_check(scene.task_navigation_active and scene.current_region == "field", "副本导航必须先步行寻找入口，不能立即切换地图")
+	await _walk_task_navigation(scene)
 	_check(scene.current_region == "dungeon" and scene.state.player.location == "training_dungeon_1", "四层试炼导航必须从副本一层开始")
 	_check(_has_actor(scene, "dungeon_guard") and not _has_actor(scene, "vermilion_phantom"), "四层副本只能显示当前已解锁守卫")
 	_check(scene._dungeon_floor_lock("training_dungeon_2") != "", "未击败一层守卫时二层必须锁定")
@@ -122,6 +137,8 @@ func _run():
 	scene.state.quest_progress = 0
 	scene.state.player.level = 8
 	scene._navigate_to_quest()
+	_check(scene.task_navigation_active and scene.current_region == "field", "黑帆导航必须先沿道路返回港口，不能跨区域瞬移")
+	await _walk_task_navigation(scene)
 	_check(scene.current_region == "black_sail" and str(scene.state.player.location) == "black_sail_1", "黑帆密令导航必须进入第二座四层副本")
 	_check(_has_actor(scene, "corsair_deckhand") and not _has_actor(scene, "corsair_captain"), "黑帆据点只能显示当前已解锁敌人")
 	_check(scene._dungeon_floor_lock("black_sail_2") != "", "未击败黑帆水手时火药仓必须锁定")
@@ -271,6 +288,15 @@ func _wait_for_auto_battle(scene):
 		if not scene.auto_battle_running:
 			return
 		await create_timer(0.05).timeout
+
+func _walk_task_navigation(scene):
+	for step in range(900):
+		if not scene.task_navigation_active:
+			return
+		scene._process(0.08)
+		if step % 20 == 0:
+			await process_frame
+	_check(false, "任务自动寻路必须在合理时间内抵达，不能撞墙卡死（区域%s，位置%s，目标%s）" % [scene.current_region, scene.player_actor.position, scene.move_target])
 
 func _has_actor(scene, actor_id):
 	for entry in scene.actors:

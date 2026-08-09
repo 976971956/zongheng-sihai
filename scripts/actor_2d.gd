@@ -1,6 +1,8 @@
 extends Node2D
 
 const CHARACTER_ATLAS = preload("res://assets/art/characters/character_atlas_v1.png")
+const PLAYER_WALK = preload("res://assets/art/characters/player_walk_v1.png")
+const PLAYER_WALK_BACK = preload("res://assets/art/characters/player_walk_back_v1.png")
 const ATLAS_CELL_SIZE = Vector2(362, 362)
 const ATLAS_CELLS = {
 	"player": Vector2i(0, 0),
@@ -31,6 +33,8 @@ var selected = false
 var bob_time = 0.0
 var art_sprite
 var motion_direction = Vector2.ZERO
+var walk_time = 0.0
+var last_facing = "down"
 
 func _ready():
 	_refresh_art_sprite()
@@ -48,12 +52,24 @@ func _process(delta):
 	bob_time += delta
 	if is_instance_valid(art_sprite):
 		var moving = motion_direction.length() > 0.05
-		art_sprite.position.y = sin(bob_time * (7.5 if moving else 2.7)) * (2.2 if moving else 1.35)
-		art_sprite.rotation = sin(bob_time * 7.5) * 0.018 if moving else 0.0
+		if display_id == "player":
+			if moving:
+				walk_time += delta
+			_update_player_walk_sprite(moving)
+		else:
+			art_sprite.position.y = sin(bob_time * (7.5 if moving else 2.7)) * (2.2 if moving else 1.35)
+			art_sprite.rotation = sin(bob_time * 7.5) * 0.018 if moving else 0.0
 	queue_redraw()
 
 func set_motion(direction):
 	motion_direction = Vector2(direction)
+	if display_id == "player":
+		if motion_direction.length() > 0.05:
+			if abs(motion_direction.x) > abs(motion_direction.y) * 0.72:
+				last_facing = "right" if motion_direction.x >= 0.0 else "left"
+			else:
+				last_facing = "down" if motion_direction.y >= 0.0 else "up"
+		return
 	if is_instance_valid(art_sprite) and abs(motion_direction.x) > 0.05:
 		art_sprite.flip_h = motion_direction.x < 0.0
 
@@ -61,6 +77,16 @@ func _refresh_art_sprite():
 	if is_instance_valid(art_sprite):
 		art_sprite.queue_free()
 	art_sprite = null
+	if display_id == "player":
+		art_sprite = Sprite2D.new()
+		art_sprite.texture = PLAYER_WALK
+		art_sprite.hframes = 4
+		art_sprite.vframes = 2
+		art_sprite.frame_coords = Vector2i(0, 1)
+		art_sprite.scale = Vector2.ONE * 0.35
+		art_sprite.z_index = 1
+		add_child(art_sprite)
+		return
 	if not ATLAS_CELLS.has(display_id):
 		return
 	var cell = ATLAS_CELLS[display_id]
@@ -72,6 +98,30 @@ func _refresh_art_sprite():
 	art_sprite.scale = Vector2.ONE * _art_scale()
 	art_sprite.z_index = 1
 	add_child(art_sprite)
+
+func _update_player_walk_sprite(moving):
+	if not is_instance_valid(art_sprite):
+		return
+	var frame_index = int(floor(walk_time * 9.0)) % 4 if moving else 0
+	if last_facing == "up":
+		if art_sprite.texture != PLAYER_WALK_BACK:
+			art_sprite.texture = PLAYER_WALK_BACK
+			art_sprite.hframes = 4
+			art_sprite.vframes = 1
+		art_sprite.frame = frame_index
+		art_sprite.flip_h = false
+		art_sprite.scale = Vector2.ONE * 0.22
+	else:
+		if art_sprite.texture != PLAYER_WALK:
+			art_sprite.texture = PLAYER_WALK
+			art_sprite.hframes = 4
+			art_sprite.vframes = 2
+		var row = 1 if last_facing == "down" else 0
+		art_sprite.frame_coords = Vector2i(frame_index, row)
+		art_sprite.flip_h = last_facing == "left"
+		art_sprite.scale = Vector2.ONE * 0.35
+	art_sprite.position.y = sin(walk_time * 9.0 * PI) * 0.9 if moving else 0.0
+	art_sprite.rotation = 0.0
 
 func _art_scale():
 	match display_id:
