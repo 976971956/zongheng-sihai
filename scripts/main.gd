@@ -1036,7 +1036,7 @@ func _show_next_quest_prompt():
 		unlock.add_theme_stylebox_override("normal", _style(Color(0.04, 0.18, 0.18, 0.86), 11, Color(TEAL, 0.55), 1, 14))
 		content.add_child(unlock)
 		content.add_child(_label("船老板已将「海燕号」交给你。前往威尼斯码头，可买入玻璃、羊毛、橄榄油和香料，并航行到拉古萨、亚历山大低买高卖。", 13, Color("b7cfd5")))
-		var go_trade = _button("前往威尼斯码头", "gold")
+		var go_trade = _button("返回2D地图，步行前往码头", "gold")
 		go_trade.pressed.connect(_go_to_unlocked_trade)
 		content.add_child(go_trade)
 		_open_modal("新玩法解锁", content, Vector2(650, 430))
@@ -1054,11 +1054,8 @@ func _show_next_quest_prompt():
 	_open_modal("新任务", content, Vector2(640, 450))
 
 func _go_to_unlocked_trade():
-	state.player.location = "venice_dock"
-	state.save_game()
 	_close_modal()
-	refresh_ui()
-	call_deferred("_open_harbor")
+	call_deferred("_open_2d_world")
 
 func _quest_reward_text(reward):
 	var parts = ["%d经验" % int(reward.get("exp", 0)), "%d银币" % int(reward.get("silver", 0))]
@@ -1730,8 +1727,16 @@ func _open_harbor():
 
 	var port_id = str(state.player.location)
 	if not GameData.TRADE_PORTS.has(port_id):
-		port_id = "venice_dock"
-		state.player.location = port_id
+		content.add_child(_label("这里不是港口", 20, GOLD))
+		var travel_guide = _label("贸易必须在真实港口进行，不能从日志界面直接跳到码头。返回2D地图后，请通过区域地图或任务导航步行前往威尼斯码头。", 13, Color("b7cfd5"))
+		travel_guide.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		travel_guide.add_theme_stylebox_override("normal", _style(Color(0.18, 0.13, 0.04, 0.45), 11, Color(GOLD, 0.45), 1, 14))
+		content.add_child(travel_guide)
+		var return_to_world = _button("返回2D地图，步行前往码头", "primary")
+		return_to_world.pressed.connect(_open_2d_world)
+		content.add_child(return_to_world)
+		_open_modal("港口贸易", content, Vector2(650, 390))
+		return
 	var port = GameData.TRADE_PORTS[port_id]
 	content.add_child(_label("%s港口市场" % port.name, 20, GOLD))
 	var status = _label("持有银币：%d｜第%d日 · %s · 货舱%d/%d · 货值%d · 浮动%+d · 本港声望%d / 总声望%d" % [int(state.player.silver), state.trade_day, state.ship.name, state.cargo_used(), state.cargo_capacity(), state.cargo_market_value(), state.cargo_unrealized_profit(), state.port_reputation_value(port_id), state.total_trade_reputation()], 12, TEAL)

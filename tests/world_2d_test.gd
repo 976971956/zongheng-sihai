@@ -181,6 +181,24 @@ func _run():
 	_check(_has_actor(scene, "basin_leviathan"), "聚宝盆远征必须生成带等级与血量的专属Boss")
 	scene._close_overlay()
 
+	# 区域地图和贸易入口都必须尊重世界移动，不能悄悄改写角色位置。
+	scene.state.quest_index = GameData.QUESTS.size()
+	scene.state.player.location = "venice_square"
+	scene._switch_region("city", "venice_square")
+	var map_walk_start = scene.player_actor.position
+	scene._travel_to_location("venice_mine")
+	_check(scene.task_navigation_active and scene.current_region == "city" and str(scene.state.player.location) == "venice_square" and scene.player_actor.position.distance_to(map_walk_start) < 1.0, "区域地图必须启动真实步行导航，不能立即传送到目标地点")
+	await _walk_task_navigation(scene)
+	_check(scene.current_region == "field" and str(scene.state.player.location) == "venice_mine", "区域地图步行导航必须能够跨区域抵达废矿山")
+	scene._open_trade_2d()
+	_check(str(scene.state.player.location) == "venice_mine" and _has_label_text(scene.overlay, "这里不是港口"), "人在野外打开贸易时必须保留原位置并提示前往码头，不能暗中传送")
+	scene._close_overlay()
+	scene.state.player.location = "alexandria_dock"
+	scene._switch_region("city", "alexandria_dock")
+	scene._travel_to_location("venice_square")
+	_check(str(scene.state.player.location) == "alexandria_dock" and not scene.task_navigation_active and _has_label_text(scene.overlay, "需要先乘船返航"), "远洋港口不能通过区域地图跳回威尼斯，必须先走航海路线")
+	scene._close_overlay()
+
 	# Validate visible encounter -> side-view battle using the same production state.
 	scene.state.quest_index = 3
 	scene.state.quest_progress = 2

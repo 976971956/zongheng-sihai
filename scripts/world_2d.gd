@@ -1781,7 +1781,7 @@ func _open_world_map():
 	var content = VBoxContainer.new()
 	content.add_theme_constant_override("separation", 10)
 	content.add_child(_label("2D区域地图", 26, GOLD))
-	var guide = _label("所有主线地点都可以从这里进入。带锁的副本楼层需要逐层击败守卫。", 15, MUTED)
+	var guide = _label("选择地点后角色会沿道路步行前往；远洋港口需要先乘船返航。带锁的副本楼层需要逐层击败守卫。", 15, MUTED)
 	guide.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.add_child(guide)
 	if state.is_trade_unlocked():
@@ -1805,7 +1805,7 @@ func _open_world_map():
 	]:
 		list.add_child(_label(group.title, 17, TEAL))
 		for location_id in group.locations:
-			var destination = _button(GameData.LOCATIONS[location_id].name, "ghost")
+			var destination = _button("步行前往 · %s" % GameData.LOCATIONS[location_id].name, "ghost")
 			var is_training = str(location_id).begins_with("training_dungeon_")
 			var is_black_sail = str(location_id).begins_with("black_sail_")
 			var is_white_whale = str(location_id).begins_with("white_whale_")
@@ -1826,8 +1826,23 @@ func _open_world_map():
 
 func _travel_to_location(location_id):
 	var region = str(region_by_location.get(location_id, "city"))
+	var current_location = str(state.player.location)
+	var at_remote_port = current_location in GameData.TRADE_PORTS and current_location != "venice_dock"
+	var local_expedition_available = region not in ["city", "field", "dungeon"] and not _task_navigation_portal_to(region).is_empty()
+	if at_remote_port and not local_expedition_available:
+		_close_overlay()
+		_show_message("需要先乘船返航", "你现在停泊在%s，不能从区域地图直接跳回威尼斯。请打开九港航海图，乘船返回威尼斯后再步行前往%s。" % [GameData.TRADE_PORTS[current_location].name, GameData.LOCATIONS[location_id].name])
+		return
 	_close_overlay()
-	call_deferred("_switch_region", region, location_id)
+	task_navigation_open_service = ""
+	task_navigation_target = {
+		"region": region,
+		"location": str(location_id),
+		"actor_id": "",
+		"name": str(GameData.LOCATIONS[location_id].name)
+	}
+	task_navigation_active = true
+	_continue_task_navigation()
 
 func _region_name(region_id):
 	match region_id:
@@ -1930,7 +1945,8 @@ func _open_trade_2d():
 		_show_message("港口尚未开放", "完成威尼斯四层试炼后，船老板会将贸易船海燕号交给你。")
 		return
 	if not GameData.TRADE_PORTS.has(state.player.location):
-		state.player.location = "venice_dock"
+		_show_message("这里不是港口", "贸易必须在真实港口进行。请关闭面板，通过区域地图或任务导航步行前往威尼斯码头；远洋港口之间则需要乘船航行。")
+		return
 	var port_id = str(state.player.location)
 	var port = GameData.TRADE_PORTS[port_id]
 	var market_event = GameData.trade_event(state.trade_day)

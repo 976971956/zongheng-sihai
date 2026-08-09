@@ -47,6 +47,10 @@ func _run():
 	scene._open_harbor()
 	_check(_has_text(scene.modal_layer, "持有银币") and _has_text(scene.modal_layer, "浮动") and _has_text(scene.modal_layer, "商会推荐") and _has_text(scene.modal_layer, "商会订单") and _has_text(scene.modal_layer, "总声望") and _has_button(scene.modal_layer, "护航物资") and _has_button(scene.modal_layer, "买满") and _has_button(scene.modal_layer, "全卖") and _has_button(scene.modal_layer, "加固船体"), "完整日志贸易页必须包含钱包、订单声望、护航、批量交易、商路推荐与船体改造")
 	scene._close_modal()
+	scene.state.player.location = "venice_mine"
+	scene._open_harbor()
+	_check(str(scene.state.player.location) == "venice_mine" and _has_text(scene.modal_layer, "这里不是港口") and _has_button(scene.modal_layer, "步行前往码头"), "完整日志在野外打开贸易时不能把角色瞬移到威尼斯码头")
+	scene._close_modal()
 	scene.state.player.location = "malta_dock"
 	scene.state.cargo = {"citrus": 2, "olive_oil": 1, "spices": 1}
 	scene._open_harbor()
