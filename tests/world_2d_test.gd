@@ -24,6 +24,13 @@ func _run():
 	_check(scene.player_actor.display_id == "player", "主角必须使用独立的新版角色模型")
 	_check(scene.actors.size() >= 4, "地图必须包含NPC和可见敌人")
 	_check(scene.player_actor.position.x > 0 and scene.player_actor.position.y > 0, "玩家必须出生在可行走地图内")
+	var saved_respawn_key = scene._enemy_spawn_key("drunk_sailor")
+	scene.state.enemy_respawns[saved_respawn_key] = scene._world_time_seconds() + 60.0
+	scene._spawn_world_actors()
+	_check(not _has_actor(scene, "drunk_sailor"), "重建地图时必须继续遵守存档中的怪物刷新倒计时")
+	scene.state.enemy_respawns.erase(saved_respawn_key)
+	scene._spawn_world_actors()
+	_check(_has_actor(scene, "drunk_sailor"), "没有刷新冷却时必须正常生成怪物")
 	var touch = InputEventScreenTouch.new()
 	touch.pressed = true
 	touch.position = Vector2(360, 500)
@@ -152,11 +159,16 @@ func _run():
 	_check(bool(scene.battle_result.get("quest_completed", false)), "最后一名任务敌人必须触发领奖引导")
 	_check(not _has_actor(scene, "drunk_sailor"), "怪物被击败后必须立即从2D地图消失")
 	var respawn_key = scene._enemy_spawn_key("drunk_sailor")
-	_check(float(scene.enemy_respawn_deadlines.get(respawn_key, 0.0)) > scene._world_time_seconds(), "怪物消失后必须建立刷新倒计时")
-	scene.enemy_respawn_deadlines[respawn_key] = scene._world_time_seconds() - 0.1
+	_check(float(scene.state.enemy_respawns.get(respawn_key, 0.0)) > scene._world_time_seconds(), "怪物消失后必须把刷新倒计时写入存档状态")
+	var early_retry = scene.state.start_battle("drunk_sailor")
+	_check(not bool(early_retry.get("ok", true)) and float(early_retry.get("respawn_remaining", 0.0)) > 0.0, "刷新冷却必须在核心战斗状态中阻止提前重复挑战")
+	scene.state.enemy_respawns[respawn_key] = scene._world_time_seconds() - 0.1
 	scene._try_respawn_enemy("drunk_sailor")
-	_check(_has_actor(scene, "drunk_sailor"), "刷新倒计时结束后怪物必须在原地图重新出现")
+	_check(not _has_actor(scene, "drunk_sailor"), "战斗结算页未关闭时怪物不能在背后刷新")
 	scene._close_overlay()
+	scene.player_actor.position = scene._spawn_for_location("venice_tavern")
+	scene._try_respawn_enemy("drunk_sailor")
+	_check(_has_actor(scene, "drunk_sailor"), "倒计时结束且玩家离开出生点后怪物必须重新出现")
 
 	# A defeat must visibly finish at zero HP and return the player to the tavern map.
 	scene.state.player.level = 1

@@ -3,6 +3,7 @@ extends RefCounted
 
 const SAVE_VERSION = 2
 const SAVE_PATH = "user://tides_save.json"
+const ENEMY_RESPAWN_SECONDS = 20.0
 
 var rng = RandomNumberGenerator.new()
 var player = {}
@@ -34,6 +35,7 @@ var discoveries = {}
 var bounty_index = 0
 var bounty_progress = 0
 var bounty_cycles = 0
+var enemy_respawns = {}
 
 func _init():
 	rng.randomize()
@@ -71,6 +73,7 @@ func new_game():
 	bounty_index = 0
 	bounty_progress = 0
 	bounty_cycles = 0
+	enemy_respawns = {}
 	message_history = ["你从海边小屋醒来，已经不记得自己的名字。"]
 	player.hp = get_stats().max_hp
 
@@ -368,12 +371,19 @@ func leave_party():
 	save_game()
 	return {"ok": true, "message": "已离开当前队伍。"}
 
+func enemy_respawn_remaining(enemy_id):
+	var deadline = float(enemy_respawns.get(str(enemy_id), 0.0))
+	return max(0.0, deadline - float(Time.get_unix_time_from_system()))
+
 func start_battle(enemy_id):
 	if not GameData.ENEMIES.has(enemy_id):
 		return {"ok": false, "message": "敌人不存在。"}
 	var location = GameData.LOCATIONS[player.location]
 	if not enemy_id in location.enemies:
 		return {"ok": false, "message": "这个敌人不在当前区域。"}
+	var respawn_remaining = enemy_respawn_remaining(enemy_id)
+	if respawn_remaining > 0.0:
+		return {"ok": false, "message": "%s尚未重新出现，约%d秒后可再次挑战。" % [GameData.ENEMIES[enemy_id].name, int(ceil(respawn_remaining))], "respawn_remaining": respawn_remaining}
 	if not active_battle.is_empty():
 		if active_battle.enemy_id == enemy_id:
 			return get_battle_view()
@@ -630,6 +640,8 @@ func _finish_battle_win(enemy_id, round_logs):
 	defeated[enemy_id] = int(defeated.get(enemy_id, 0)) + 1
 	if enemy_id in ["dungeon_guard", "stone_puppet", "tide_beast", "vermilion_phantom", "corsair_deckhand", "corsair_raider", "corsair_guard", "corsair_captain"]:
 		dungeon_cleared[enemy_id] = true
+	if not _is_dungeon_location(str(player.location)):
+		enemy_respawns[str(enemy_id)] = float(Time.get_unix_time_from_system()) + ENEMY_RESPAWN_SECONDS
 	var quest_completed = _advance_quest("kill", enemy_id)
 	var bounty_completed = _advance_bounty(enemy_id)
 	var drop_id = ""
@@ -1015,7 +1027,8 @@ func save_game():
 		"battle_stance": battle_stance, "auto_heal_threshold": auto_heal_threshold, "auto_cure_status": auto_cure_status,
 		"equipment_upgrades": equipment_upgrades, "trade_contract_claimed": trade_contract_claimed,
 		"trade_contract_count": trade_contract_count, "active_card": active_card, "discoveries": discoveries,
-		"bounty_index": bounty_index, "bounty_progress": bounty_progress, "bounty_cycles": bounty_cycles
+		"bounty_index": bounty_index, "bounty_progress": bounty_progress, "bounty_cycles": bounty_cycles,
+		"enemy_respawns": enemy_respawns
 	}
 	var file = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file:
@@ -1082,6 +1095,14 @@ func load_game():
 	bounty_index = clamp(int(parsed.get("bounty_index", 0)), 0, max(0, GameData.BOUNTIES.size() - 1))
 	bounty_progress = max(0, int(parsed.get("bounty_progress", 0)))
 	bounty_cycles = max(0, int(parsed.get("bounty_cycles", 0)))
+	enemy_respawns = parsed.get("enemy_respawns", {})
+	if typeof(enemy_respawns) != TYPE_DICTIONARY:
+		enemy_respawns = {}
+	else:
+		for respawn_key in enemy_respawns.keys():
+			var deadline_type = typeof(enemy_respawns[respawn_key])
+			if not deadline_type in [TYPE_FLOAT, TYPE_INT] or float(enemy_respawns[respawn_key]) <= 0.0:
+				enemy_respawns.erase(respawn_key)
 	if active_card != "" and (not GameData.ITEMS.has(active_card) or int(inventory.get(active_card, 0)) <= 0):
 		active_card = ""
 	if not ship.has("name"):

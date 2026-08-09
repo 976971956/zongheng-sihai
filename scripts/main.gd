@@ -783,7 +783,9 @@ func _enemy_action_card(enemy_id):
 	text_box.add_child(_label(enemy.name, 14, name_color))
 	text_box.add_child(_label("%s · 体力 %d · 攻击 %d · 防御 %d" % [enemy.rank, enemy.hp, enemy.attack, enemy.defense], 10, MUTED))
 
-	var fight_button = _button("挑战", "danger" if enemy.rank in ["首领", "副本 Boss"] else "primary")
+	var respawn_remaining = state.enemy_respawn_remaining(enemy_id)
+	var fight_text = "检查刷新 · %d秒" % int(ceil(respawn_remaining)) if respawn_remaining > 0.0 else "挑战"
+	var fight_button = _button(fight_text, "ghost" if respawn_remaining > 0.0 else ("danger" if enemy.rank in ["首领", "副本 Boss"] else "primary"))
 	fight_button.custom_minimum_size.x = 82
 	fight_button.pressed.connect(_on_fight.bind(enemy_id))
 	row.add_child(fight_button)

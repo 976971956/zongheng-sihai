@@ -15,7 +15,9 @@ const WorldMapScript = preload("res://scripts/world_map_2d.gd")
 const ActorScript = preload("res://scripts/actor_2d.gd")
 const BattleStageScript = preload("res://scripts/battle_stage_2d.gd")
 const JoystickScript = preload("res://scripts/virtual_joystick.gd")
-const MONSTER_RESPAWN_SECONDS = 8.0
+const MONSTER_RESPAWN_SECONDS = GameState.ENEMY_RESPAWN_SECONDS
+const MONSTER_RESPAWN_RETRY_SECONDS = 1.5
+const MONSTER_RESPAWN_SAFE_DISTANCE = 170.0
 const AUTO_BATTLE_HIT_DELAY = 0.16
 const AUTO_BATTLE_READ_DELAY = 0.30
 
@@ -71,7 +73,6 @@ var battle_cure_button
 var battle_result = {}
 var auto_battle_running = false
 var active_enemy_actor = {}
-var enemy_respawn_deadlines = {}
 var enemy_respawn_scheduled = {}
 var current_zone = ""
 var current_region = "city"
@@ -283,21 +284,21 @@ func _spawn_enemy_if_ready(enemy_id):
 	if str(data.region) != current_region:
 		return
 	var key = _enemy_spawn_key(enemy_id)
-	var remaining = float(enemy_respawn_deadlines.get(key, 0.0)) - _world_time_seconds()
+	var remaining = float(state.enemy_respawns.get(key, 0.0)) - _world_time_seconds()
 	if remaining > 0.0:
 		_schedule_enemy_respawn(enemy_id, remaining)
 		return
-	enemy_respawn_deadlines.erase(key)
+	state.enemy_respawns.erase(key)
+	enemy_respawn_scheduled.erase(key)
 	if _has_actor_id(enemy_id):
 		return
 	_add_actor("enemy", enemy_id, data.name, data.position, data.color, data.accent, data.location)
 
 func _enemy_spawn_key(enemy_id):
-	var data = ENEMY_SPAWNS.get(enemy_id, {})
-	return "%s:%s" % [str(data.get("region", current_region)), enemy_id]
+	return str(enemy_id)
 
 func _world_time_seconds():
-	return float(Time.get_ticks_msec()) / 1000.0
+	return float(Time.get_unix_time_from_system())
 
 func _has_actor_id(actor_id):
 	for entry in actors:
@@ -307,19 +308,33 @@ func _has_actor_id(actor_id):
 
 func _schedule_enemy_respawn(enemy_id, delay):
 	var key = _enemy_spawn_key(enemy_id)
-	var deadline = float(enemy_respawn_deadlines.get(key, _world_time_seconds() + float(delay)))
+	var deadline = float(state.enemy_respawns.get(key, _world_time_seconds() + float(delay)))
 	if is_equal_approx(float(enemy_respawn_scheduled.get(key, -1.0)), deadline):
 		return
 	enemy_respawn_scheduled[key] = deadline
 	var timer = get_tree().create_timer(max(0.05, float(delay)))
 	timer.timeout.connect(_try_respawn_enemy.bind(enemy_id, deadline))
 
+func _defer_enemy_respawn(enemy_id):
+	var key = _enemy_spawn_key(enemy_id)
+	var retry_deadline = _world_time_seconds() + MONSTER_RESPAWN_RETRY_SECONDS
+	enemy_respawn_scheduled[key] = retry_deadline
+	var timer = get_tree().create_timer(MONSTER_RESPAWN_RETRY_SECONDS)
+	timer.timeout.connect(_try_respawn_enemy.bind(enemy_id, retry_deadline))
+
+func _respawn_is_blocked(data):
+	if is_instance_valid(overlay):
+		return true
+	if not is_instance_valid(player_actor):
+		return false
+	return player_actor.position.distance_to(_world_point(data.position)) < MONSTER_RESPAWN_SAFE_DISTANCE
+
 func _try_respawn_enemy(enemy_id, scheduled_deadline = -1.0):
 	var key = _enemy_spawn_key(enemy_id)
 	if scheduled_deadline >= 0.0 and not is_equal_approx(float(enemy_respawn_scheduled.get(key, -2.0)), float(scheduled_deadline)):
 		return
 	enemy_respawn_scheduled.erase(key)
-	var remaining = float(enemy_respawn_deadlines.get(key, 0.0)) - _world_time_seconds()
+	var remaining = float(state.enemy_respawns.get(key, 0.0)) - _world_time_seconds()
 	if remaining > 0.0:
 		_schedule_enemy_respawn(enemy_id, remaining)
 		return
@@ -327,11 +342,20 @@ func _try_respawn_enemy(enemy_id, scheduled_deadline = -1.0):
 	if data.is_empty():
 		return
 	if str(data.region) in ["dungeon", "black_sail"] and bool(state.dungeon_cleared.get(enemy_id, false)):
-		enemy_respawn_deadlines.erase(key)
+		state.enemy_respawns.erase(key)
 		return
-	enemy_respawn_deadlines.erase(key)
-	if str(data.region) != current_region or _has_actor_id(enemy_id):
+	if str(data.region) != current_region:
+		state.enemy_respawns.erase(key)
 		return
+	if _has_actor_id(enemy_id):
+		state.enemy_respawns.erase(key)
+		return
+	if _respawn_is_blocked(data):
+		_defer_enemy_respawn(enemy_id)
+		if not is_instance_valid(overlay):
+			hint_label.text = "%s将在你离开刷新点后重新出现。" % data.name
+		return
+	state.enemy_respawns.erase(key)
 	_add_actor("enemy", enemy_id, data.name, data.position, data.color, data.accent, data.location)
 	_refresh_waypoint()
 	hint_label.text = "%s重新出现了，可以再次挑战。" % data.name
@@ -353,13 +377,15 @@ func _despawn_defeated_enemy():
 		action_button.text = "敌人已击败"
 		action_button.disabled = true
 	if current_region in ["dungeon", "black_sail"]:
-		enemy_respawn_deadlines.erase(_enemy_spawn_key(enemy_id))
+		state.enemy_respawns.erase(_enemy_spawn_key(enemy_id))
 		call_deferred("_spawn_world_actors")
 		call_deferred("_refresh_waypoint")
 		hint_label.text = "%s已被击败，下一层道路已开放。" % defeated.name
 		return
 	var key = _enemy_spawn_key(enemy_id)
-	enemy_respawn_deadlines[key] = _world_time_seconds() + MONSTER_RESPAWN_SECONDS
+	if state.enemy_respawn_remaining(enemy_id) <= 0.0:
+		state.enemy_respawns[key] = _world_time_seconds() + MONSTER_RESPAWN_SECONDS
+		state.save_game()
 	_schedule_enemy_respawn(enemy_id, MONSTER_RESPAWN_SECONDS)
 	hint_label.text = "%s已被击败并消失，%d秒后在原地刷新。" % [defeated.name, int(MONSTER_RESPAWN_SECONDS)]
 

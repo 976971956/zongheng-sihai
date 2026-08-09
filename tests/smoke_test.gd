@@ -161,6 +161,8 @@ func _claim(state, expected_id):
 func _win_times(state, enemy_id, count):
 	for _index in range(count):
 		state.player.hp = state.get_stats().max_hp
+		# Each loop represents returning after the overworld respawn delay.
+		state.enemy_respawns.erase(str(enemy_id))
 		var start = state.start_battle(enemy_id)
 		_check(start.ok and not start.battle_over, "%s无法开始战斗" % enemy_id)
 		var result = state.auto_attack()

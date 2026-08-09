@@ -103,6 +103,9 @@ func _prepare_rest(state):
 
 func _fight(state, enemy_id):
 	state.player.location = _enemy_location(enemy_id)
+	# The stress test compresses an entire route into one frame, so model the
+	# normal wait between repeated overworld encounters explicitly.
+	state.enemy_respawns.erase(str(enemy_id))
 	var start = state.start_battle(enemy_id)
 	if not bool(start.get("ok", false)):
 		return false
