@@ -39,7 +39,7 @@ func _run():
 	scene.state.quest_index = GameData.QUESTS.size()
 	scene.state.bounty_progress = int(scene.state.get_bounty().need)
 	scene._open_quest_detail()
-	_check(_has_text(scene.modal_layer, "第三卷") and _has_button(scene.modal_layer, "领取悬赏奖励"), "完整日志在第三卷结束后必须衔接循环悬赏")
+	_check(_has_text(scene.modal_layer, "第十三卷") and _has_button(scene.modal_layer, "领取悬赏奖励"), "完整日志在第十三卷结束后必须衔接循环悬赏")
 	scene._close_modal()
 
 	scene.state.player.location = "venice_dock"

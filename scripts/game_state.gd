@@ -71,8 +71,11 @@ func new_game():
 	trade_profit = 0
 	trade_volume = 0
 	trade_lifetime_profit = 0
-	port_reputation = {"venice_dock": 0, "ragusa_dock": 0, "alexandria_dock": 0, "malta_dock": 0}
-	trade_order_cycles = {"venice_dock": 0, "ragusa_dock": 0, "alexandria_dock": 0, "malta_dock": 0}
+	port_reputation = {}
+	trade_order_cycles = {}
+	for port_id in GameData.TRADE_PORTS:
+		port_reputation[str(port_id)] = 0
+		trade_order_cycles[str(port_id)] = 0
 	completed_trade_orders = {}
 	voyage_protection = 0
 	battle_stance = "balanced"
@@ -202,7 +205,7 @@ func get_exit_lock(edge):
 	return "通往下一层的道路尚未开放，请先击败%s。" % GameData.ENEMIES[required_enemy].name
 
 func _is_dungeon_location(location_id):
-	return str(location_id).begins_with("training_dungeon_") or str(location_id).begins_with("black_sail_") or str(location_id).begins_with("white_whale_")
+	return str(location_id).begins_with("training_dungeon_") or str(location_id).begins_with("black_sail_") or str(location_id).begins_with("white_whale_") or str(location_id).begins_with("legacy_")
 
 func talk_to(npc_id):
 	var location = GameData.LOCATIONS[player.location]

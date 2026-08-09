@@ -164,6 +164,21 @@ func _run():
 	scene._spawn_world_actors()
 	_check(_has_actor(scene, "drowned_sailor") and scene._dungeon_floor_lock("white_whale_2") == "", "击败覆甲礁蟹后必须生成下一层敌人并开放道路")
 
+	# 第四至第十三卷的远征入口必须随当前任务在对应港口出现，并通过步行进入。
+	scene._close_overlay()
+	scene.state.quest_index = 41
+	scene.state.quest_progress = 0
+	scene.state.player.level = 30
+	scene._switch_region("city", "cape_town_dock")
+	_check(_has_actor(scene, "cape_keeper") and _has_actor(scene, "legacy"), "第四卷到达开普敦后必须生成向导与聚宝盆远征入口")
+	var legacy_start_position = scene.player_actor.position
+	scene._navigate_to_quest()
+	_check(scene.task_navigation_active and scene.current_region == "city" and scene.player_actor.position.distance_to(legacy_start_position) < 1.0, "终局远征导航必须从港口步行寻找入口")
+	await _walk_task_navigation(scene)
+	_check(scene.current_region == "legacy" and str(scene.state.player.location) == "legacy_basin", "聚宝盆任务导航必须步行进入北河遗迹")
+	_check(_has_actor(scene, "basin_leviathan"), "聚宝盆远征必须生成带等级与血量的专属Boss")
+	scene._close_overlay()
+
 	# Validate visible encounter -> side-view battle using the same production state.
 	scene.state.quest_index = 3
 	scene.state.quest_progress = 2
@@ -256,7 +271,7 @@ func _run():
 	_check(scene.state.trade_contract_count == 1 and scene.state.trade_contract_target() == 180 and scene.state.trade_contract_progress() == 0, "商会委托领取后必须自动开启更高目标的下一轮")
 	_check(not scene.state.best_trade_opportunity().is_empty(), "港口必须能计算一条可见的动态商路推荐")
 
-	# 三港复用同一港区地图，但重新加载或走入码头视觉区域时不能篡改真实所在港口。
+	# 九港复用同一港区地图，但重新加载或走入码头视觉区域时不能篡改真实所在港口。
 	scene.state.quest_index = GameData.QUESTS.size()
 	scene.state.player.location = "alexandria_dock"
 	scene.current_region = "city"
@@ -286,10 +301,10 @@ func _run():
 	scene.state.bounty_index = 0
 	scene.state.bounty_progress = 3
 	scene._open_quest()
-	_check(_has_label_text(scene.overlay, "第三卷·白鲸遗航") and _has_label_text(scene.overlay, "剧情回顾") and _has_button_text(scene.overlay, "领取悬赏奖励"), "主线结束后任务页必须显示第三卷进度、剧情回顾和可持续领取的悬赏")
+	_check(_has_label_text(scene.overlay, "第十三卷·封印迷阵") and _has_label_text(scene.overlay, "剧情回顾") and _has_button_text(scene.overlay, "领取悬赏奖励"), "主线结束后任务页必须显示第十三卷进度、剧情回顾和可持续领取的悬赏")
 
 	if failures.is_empty():
-		print("WORLD_2D_OK: 移动、任务导航、三座副本、自动战斗、怪物刷新、四港贸易与厨房全部通过")
+		print("WORLD_2D_OK: 移动导航、十三座远征、自动战斗、怪物刷新、九港贸易与厨房全部通过")
 		quit(0)
 	else:
 		for failure in failures:

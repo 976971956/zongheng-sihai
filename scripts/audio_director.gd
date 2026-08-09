@@ -8,6 +8,7 @@ const MUSIC = {
 	"dungeon": preload("res://assets/audio/music/dungeon.ogg"),
 	"black_sail": preload("res://assets/audio/music/corsair.ogg"),
 	"white_whale": preload("res://assets/audio/music/dungeon.ogg"),
+	"legacy": preload("res://assets/audio/music/corsair.ogg"),
 	"battle": preload("res://assets/audio/music/battle.ogg")
 }
 const SFX = {

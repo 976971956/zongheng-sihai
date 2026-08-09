@@ -24,6 +24,11 @@ const ATLAS_CELLS = {
 	"corsair_guard": Vector2i(2, 1),
 	"corsair_captain": Vector2i(3, 0)
 }
+const LEGACY_BOSS_IDS = [
+	"basin_leviathan", "nine_tail_fox", "earth_demon_king", "tira_guardian",
+	"celestial_demon_general", "jade_dream_queen", "black_furnace_lord",
+	"returned_demon_king", "clockwork_tailor", "tide_void_emperor"
+]
 
 var body_color = Color("2e9c99")
 var accent_color = Color("f2c66d")
@@ -136,7 +141,7 @@ func _art_scale():
 
 func _draw():
 	var bob = sin(bob_time * 2.7) * 1.35
-	var large = display_id in ["giant_bear", "stone_puppet", "tide_beast", "vermilion_phantom"]
+	var large = display_id in ["giant_bear", "stone_puppet", "tide_beast", "vermilion_phantom"] or display_id in LEGACY_BOSS_IDS
 	_draw_oval(Vector2(0, 34 if large else 31), Vector2(31, 9) if large else Vector2(25, 7), Color(0.005, 0.02, 0.025, 0.38))
 	if selected:
 		var ring_radius = 39.0 if large else 34.0
@@ -150,7 +155,7 @@ func _draw():
 			_draw_travel_marker()
 		elif actor_kind == "discovery":
 			_draw_discovery_marker()
-		elif display_id in ["sewer_rat", "giant_bear", "wildwood_ghost", "stone_puppet", "tide_beast", "vermilion_phantom"]:
+		elif display_id in ["sewer_rat", "giant_bear", "wildwood_ghost", "stone_puppet", "tide_beast", "vermilion_phantom"] or display_id in LEGACY_BOSS_IDS:
 			_draw_monster()
 		else:
 			_draw_person()
@@ -296,6 +301,9 @@ func _draw_person():
 		draw_line(Vector2(-5, -14), Vector2(5, -14), Color("743d36"), 2, true)
 
 func _draw_monster():
+	if display_id in LEGACY_BOSS_IDS:
+		_draw_legacy_boss()
+		return
 	match display_id:
 		"sewer_rat": _draw_rat()
 		"giant_bear": _draw_bear()
@@ -303,6 +311,61 @@ func _draw_monster():
 		"stone_puppet": _draw_golem()
 		"tide_beast": _draw_tide_beast()
 		"vermilion_phantom": _draw_phoenix()
+
+func _draw_legacy_boss():
+	var outline = Color("101b27")
+	var core = body_color.lightened(0.08)
+	var glow = Color(accent_color, 0.30 + (sin(bob_time * 2.4) + 1.0) * 0.08)
+	draw_circle(Vector2(0, -6), 48, Color(accent_color, 0.08))
+	draw_arc(Vector2(0, -6), 43, bob_time * 0.35, bob_time * 0.35 + PI * 1.65, 42, glow, 4)
+	# Every late-game boss shares a readable raid silhouette, then receives a
+	# distinct legendary crest so it remains recognizable on a phone screen.
+	_polygon([Vector2(-26, -12), Vector2(-34, 25), Vector2(-17, 39), Vector2(0, 31), Vector2(17, 39), Vector2(34, 25), Vector2(26, -12)], core, outline, 3)
+	draw_circle(Vector2(0, -26), 20, core.lightened(0.10))
+	draw_arc(Vector2(0, -26), 20, 0, TAU, 30, outline, 3)
+	draw_circle(Vector2(-7, -28), 3, accent_color)
+	draw_circle(Vector2(7, -28), 3, accent_color)
+	match display_id:
+		"basin_leviathan":
+			_polygon([Vector2(-18, -40), Vector2(-39, -53), Vector2(-27, -24)], Color("c7922e"), outline, 2)
+			_polygon([Vector2(18, -40), Vector2(39, -53), Vector2(27, -24)], Color("c7922e"), outline, 2)
+			for x in [-38, 38]: draw_circle(Vector2(x, 12), 10, Color("f2c34f"))
+		"nine_tail_fox":
+			_polygon([Vector2(-16, -42), Vector2(-27, -63), Vector2(-4, -45)], Color("d96d58"), outline, 2)
+			_polygon([Vector2(16, -42), Vector2(27, -63), Vector2(4, -45)], Color("d96d58"), outline, 2)
+			for side in [-1, 1]:
+				for tail in range(3): draw_arc(Vector2(side * 20, 18), 28 + tail * 7, -2.0 if side < 0 else -1.15, 0.45 if side < 0 else 2.0, 18, Color("db866d"), 6)
+		"earth_demon_king":
+			_polygon([Vector2(-22, -43), Vector2(-14, -64), Vector2(0, -48), Vector2(14, -64), Vector2(22, -43)], Color("a48142"), outline, 3)
+			for y in [-2, 13, 28]: draw_line(Vector2(-25, y), Vector2(25, y + 3), Color("56d3c7"), 3)
+		"tira_guardian":
+			for side in [-1, 1]:
+				draw_line(Vector2(side * 30, 27), Vector2(side * 48, -48), Color("d7e4e6"), 7)
+				draw_line(Vector2(side * 22, 4), Vector2(side * 45, 10), accent_color, 4)
+		"celestial_demon_general", "returned_demon_king":
+			_polygon([Vector2(-26, -4), Vector2(-63, -38), Vector2(-52, 17), Vector2(-30, 28)], core.darkened(0.25), outline, 3)
+			_polygon([Vector2(26, -4), Vector2(63, -38), Vector2(52, 17), Vector2(30, 28)], core.darkened(0.25), outline, 3)
+			_polygon([Vector2(-15, -43), Vector2(-9, -62), Vector2(0, -47), Vector2(9, -62), Vector2(15, -43)], accent_color, outline, 2)
+		"jade_dream_queen":
+			_polygon([Vector2(-22, -42), Vector2(-13, -62), Vector2(0, -49), Vector2(13, -62), Vector2(22, -42)], Color("86d7c4"), outline, 2)
+			for side in [-1, 1]: draw_arc(Vector2(side * 25, 7), 30, -1.7, 1.7, 22, Color("b7f0dc"), 5)
+		"black_furnace_lord":
+			draw_circle(Vector2(0, 9), 13, Color("f06a35"))
+			draw_circle(Vector2(0, 9), 6 + sin(bob_time * 3.0) * 2, Color("ffd06a"))
+			for side in [-1, 1]: draw_line(Vector2(side * 26, 1), Vector2(side * 48, -26), Color("c94d32"), 8)
+		"clockwork_tailor":
+			for side in [-1, 1]:
+				draw_line(Vector2(side * 25, 1), Vector2(side * 49, -20), Color("b5aa86"), 5)
+				draw_line(Vector2(side * 25, 12), Vector2(side * 49, 35), Color("b5aa86"), 5)
+			draw_circle(Vector2(0, 8), 11, Color("e0b557"))
+			draw_line(Vector2(-9, 0), Vector2(9, 16), outline, 3)
+			draw_line(Vector2(9, 0), Vector2(-9, 16), outline, 3)
+		"tide_void_emperor":
+			draw_circle(Vector2(0, 7), 17, Color("06101e"))
+			draw_arc(Vector2(0, 7), 17, 0, TAU, 28, Color("58e2d1"), 4)
+			for arm in range(6):
+				var angle = float(arm) * TAU / 6.0 + bob_time * 0.1
+				draw_line(Vector2.from_angle(angle) * 28 + Vector2(0, 7), Vector2.from_angle(angle + 0.25) * 55 + Vector2(0, 7), Color("486ba4"), 7)
 
 func _draw_rat():
 	var fur = Color("66706c")

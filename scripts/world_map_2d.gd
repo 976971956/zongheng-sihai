@@ -22,7 +22,7 @@ func _draw():
 	var texture = CITY_ART
 	if region_mode == "field":
 		texture = FIELD_ART
-	elif region_mode in ["dungeon", "black_sail", "white_whale"]:
+	elif region_mode in ["dungeon", "black_sail", "white_whale", "legacy"]:
 		texture = DUNGEON_ART
 	draw_texture_rect(texture, Rect2(Vector2.ZERO, WORLD_SIZE), false)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * WORLD_SCALE)
@@ -69,7 +69,7 @@ func _draw_art_overlays():
 		]), PackedColorArray([Color(0.02, 0.02, 0.028, 0.9)]))
 		draw_line(Vector2(325, 72), Vector2(325, 182), Color(0.62, 0.42, 0.26, 0.9), 5)
 		draw_circle(Vector2(351, 128), 9, Color(0.68, 0.08, 0.10, 0.9))
-	else:
+	elif region_mode == "white_whale":
 		# 白鲸号残骸：冷蓝潮光、船肋与漂移海雾让共用的四层结构拥有独立辨识度。
 		draw_rect(Rect2(0, 0, 720, 1280), Color(0.01, 0.16, 0.20, 0.36))
 		var pulse = 0.045 + (sin(wave_time * 1.5) + 1.0) * 0.02
@@ -81,6 +81,17 @@ func _draw_art_overlays():
 		for index in range(7):
 			var drift = sin(wave_time * 0.55 + index) * 22.0
 			draw_circle(Vector2(80 + index * 96 + drift, 230 + (index % 4) * 250), 42, Color(0.65, 0.95, 0.94, 0.035))
+	else:
+		# 十座终局远征共享潮汐祭坛：金色航线与青色封印会随呼吸般明灭。
+		draw_rect(Rect2(0, 0, 720, 1280), Color(0.02, 0.055, 0.11, 0.43))
+		var seal_pulse = 0.12 + (sin(wave_time * 1.8) + 1.0) * 0.05
+		draw_circle(Vector2(360, 500), 148, Color(0.04, 0.78, 0.72, seal_pulse), false, 8)
+		draw_circle(Vector2(360, 500), 92, Color(0.95, 0.68, 0.18, seal_pulse), false, 5)
+		for spoke in range(8):
+			var angle = float(spoke) * TAU / 8.0 + wave_time * 0.06
+			var inner = Vector2(360, 500) + Vector2.from_angle(angle) * 105.0
+			var outer = Vector2(360, 500) + Vector2.from_angle(angle) * 172.0
+			draw_line(inner, outer, Color(0.92, 0.67, 0.25, 0.42), 4)
 
 func _draw_city():
 	# Land, canals and the open sea.

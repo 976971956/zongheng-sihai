@@ -201,8 +201,47 @@ func _init():
 	state.talk_to("malta_keeper")
 	var volume_three_reward = _claim(state, "heir_testimony")
 	_check(volume_three_reward.reward_item == "white_whale_coat" and state.equip_item("white_whale_coat").ok, "第三卷结局必须奖励可装备的白鲸守望衣")
-	_check(state.get_current_quest().is_empty() and int(state.player.level) == GameData.MAX_LEVEL, "三卷完整主线必须支持成长至Lv.30")
+	_check(state.get_current_quest().id == "sail_cape" and int(state.player.level) >= 30, "第三卷结束后必须接续第四卷聚宝盆")
 	_check(str(state.player.title) == "白鲸继航者", "第三卷结局必须授予白鲸继航者称号")
+
+	var late_volumes = [
+		{"port": "cape_town_dock", "sail": "sail_cape", "meet": "meet_amanda", "npc": "cape_keeper", "order_quest": "basin_order", "order": "basin_supplies", "enter": "enter_basin", "location": "legacy_basin", "kill": "defeat_basin", "enemy": "basin_leviathan", "return": "basin_return", "gear": "basin_charm"},
+		{"port": "quanzhou_dock", "sail": "sail_quanzhou", "meet": "meet_shenyan", "npc": "quanzhou_scholar", "order_quest": "changan_order", "order": "changan_seals", "enter": "enter_changan", "location": "legacy_changan", "kill": "defeat_changan", "enemy": "nine_tail_fox", "return": "changan_return", "gear": "demon_mask"},
+		{"port": "athens_dock", "sail": "sail_athens_earth", "meet": "meet_oracle_earth", "npc": "athens_oracle", "order_quest": "earth_order", "order": "earth_lamps", "enter": "enter_earth", "location": "legacy_earth", "kill": "defeat_earth", "enemy": "earth_demon_king", "return": "earth_return", "gear": "earth_armor"},
+		{"port": "venice_dock", "sail": "sail_venice_tira", "meet": "meet_keeper_tira", "npc": "tavern_keeper", "order_quest": "tira_order", "order": "tira_forge", "enter": "enter_tira", "location": "legacy_tira", "kill": "defeat_tira", "enemy": "tira_guardian", "return": "tira_return", "gear": "tira_sword"},
+		{"port": "yangzhou_dock", "sail": "sail_yangzhou_demon", "meet": "meet_suling_demon", "npc": "yangzhou_weaver", "order_quest": "demon_order", "order": "demon_sails", "enter": "enter_demon_legend", "location": "legacy_demon_legend", "kill": "defeat_demon_legend", "enemy": "celestial_demon_general", "return": "demon_legend_return", "gear": "celestial_belt"},
+		{"port": "amsterdam_dock", "sail": "sail_amsterdam_jade", "meet": "meet_vander_jade", "npc": "amsterdam_cartographer", "order_quest": "jade_order", "order": "jade_calendar", "enter": "enter_jade", "location": "legacy_jade", "kill": "defeat_jade", "enemy": "jade_dream_queen", "return": "jade_return", "gear": "jade_boots"},
+		{"port": "venice_dock", "sail": "sail_venice_fire", "meet": "meet_keeper_fire", "npc": "tavern_keeper", "order_quest": "fire_order", "order": "furnace_decoy", "enter": "enter_fire", "location": "legacy_fire", "kill": "defeat_fire", "enemy": "black_furnace_lord", "return": "fire_return", "gear": "furnace_core"},
+		{"port": "quanzhou_dock", "sail": "sail_quanzhou_return", "meet": "meet_shenyan_return", "npc": "quanzhou_scholar", "order_quest": "return_order", "order": "return_wards", "enter": "enter_return", "location": "legacy_return", "kill": "defeat_return", "enemy": "returned_demon_king", "return": "return_home", "gear": "demon_crown"},
+		{"port": "athens_dock", "sail": "sail_athens_shears", "meet": "meet_oracle_shears", "npc": "athens_oracle", "order_quest": "shears_order", "order": "shears_alloy", "enter": "enter_shears", "location": "legacy_shears", "kill": "defeat_shears", "enemy": "clockwork_tailor", "return": "shears_return", "gear": "divine_shears"},
+		{"port": "yangzhou_dock", "sail": "sail_yangzhou_seal", "meet": "meet_suling_seal", "npc": "yangzhou_weaver", "order_quest": "seal_order", "order": "seal_threads", "enter": "enter_seal", "location": "legacy_seal", "kill": "defeat_seal", "enemy": "tide_void_emperor", "return": "seal_epilogue", "gear": "tidekeeper_regalia"}
+	]
+	for volume in late_volumes:
+		var voyage_result = state.sail_to(str(volume.port))
+		_check(bool(voyage_result.ok), "%s必须存在可航行的连续主线航路" % str(volume.sail))
+		_claim(state, str(volume.sail))
+		if str(volume.npc) == "tavern_keeper":
+			state.player.location = "venice_tavern"
+		state.talk_to(str(volume.npc))
+		_claim(state, str(volume.meet))
+		state.player.location = str(volume.port)
+		var order = GameData.TRADE_ORDERS[str(volume.order)]
+		var cargo_result = state.buy_cargo(str(order.good), int(order.amount))
+		_check(bool(cargo_result.ok), "主线订单%s必须能在当前港准备货物" % str(volume.order))
+		_check(bool(state.claim_trade_order().ok), "主线订单%s必须能交付" % str(volume.order))
+		_claim(state, str(volume.order_quest))
+		state.arrive_from_2d(str(volume.location))
+		_claim(state, str(volume.enter))
+		_win_times(state, str(volume.enemy), 1)
+		var boss_reward = _claim(state, str(volume.kill))
+		_check(str(boss_reward.get("reward_item", "")) == str(volume.gear) and state.equip_item(str(volume.gear)).ok, "%s必须掉落并可装备专属装备" % str(volume.enemy))
+		state.player.location = "venice_tavern" if str(volume.npc) == "tavern_keeper" else str(volume.port)
+		state.talk_to(str(volume.npc))
+		_claim(state, str(volume.return))
+		state.player.location = str(volume.port)
+
+	_check(state.get_current_quest().is_empty() and int(state.player.level) == GameData.MAX_LEVEL, "十三卷完整主线必须支持成长至Lv.100")
+	_check(str(state.player.title) == "四海守潮人", "第十三卷结局必须授予四海守潮人称号")
 
 	state.inventory["ghost_card"] = 1
 	var defense_before_card = int(state.get_stats().defense)
@@ -222,7 +261,7 @@ func _init():
 	var silver_before = int(state.player.silver)
 	var identify = state.identify_unknown()
 	_check(identify.ok and int(state.player.silver) == silver_before - 5, "未知道具应消耗5银币并成功鉴定")
-	_check(GameData.LOCATIONS.size() == 25, "世界图应包含威尼斯、四座贸易港和三座四层副本")
+	_check(GameData.LOCATIONS.size() == 40, "世界图应包含九座贸易港、三座四层副本与十座终局远征")
 	_check(GameData.SLOT_NAMES.has("waist"), "装备系统应包含腰部槽位")
 	state.player.level = GameData.MAX_LEVEL
 	state.player.xp = 350
@@ -239,7 +278,7 @@ func _init():
 	_check(not dungeon_reset.move_to("training_dungeon_2").ok, "离开副本后必须重置逐层解锁进度")
 
 	if failures.is_empty():
-		print("SMOKE_OK: 三卷主线、三座逐层副本、四港贸易、烹饪补给与成长闭环全部通过")
+		print("SMOKE_OK: 十三卷主线、九港贸易、十座终局远征与Lv.100成长闭环全部通过")
 		quit(0)
 	else:
 		for failure in failures:

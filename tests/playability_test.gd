@@ -16,7 +16,7 @@ func _init():
 		total_losses += int(count)
 	_check(total_losses == 0, "标准成长路线在%d次随机压测中不应出现无法继续的必败节点：%s" % [RUNS, str(milestone_losses)])
 	if failures.is_empty():
-		print("PLAYABILITY_OK: %d次完整成长压测全部通过，训练场、黑帆与白鲸三座四层副本无卡关" % RUNS)
+		print("PLAYABILITY_OK: %d次十三卷完整成长压测全部通过，十三座副本与终局远征无卡关" % RUNS)
 		quit(0)
 	else:
 		for failure in failures:
@@ -108,7 +108,31 @@ func _run_normal_player(seed_value):
 		if str(encounter.gear) != "":
 			state.equip_item(str(encounter.gear))
 	_complete_current_quest(state, "heir_testimony")
-	_check(int(state.player.level) == GameData.MAX_LEVEL, "种子%d：白鲸遗航结束时应达到Lv.%d" % [seed_value, GameData.MAX_LEVEL])
+	_check(int(state.player.level) >= 30, "种子%d：白鲸遗航结束时应达到Lv.30" % seed_value)
+
+	# 后十卷维持“港口叙事→贸易准备→单场Boss→专属装备”的稳定成长节奏。
+	for expedition in [
+		{"prefix": "basin", "quests": ["sail_cape", "meet_amanda", "basin_order", "enter_basin"], "enemy": "basin_leviathan", "kill": "defeat_basin", "return": "basin_return", "gear": "basin_charm"},
+		{"prefix": "changan", "quests": ["sail_quanzhou", "meet_shenyan", "changan_order", "enter_changan"], "enemy": "nine_tail_fox", "kill": "defeat_changan", "return": "changan_return", "gear": "demon_mask"},
+		{"prefix": "earth", "quests": ["sail_athens_earth", "meet_oracle_earth", "earth_order", "enter_earth"], "enemy": "earth_demon_king", "kill": "defeat_earth", "return": "earth_return", "gear": "earth_armor"},
+		{"prefix": "tira", "quests": ["sail_venice_tira", "meet_keeper_tira", "tira_order", "enter_tira"], "enemy": "tira_guardian", "kill": "defeat_tira", "return": "tira_return", "gear": "tira_sword"},
+		{"prefix": "demon", "quests": ["sail_yangzhou_demon", "meet_suling_demon", "demon_order", "enter_demon_legend"], "enemy": "celestial_demon_general", "kill": "defeat_demon_legend", "return": "demon_legend_return", "gear": "celestial_belt"},
+		{"prefix": "jade", "quests": ["sail_amsterdam_jade", "meet_vander_jade", "jade_order", "enter_jade"], "enemy": "jade_dream_queen", "kill": "defeat_jade", "return": "jade_return", "gear": "jade_boots"},
+		{"prefix": "fire", "quests": ["sail_venice_fire", "meet_keeper_fire", "fire_order", "enter_fire"], "enemy": "black_furnace_lord", "kill": "defeat_fire", "return": "fire_return", "gear": "furnace_core"},
+		{"prefix": "return", "quests": ["sail_quanzhou_return", "meet_shenyan_return", "return_order", "enter_return"], "enemy": "returned_demon_king", "kill": "defeat_return", "return": "return_home", "gear": "demon_crown"},
+		{"prefix": "shears", "quests": ["sail_athens_shears", "meet_oracle_shears", "shears_order", "enter_shears"], "enemy": "clockwork_tailor", "kill": "defeat_shears", "return": "shears_return", "gear": "divine_shears"},
+		{"prefix": "seal", "quests": ["sail_yangzhou_seal", "meet_suling_seal", "seal_order", "enter_seal"], "enemy": "tide_void_emperor", "kill": "defeat_seal", "return": "seal_epilogue", "gear": "tidekeeper_regalia"}
+	]:
+		for quest_id in expedition.quests:
+			_complete_current_quest(state, str(quest_id))
+		_prepare_rest(state)
+		if not _fight(state, str(expedition.enemy)):
+			_record_loss("legacy/%s" % str(expedition.prefix))
+			return
+		_complete_current_quest(state, str(expedition.kill))
+		state.equip_item(str(expedition.gear))
+		_complete_current_quest(state, str(expedition.return))
+	_check(state.get_current_quest().is_empty() and int(state.player.level) == GameData.MAX_LEVEL, "种子%d：十三卷结束时应达到Lv.%d" % [seed_value, GameData.MAX_LEVEL])
 
 func _complete_current_quest(state, expected_id):
 	var quest = state.get_current_quest()

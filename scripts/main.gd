@@ -688,6 +688,8 @@ func _audio_region_for_location(location_id):
 		return "black_sail"
 	if location_id.begins_with("white_whale_"):
 		return "white_whale"
+	if location_id.begins_with("legacy_"):
+		return "legacy"
 	if location_id in ["residential_quarter", "venice_mine", "venice_back_hill", "venice_wildwood", "venice_north_gate"]:
 		return "field"
 	return "city"
@@ -1555,7 +1557,7 @@ func _open_quest_detail():
 		content.add_child(recap)
 	var quest = state.get_current_quest()
 	if quest.is_empty():
-		content.add_child(_empty_state("第三卷·白鲸遗航已完成。白鲸号家书把下一段航路指向开普敦北河潮门。"))
+		content.add_child(_empty_state("第十三卷·封印迷阵已完成。九港航路与十座终局潮阵已重归平静。"))
 	else:
 		content.add_child(_label(quest.title, 20, GOLD))
 		content.add_child(_label(quest.story, 13, Color("b7cfd5")))
@@ -1841,6 +1843,8 @@ func _open_harbor():
 		if destination == port_id:
 			continue
 		var route = GameData.trade_route(port_id, destination)
+		if route.is_empty():
+			continue
 		var days = max(1, int(route.days) - (int(state.ship.speed) - 1))
 		var risk = state.voyage_risk(destination)
 		var sail = _button("前往%s · %d日 · 航费%d · 风险%d%%" % [GameData.TRADE_PORTS[destination].name, days, int(route.fee), risk], "primary")
