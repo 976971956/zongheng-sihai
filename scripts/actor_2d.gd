@@ -1,9 +1,11 @@
 extends Node2D
 
 const CHARACTER_ATLAS = preload("res://assets/art/characters/character_atlas_v1.png")
+const HARBOR_NPC_ATLAS = preload("res://assets/art/characters/harbor_npc_atlas_v1.png")
 const PLAYER_WALK = preload("res://assets/art/characters/player_walk_v1.png")
 const PLAYER_WALK_BACK = preload("res://assets/art/characters/player_walk_back_v1.png")
 const ATLAS_CELL_SIZE = Vector2(362, 362)
+const HARBOR_NPC_CELL_SIZE = Vector2(197, 197)
 const ATLAS_CELLS = {
 	"player": Vector2i(0, 0),
 	"alisa": Vector2i(1, 0),
@@ -12,6 +14,7 @@ const ATLAS_CELLS = {
 	"drunk_sailor": Vector2i(0, 1),
 	"mine_thief": Vector2i(1, 1),
 	"dungeon_guard": Vector2i(2, 1),
+	"guard_captain": Vector2i(2, 1),
 	"giant_bear": Vector2i(3, 1),
 	"sewer_rat": Vector2i(0, 2),
 	"wildwood_ghost": Vector2i(1, 2),
@@ -23,6 +26,35 @@ const ATLAS_CELLS = {
 	"corsair_raider": Vector2i(1, 1),
 	"corsair_guard": Vector2i(2, 1),
 	"corsair_captain": Vector2i(3, 0)
+}
+const HARBOR_NPC_CELLS = {
+	"venice_quartermaster": Vector2i(0, 0),
+	"venice_shipwright": Vector2i(1, 0),
+	"ragusa_harbormaster": Vector2i(2, 0),
+	"ragusa_innkeeper": Vector2i(3, 0),
+	"alex_lighthouse_keeper": Vector2i(4, 0),
+	"alex_shipwright": Vector2i(5, 0),
+	"malta_cook": Vector2i(0, 1),
+	"malta_diver": Vector2i(1, 1),
+	"cape_shipwright": Vector2i(2, 1),
+	"cape_quartermaster": Vector2i(3, 1),
+	"quanzhou_navigator": Vector2i(4, 1),
+	"quanzhou_merchant": Vector2i(5, 1),
+	"athens_smith": Vector2i(0, 2),
+	"athens_innkeeper": Vector2i(1, 2),
+	"yangzhou_pilot": Vector2i(2, 2),
+	"yangzhou_merchant": Vector2i(3, 2),
+	"amsterdam_auctioneer": Vector2i(4, 2),
+	"amsterdam_shipwright": Vector2i(5, 2),
+	# Earlier story NPCs reuse the closest port-specific silhouette instead of
+	# falling back to the generic procedural mannequin.
+	"jeweler": Vector2i(0, 0),
+	"malta_keeper": Vector2i(4, 0),
+	"cape_keeper": Vector2i(3, 1),
+	"quanzhou_scholar": Vector2i(4, 1),
+	"athens_oracle": Vector2i(1, 2),
+	"yangzhou_weaver": Vector2i(3, 2),
+	"amsterdam_cartographer": Vector2i(5, 2)
 }
 const LEGACY_BOSS_IDS = [
 	"basin_leviathan", "nine_tail_fox", "earth_demon_king", "tira_guardian",
@@ -92,12 +124,14 @@ func _refresh_art_sprite():
 		art_sprite.z_index = 1
 		add_child(art_sprite)
 		return
-	if not ATLAS_CELLS.has(display_id):
+	if not ATLAS_CELLS.has(display_id) and not HARBOR_NPC_CELLS.has(display_id):
 		return
-	var cell = ATLAS_CELLS[display_id]
+	var atlas = HARBOR_NPC_ATLAS if HARBOR_NPC_CELLS.has(display_id) else CHARACTER_ATLAS
+	var cell_size = HARBOR_NPC_CELL_SIZE if HARBOR_NPC_CELLS.has(display_id) else ATLAS_CELL_SIZE
+	var cell = HARBOR_NPC_CELLS[display_id] if HARBOR_NPC_CELLS.has(display_id) else ATLAS_CELLS[display_id]
 	var atlas_texture = AtlasTexture.new()
-	atlas_texture.atlas = CHARACTER_ATLAS
-	atlas_texture.region = Rect2(Vector2(cell.x, cell.y) * ATLAS_CELL_SIZE, ATLAS_CELL_SIZE)
+	atlas_texture.atlas = atlas
+	atlas_texture.region = Rect2(Vector2(cell.x, cell.y) * cell_size, cell_size)
 	art_sprite = Sprite2D.new()
 	art_sprite.texture = atlas_texture
 	art_sprite.scale = Vector2.ONE * _art_scale()
@@ -129,6 +163,8 @@ func _update_player_walk_sprite(moving):
 	art_sprite.rotation = 0.0
 
 func _art_scale():
+	if HARBOR_NPC_CELLS.has(display_id):
+		return 0.45
 	match display_id:
 		"tavern_keeper": return 0.25
 		"giant_bear": return 0.32
@@ -150,7 +186,7 @@ func _draw():
 		var sparkle = Vector2.RIGHT.rotated(bob_time * 1.6) * ring_radius + Vector2(0, 5)
 		draw_circle(sparkle, 4, Color("fff1ad"))
 	draw_set_transform(Vector2(0, bob))
-	if not ATLAS_CELLS.has(display_id):
+	if not ATLAS_CELLS.has(display_id) and not HARBOR_NPC_CELLS.has(display_id):
 		if actor_kind == "travel":
 			_draw_travel_marker()
 		elif actor_kind == "discovery":

@@ -19,6 +19,8 @@ func _init():
 	_check(not port_lock_state.sail_to("alexandria_dock").ok, "尚未发现的港口不能绕过海图锁定直接启航")
 	_check(GameData.NPCS.size() >= 31, "九港剧情与服务人物必须完整配置，不能只保留少量任务NPC")
 	for port_id in GameData.TRADE_PORTS:
+		var order_npc = str(GameData.TRADE_PORTS[port_id].get("order_npc", ""))
+		_check(order_npc != "" and order_npc in GameData.LOCATIONS[port_id].npcs, "%s商会交付人物必须真实存在于港口地图" % GameData.TRADE_PORTS[port_id].name)
 		if port_id != "venice_dock":
 			_check(GameData.LOCATIONS[port_id].npcs.size() >= 3, "%s至少需要剧情、贸易和港口服务三名可互动人物" % GameData.TRADE_PORTS[port_id].name)
 	var opening_story = state.story_progress()

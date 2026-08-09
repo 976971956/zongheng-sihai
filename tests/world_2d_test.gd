@@ -34,6 +34,7 @@ func _run():
 	scene.player_actor.set_motion(Vector2.ZERO)
 	_check(scene.actors.size() >= 4, "地图必须包含NPC和可见敌人")
 	_check(_has_actor(scene, "guard_captain") and _has_actor(scene, "jeweler") and _has_actor(scene, "venice_shipwright"), "威尼斯必须生成守卫、珠宝商与船匠，不能只存在于数据配置中")
+	_check(_actor_has_art(scene, "guard_captain") and _actor_has_art(scene, "jeweler") and _actor_has_art(scene, "venice_shipwright"), "威尼斯补充NPC也必须使用完整人物精灵，不能回退到通用占位模型")
 	_check(scene.player_actor.position.x > 0 and scene.player_actor.position.y > 0, "玩家必须出生在可行走地图内")
 	var saved_respawn_key = scene._enemy_spawn_key("drunk_sailor")
 	scene.state.enemy_respawns[saved_respawn_key] = scene._world_time_seconds() + 60.0
@@ -249,7 +250,7 @@ func _run():
 	_check(bool(equipment_upgrade.get("ok", false)) and scene.state.equipment_upgrade_level("warrior_blade") == 1 and int(scene.state.get_stats().attack) > attack_before_upgrade, "贸易银币必须可以用于强化已装备武器并提升属性")
 	scene._open_trade_2d()
 	_check(is_instance_valid(scene.overlay), "主线完成后必须能从2D地图打开港口市场")
-	_check(_has_button_text(scene.overlay, "买1") and _has_button_text(scene.overlay, "买满") and _has_button_text(scene.overlay, "全卖") and _has_button_text(scene.overlay, "拉古萨") and _has_button_text(scene.overlay, "交付订单") and _has_button_text(scene.overlay, "护航物资") and _has_label_text(scene.overlay, "持有银币") and _has_label_text(scene.overlay, "总声望") and _has_label_text(scene.overlay, "今日行情"), "2D港口市场必须包含资产、批量买卖、订单声望、护航、跨港航线和动态行情")
+	_check(_has_button_text(scene.overlay, "买1") and _has_button_text(scene.overlay, "买满") and _has_button_text(scene.overlay, "全卖") and _has_button_text(scene.overlay, "拉古萨") and _has_button_text(scene.overlay, "商会交付") and _has_button_text(scene.overlay, "护航物资") and _has_label_text(scene.overlay, "持有银币") and _has_label_text(scene.overlay, "总声望") and _has_label_text(scene.overlay, "今日行情"), "2D港口市场必须包含资产、批量买卖、订单声望、护航、跨港航线和动态行情")
 	var silver_before = int(scene.state.player.silver)
 	scene._trade_buy_2d("venetian_glass")
 	_check(int(scene.state.cargo.get("venetian_glass", 0)) == 1 and int(scene.state.player.silver) < silver_before, "2D市场买货必须同步货舱和银币")
@@ -285,9 +286,37 @@ func _run():
 	scene.player_actor.position = _actor_position(scene, "alexandria_merchant")
 	scene._update_nearest_actor()
 	scene._interact()
-	_check(_has_label_text(scene.overlay, "亚历山大港口市场") and _has_button_text(scene.overlay, "交付订单"), "非对话任务时点击亚历山大商人必须直接打开当地港口市场")
+	_check(_has_label_text(scene.overlay, "亚历山大港口市场") and _has_button_text(scene.overlay, "向亚历山大商会交付"), "非对话任务时点击亚历山大商人必须直接打开当地港口市场")
 	scene._close_overlay()
 	await process_frame
+
+	# “亚历山大商会”必须在地图上有明确人物，任务导航要步行到柜台再打开订单，不能只显示抽象文字。
+	scene.state.quest_index = 22
+	scene.state.quest_progress = 0
+	scene.state.completed_trade_orders.erase("alexandria_lighthouse_glass")
+	scene.state.cargo["venetian_glass"] = 3
+	scene.state.cargo_costs["venetian_glass"] = 72
+	scene.state.player.location = "alexandria_dock"
+	scene._spawn_world_actors()
+	scene.player_actor.position = scene._spawn_for_location("alexandria_dock")
+	var guild_target = scene._quest_navigation_target()
+	_check(str(guild_target.actor_id) == "alex_lighthouse_keeper" and _has_actor(scene, "alex_lighthouse_keeper"), "灯塔修缮任务必须指向地图上的亚历山大商会执事")
+	scene._navigate_to_quest()
+	_check(scene.task_navigation_active and not is_instance_valid(scene.overlay), "点击亚历山大商会任务导航后必须从当前位置步行，不能直接弹出通用市场")
+	await _walk_task_navigation(scene)
+	await process_frame
+	await process_frame
+	_check(_has_label_text(scene.overlay, "亚历山大商会订单") and _has_button_text(scene.overlay, "向亚历山大商会交付"), "抵达商会执事后必须打开可完成灯塔订单的明确交付界面")
+	scene._close_overlay()
+	await process_frame
+
+	# 九港每名可见NPC都必须使用精灵模型，不能回退成同一套通用线框小人。
+	scene.state.quest_index = GameData.QUESTS.size()
+	for modeled_port_id in GameData.TRADE_PORTS:
+		scene._switch_region("city", str(modeled_port_id))
+		for modeled_npc_id in GameData.LOCATIONS[str(modeled_port_id)].npcs:
+			_check(_actor_has_art(scene, str(modeled_npc_id)), "%s的%s必须拥有可见2D人物精灵" % [GameData.TRADE_PORTS[str(modeled_port_id)].name, GameData.NPCS[str(modeled_npc_id)].name])
+	scene._switch_region("city", "alexandria_dock")
 
 	# 航海必须使用可视化九港海图，并在航行动画完成后落到真实目的港。
 	scene.state.player.silver = 1000
@@ -381,6 +410,12 @@ func _actor_model_id(scene, actor_id):
 		if str(entry.id) == actor_id:
 			return str(entry.node.display_id)
 	return ""
+
+func _actor_has_art(scene, actor_id):
+	for entry in scene.actors:
+		if str(entry.id) == str(actor_id):
+			return is_instance_valid(entry.node.art_sprite) and entry.node.art_sprite.texture != null
+	return false
 
 func _actor_position(scene, actor_id):
 	for entry in scene.actors:

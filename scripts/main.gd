@@ -1630,7 +1630,7 @@ func _quest_route_hint(index):
 		"lighthouse_letter": "步行返回老海鸥酒馆 → 阅读萨米尔来信",
 		"sail_lighthouse": "步行到威尼斯码头 → 可先买3箱玻璃 → 启航亚历山大",
 		"samir_testimony": "亚历山大灯塔港 → 与香料商萨米尔交谈",
-		"lighthouse_repairs": "亚历山大港口订单 → 交付3箱威尼斯玻璃",
+		"lighthouse_repairs": "亚历山大码头 → 找商会执事莱拉 → 交付3箱威尼斯玻璃",
 		"ragusa_nightwatch": "亚历山大买4桶橄榄油 → 航行拉古萨 → 交付订单",
 		"three_port_trust": "完成任意港口订单或盈利出售货物 → 三港总声望达到6",
 		"guarded_passage": "任意港口 → 购买护航物资",
@@ -1755,10 +1755,10 @@ func _open_harbor():
 		var order_row = HBoxContainer.new()
 		order_row.add_theme_constant_override("separation", 8)
 		var held_for_order = int(state.cargo.get(str(order.good), 0))
-		var order_info = _label("港口订单｜%s%s\n%s×%d · 货舱%d/%d · 奖金%d · 声望+%d" % [str(order.title), " · 主线" if bool(order.get("story", false)) else "", GameData.TRADE_GOODS[str(order.good)].name, int(order.amount), held_for_order, int(order.amount), int(order.bonus), int(order.reputation)], 11, GOLD)
+		var order_info = _label("%s商会订单｜%s%s\n%s×%d · 货舱%d/%d · 奖金%d · 声望+%d" % [port.name, str(order.title), " · 主线" if bool(order.get("story", false)) else "", GameData.TRADE_GOODS[str(order.good)].name, int(order.amount), held_for_order, int(order.amount), int(order.bonus), int(order.reputation)], 11, GOLD)
 		order_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		order_row.add_child(order_info)
-		var order_claim = _button("交付订单", "gold")
+		var order_claim = _button("向商会交付", "gold")
 		order_claim.disabled = not state.trade_order_can_claim(port_id)
 		order_claim.pressed.connect(_claim_trade_order_from_journal)
 		order_row.add_child(order_claim)

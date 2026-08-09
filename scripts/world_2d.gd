@@ -275,7 +275,9 @@ func _spawn_world_actors():
 	if current_region == "city":
 		var active_port = str(state.player.location)
 		if active_port in GameData.TRADE_PORTS and active_port != "venice_dock":
-			var port_npc_positions = [Vector2(145, 790), Vector2(350, 850), Vector2(555, 790)]
+			# Keep the outer NPC nameplates inside a 720px phone viewport while the
+			# camera is centered on the dock spawn.
+			var port_npc_positions = [Vector2(185, 790), Vector2(350, 850), Vector2(515, 790)]
 			var port_npc_colors = [Color("49697a"), Color("7b5944"), Color("506f61")]
 			var port_npcs = GameData.LOCATIONS[active_port].npcs
 			for npc_index in range(port_npcs.size()):
@@ -479,8 +481,8 @@ func _add_actor(kind, id, display_name, position, color, accent, location_id = "
 	world_layer.add_child(actor)
 	var nameplate = Label.new()
 	nameplate.text = display_name
-	nameplate.position = Vector2(-72, 50)
-	nameplate.size = Vector2(144, 31)
+	nameplate.position = Vector2(-90, 50)
+	nameplate.size = Vector2(180, 31)
 	nameplate.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	nameplate.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	nameplate.add_theme_font_size_override("font_size", 15)
@@ -733,8 +735,8 @@ func _update_nearest_actor():
 			action_button.text = "进入 · %s" % nearest_actor.name
 		elif nearest_actor.kind == "discovery":
 			action_button.text = "调查 · %s" % nearest_actor.name
-		elif nearest_actor.kind == "npc" and state.is_trade_unlocked() and not _is_current_talk_target(str(nearest_actor.id)) and _npc_service(str(nearest_actor.id)) in ["harbor", "shipyard", "cook"]:
-			var service_title = {"harbor": "港口贸易", "shipyard": "船坞改造", "cook": "港口厨房"}.get(_npc_service(str(nearest_actor.id)), "港口服务")
+		elif nearest_actor.kind == "npc" and state.is_trade_unlocked() and not _is_current_talk_target(str(nearest_actor.id)) and _npc_service(str(nearest_actor.id)) in ["harbor", "shipyard", "cook", "trade_order"]:
+			var service_title = {"harbor": "港口贸易", "shipyard": "船坞改造", "cook": "港口厨房", "trade_order": "商会交付"}.get(_npc_service(str(nearest_actor.id)), "港口服务")
 			action_button.text = "%s · %s" % [service_title, str(nearest_actor.name)]
 		elif nearest_actor.kind == "npc" and _npc_service(str(nearest_actor.id)) == "rest" and not _is_current_talk_target(str(nearest_actor.id)):
 			action_button.text = "住宿休息 · %s" % str(nearest_actor.name)
@@ -838,7 +840,7 @@ func _interact():
 	if nearest_actor.kind == "npc":
 		var npc_id = str(nearest_actor.id)
 		var service = _npc_service(npc_id)
-		if service in ["harbor", "shipyard", "cook"] and state.is_trade_unlocked() and not _is_current_talk_target(npc_id):
+		if service in ["harbor", "shipyard", "cook", "trade_order"] and state.is_trade_unlocked() and not _is_current_talk_target(npc_id):
 			_open_trade_2d()
 			return
 		if service == "rest" and not _is_current_talk_target(npc_id):
@@ -1516,6 +1518,7 @@ func _quest_navigation_target():
 		}
 	var objective = quest.objective
 	var target_location = ""
+	var target_actor_id = ""
 	if objective.type == "visit":
 		target_location = str(objective.target)
 	elif objective.type == "talk":
@@ -1531,6 +1534,7 @@ func _quest_navigation_target():
 	elif objective.type == "trade_order":
 		var order = GameData.TRADE_ORDERS.get(str(objective.target), {})
 		target_location = str(order.get("port", "venice_dock"))
+		target_actor_id = str(GameData.TRADE_PORTS.get(target_location, {}).get("order_npc", ""))
 	elif objective.type == "cook":
 		target_location = str(GameData.RECIPES.get(str(objective.target), {"port": "malta_dock"}).port)
 	elif objective.type in ["trade_buy", "trade_sell", "trade_reputation", "prepare_voyage", "upgrade_ship"]:
@@ -1546,11 +1550,14 @@ func _quest_navigation_target():
 			return {"region": "dungeon", "location": "training_dungeon_3", "actor_id": "tide_beast", "name": "三层潮汐兽"}
 	if target_location == "":
 		target_location = "venice_square"
-	var actor_id = "" if objective.type in ["visit", "trade_order", "trade_reputation", "prepare_voyage", "trade_buy", "trade_sell", "upgrade_ship", "cook"] else str(objective.target)
+	var actor_id = target_actor_id if target_actor_id != "" else ("" if objective.type in ["visit", "trade_order", "trade_reputation", "prepare_voyage", "trade_buy", "trade_sell", "upgrade_ship", "cook"] else str(objective.target))
+	var target_name = GameData.objective_name(objective)
+	if objective.type == "trade_order" and target_location in GameData.TRADE_PORTS:
+		target_name = "%s商会" % GameData.TRADE_PORTS[target_location].name
 	return {
 		"region": str(region_by_location.get(target_location, "city")),
 		"location": target_location, "actor_id": actor_id,
-		"name": GameData.objective_name(objective)
+		"name": target_name
 	}
 
 func _refresh_waypoint():
@@ -1593,17 +1600,28 @@ func _navigate_to_quest():
 	if not quest.is_empty() and str(quest.objective.type) == "upgrade_equipment":
 		_open_inventory()
 		return
-	var needs_harbor = not quest.is_empty() and (str(quest.objective.type) in ["trade_buy", "trade_sell", "trade_order", "trade_reputation", "prepare_voyage", "upgrade_ship", "cook"] or (str(quest.objective.type) == "visit" and str(quest.objective.target) in GameData.TRADE_PORTS))
+	var navigation_target = _quest_navigation_target()
+	var objective_type = str(quest.objective.type) if not quest.is_empty() else ""
+	var needs_harbor = not quest.is_empty() and (objective_type in ["trade_buy", "trade_sell", "trade_order", "trade_reputation", "prepare_voyage", "upgrade_ship", "cook"] or (objective_type == "visit" and str(quest.objective.target) in GameData.TRADE_PORTS))
 	if needs_harbor:
-		if str(state.player.location) in GameData.TRADE_PORTS:
+		var target_port = str(navigation_target.get("location", ""))
+		if target_port in GameData.TRADE_PORTS and str(state.player.location) in GameData.TRADE_PORTS and str(state.player.location) != target_port:
+			_open_sailing_map(target_port)
+			return
+		if str(state.player.location) in GameData.TRADE_PORTS and objective_type != "trade_order":
 			_open_trade_2d()
 			return
-		task_navigation_open_service = "trade"
+		if objective_type == "trade_order" and str(state.player.location) == target_port:
+			task_navigation_open_service = "trade"
+		elif target_port in GameData.TRADE_PORTS:
+			task_navigation_open_service = "sail:%s" % target_port
+		else:
+			task_navigation_open_service = "trade"
 	else:
 		task_navigation_open_service = ""
 	if is_instance_valid(overlay):
 		_close_overlay()
-	task_navigation_target = _quest_navigation_target()
+	task_navigation_target = navigation_target
 	task_navigation_active = true
 	_continue_task_navigation()
 
@@ -1708,6 +1726,8 @@ func _finish_task_navigation_leg():
 	hint_label.text = "已步行到达：%s｜靠近后点击互动" % target_name
 	if open_service == "trade":
 		call_deferred("_open_trade_2d")
+	elif open_service.begins_with("sail:"):
+		call_deferred("_open_sailing_map", open_service.trim_prefix("sail:"))
 
 func _cancel_task_navigation():
 	task_navigation_active = false
@@ -1950,11 +1970,13 @@ func _open_trade_2d():
 		var held_for_order = int(state.cargo.get(str(order.good), 0))
 		var order_card = VBoxContainer.new()
 		order_card.add_theme_constant_override("separation", 6)
-		order_card.add_child(_label("港口订单｜%s%s" % [str(order.title), " · 主线" if bool(order.get("story", false)) else ""], 16, GOLD))
-		var order_copy = _label("%s\n交付%s×%d｜货舱%d/%d｜额外奖金%d｜声望+%d" % [str(order.description), str(order_good.name), int(order.amount), held_for_order, int(order.amount), int(order.bonus), int(order.reputation)], 13, INK)
+		order_card.add_child(_label("%s商会订单｜%s%s" % [port.name, str(order.title), " · 主线" if bool(order.get("story", false)) else ""], 16, GOLD))
+		var shortage = max(0, int(order.amount) - held_for_order)
+		var shortage_text = "货物齐备，可以交付。" if shortage == 0 else "货物不足：还缺%s×%d；可在下方购买，或打开海图前往低价港采购。" % [str(order_good.name), shortage]
+		var order_copy = _label("%s\n交付%s×%d｜货舱%d/%d｜额外奖金%d｜声望+%d\n%s" % [str(order.description), str(order_good.name), int(order.amount), held_for_order, int(order.amount), int(order.bonus), int(order.reputation), shortage_text], 13, INK)
 		order_copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		order_card.add_child(order_copy)
-		var order_claim = _button("交付订单", "gold")
+		var order_claim = _button("向%s商会交付" % port.name, "gold")
 		order_claim.disabled = not state.trade_order_can_claim(port_id)
 		order_claim.pressed.connect(_claim_trade_order_2d)
 		order_card.add_child(order_claim)

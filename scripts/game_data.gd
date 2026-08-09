@@ -278,7 +278,7 @@ const NPCS = {
 	,"venice_shipwright": {"name": "洛伦佐", "role": "海燕号船匠", "service": "shipyard", "dialogue": "货舱、船帆和装甲各有用处。想跑远洋，先决定这条船要成为商船还是快船。"}
 	,"ragusa_harbormaster": {"name": "娜迪娅", "role": "石墙港务官", "service": "harbor", "dialogue": "北风一到，石墙外的浪会像刀。出港前看看海图上的风险。"}
 	,"ragusa_innkeeper": {"name": "佩塔尔", "role": "石墙旅店主人", "service": "rest", "dialogue": "跑完长航线就歇一晚。满身疲惫去碰海盗，可不是勇敢。"}
-	,"alex_lighthouse_keeper": {"name": "莱拉", "role": "灯塔守望人", "dialogue": "蓝灯代表潮门，金灯代表商船，红灯亮起时说明风暴正在靠近。"}
+	,"alex_lighthouse_keeper": {"name": "商会执事·莱拉", "role": "亚历山大商会 · 灯塔订单", "service": "trade_order", "dialogue": "这里就是亚历山大商会的订单柜台。带齐三箱威尼斯玻璃后交给我，灯塔修缮队会立即验收。"}
 	,"alex_shipwright": {"name": "哈伦", "role": "三角帆船匠", "service": "shipyard", "dialogue": "这里的逆风航线多，速度每提升一级，都能省下一整天补给。"}
 	,"malta_cook": {"name": "特蕾莎", "role": "蜂蜜石港厨师", "service": "cook", "dialogue": "柑橘、香料和橄榄油都能变成远航餐。先把配料放进货舱。"}
 	,"malta_diver": {"name": "尼科", "role": "白鲸号打捞人", "dialogue": "沉船不会消失，只会慢慢变成礁石。退潮时别错过露出的旧舱门。"}
@@ -295,15 +295,15 @@ const NPCS = {
 }
 
 const TRADE_PORTS = {
-	"venice_dock": {"name": "威尼斯", "specialty": "玻璃器皿", "note": "玻璃便宜，香料昂贵"},
-	"ragusa_dock": {"name": "拉古萨", "specialty": "羊毛布", "note": "羊毛与橄榄油价格较低"},
-	"alexandria_dock": {"name": "亚历山大", "specialty": "东方香料", "note": "香料便宜，玻璃需求旺盛"},
-	"malta_dock": {"name": "马耳他", "specialty": "金岛柑橘", "note": "柑橘便宜，可在港口厨房制作远航餐食"},
-	"cape_town_dock": {"name": "开普敦", "specialty": "橄榄油", "note": "远洋补给需求旺盛", "npc": "cape_keeper"},
-	"quanzhou_dock": {"name": "泉州", "specialty": "东方香料", "note": "香料与柑橘适合向西远销", "npc": "quanzhou_scholar"},
-	"athens_dock": {"name": "雅典", "specialty": "橄榄油", "note": "玻璃和羊毛价格稳定", "npc": "athens_oracle"},
-	"yangzhou_dock": {"name": "扬州", "specialty": "羊毛布", "note": "远海货物在运河口溢价明显", "npc": "yangzhou_weaver"},
-	"amsterdam_dock": {"name": "阿姆斯特丹", "specialty": "威尼斯玻璃", "note": "北海商会大量收购香料", "npc": "amsterdam_cartographer"}
+	"venice_dock": {"name": "威尼斯", "specialty": "玻璃器皿", "note": "玻璃便宜，香料昂贵", "order_npc": "ship_owner"},
+	"ragusa_dock": {"name": "拉古萨", "specialty": "羊毛布", "note": "羊毛与橄榄油价格较低", "order_npc": "ragusa_harbormaster"},
+	"alexandria_dock": {"name": "亚历山大", "specialty": "东方香料", "note": "香料便宜，玻璃需求旺盛", "order_npc": "alex_lighthouse_keeper"},
+	"malta_dock": {"name": "马耳他", "specialty": "金岛柑橘", "note": "柑橘便宜，可在港口厨房制作远航餐食", "order_npc": "malta_keeper"},
+	"cape_town_dock": {"name": "开普敦", "specialty": "橄榄油", "note": "远洋补给需求旺盛", "npc": "cape_keeper", "order_npc": "cape_quartermaster"},
+	"quanzhou_dock": {"name": "泉州", "specialty": "东方香料", "note": "香料与柑橘适合向西远销", "npc": "quanzhou_scholar", "order_npc": "quanzhou_merchant"},
+	"athens_dock": {"name": "雅典", "specialty": "橄榄油", "note": "玻璃和羊毛价格稳定", "npc": "athens_oracle", "order_npc": "athens_smith"},
+	"yangzhou_dock": {"name": "扬州", "specialty": "羊毛布", "note": "远海货物在运河口溢价明显", "npc": "yangzhou_weaver", "order_npc": "yangzhou_merchant"},
+	"amsterdam_dock": {"name": "阿姆斯特丹", "specialty": "威尼斯玻璃", "note": "北海商会大量收购香料", "npc": "amsterdam_cartographer", "order_npc": "amsterdam_auctioneer"}
 }
 
 const PORT_UNLOCK_QUEST = {
@@ -555,7 +555,7 @@ const EARLY_QUESTS = [
 	,{"id": "lighthouse_letter", "title": "灯塔来信", "story": "第一卷之后，酒馆老板收到萨米尔的密信。回酒馆确认灯塔异象。", "objective": {"type": "talk", "target": "tavern_keeper", "need": 1}, "reward": {"exp": 1800, "silver": 260}}
 	,{"id": "sail_lighthouse", "title": "驶向灯塔港", "story": "备好三箱威尼斯玻璃，驾驶海燕号抵达亚历山大。", "objective": {"type": "visit", "target": "alexandria_dock", "need": 1}, "reward": {"exp": 2200, "silver": 300}}
 	,{"id": "samir_testimony", "title": "香料商的证词", "story": "在亚历山大港寻找萨米尔，询问艾丽莎父亲与潮门的秘密。", "objective": {"type": "talk", "target": "alexandria_merchant", "need": 1}, "reward": {"exp": 2600, "silver": 340}}
-	,{"id": "lighthouse_repairs", "title": "修缮灯塔镜室", "story": "向亚历山大商会交付三箱威尼斯玻璃，换取第一枚商会印记。", "objective": {"type": "trade_order", "target": "alexandria_lighthouse_glass", "need": 1}, "reward": {"exp": 3000, "silver": 380}}
+	,{"id": "lighthouse_repairs", "title": "修缮灯塔镜室", "story": "到亚历山大灯塔港码头寻找商会执事莱拉，交付三箱威尼斯玻璃，换取第一枚商会印记。", "objective": {"type": "trade_order", "target": "alexandria_lighthouse_glass", "need": 1}, "reward": {"exp": 3000, "silver": 380}}
 	,{"id": "ragusa_nightwatch", "title": "石墙港的灯火", "story": "把四桶橄榄油送到拉古萨，为守夜人补足灯油。", "objective": {"type": "trade_order", "target": "ragusa_lamp_oil", "need": 1}, "reward": {"exp": 3400, "silver": 420}}
 	,{"id": "three_port_trust", "title": "三港信任", "story": "继续完成港口订单，将三港总声望提升到6，取得商会星图。", "objective": {"type": "trade_reputation", "target": "total", "need": 6}, "reward": {"exp": 3800, "silver": 480}}
 	,{"id": "guarded_passage", "title": "穿越季风", "story": "在任意港口购买一次护航物资，为长航程免除一次风暴损失。", "objective": {"type": "prepare_voyage", "target": "storm_kit", "need": 1}, "reward": {"exp": 4200, "silver": 520}}
