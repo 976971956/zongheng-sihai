@@ -762,6 +762,12 @@ func _npc_action_card(npc_id):
 	row.add_child(text_box)
 	text_box.add_child(_label(npc.name, 14, INK))
 	text_box.add_child(_label(npc.role, 10, MUTED))
+	var service = str(npc.get("service", ""))
+	if service in ["jewelry_shop", "tavern_shop"]:
+		var shop_button = _button("珠宝" if service == "jewelry_shop" else "食物", "gold")
+		shop_button.custom_minimum_size.x = 82
+		shop_button.pressed.connect(_open_vendor_shop.bind(str(npc_id)))
+		row.add_child(shop_button)
 	var talk_button = _button("交谈", "primary")
 	talk_button.custom_minimum_size.x = 82
 	talk_button.pressed.connect(_on_talk.bind(npc_id))
@@ -1472,6 +1478,47 @@ func _open_shop():
 	content.add_child(_label("持有银币：%d" % int(state.player.silver), 12, Color("e8d49b")))
 	_open_modal("海风市场", content, Vector2(690, 590))
 
+func _open_vendor_shop(npc_id):
+	var vendor_id = str(npc_id)
+	if not GameData.VENDOR_SHOPS.has(vendor_id):
+		_show_toast("这位人物暂时没有可出售的商品。", false)
+		return
+	var shop = GameData.VENDOR_SHOPS[vendor_id]
+	var content = VBoxContainer.new()
+	content.add_theme_constant_override("separation", 10)
+	content.add_child(_label(str(shop.name), 20, GOLD))
+	var intro = _label("%s\n持有银币：%d" % [str(shop.description), int(state.player.silver)], 13, TEAL)
+	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(intro)
+	for item_id in GameData.vendor_stock(vendor_id):
+		var item = GameData.ITEMS[str(item_id)]
+		var row = _panel_container(PANEL_SOFT, 11, LINE, 1)
+		var row_margin = _inside_margin(13, 11)
+		row.add_child(row_margin)
+		var hbox = HBoxContainer.new()
+		hbox.add_theme_constant_override("separation", 12)
+		row_margin.add_child(hbox)
+		var text_stack = VBoxContainer.new()
+		text_stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		hbox.add_child(text_stack)
+		text_stack.add_child(_label("%s · %s" % [str(item.name), str(item.rarity)], 14, INK))
+		var description = _label("%s\n持有%d件" % [str(item.description), int(state.inventory.get(str(item_id), 0))], 11, MUTED)
+		description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		text_stack.add_child(description)
+		var buy = _button("%d银 · 购买" % int(item.price), "gold")
+		buy.disabled = int(state.player.silver) < int(item.price)
+		buy.pressed.connect(_buy_from_vendor.bind(vendor_id, str(item_id)))
+		hbox.add_child(buy)
+		content.add_child(row)
+	_open_modal(str(shop.name), content, Vector2(700, 620))
+
+func _buy_from_vendor(npc_id, item_id):
+	var result = state.buy_vendor_item(npc_id, item_id)
+	_close_modal()
+	refresh_ui()
+	_show_toast(result.message, result.ok)
+	call_deferred("_open_vendor_shop", npc_id)
+
 func _buy_from_shop(item_id):
 	var result = state.buy_item(item_id)
 	_close_modal()
@@ -1782,7 +1829,8 @@ func _open_harbor():
 		for good_id in recipe.cargo:
 			var need = int(recipe.cargo[good_id])
 			var held = int(state.cargo.get(good_id, 0))
-			ingredients.append("%s %d/%d" % [GameData.TRADE_GOODS[good_id].name, held, need])
+			var source_port = str(GameData.TRADE_GOODS[good_id].origin)
+			ingredients.append("%s %d/%d（%s）" % [GameData.TRADE_GOODS[good_id].name, held, need, GameData.TRADE_PORTS[source_port].name])
 			can_cook = can_cook and held >= need
 		var recipe_row = HBoxContainer.new()
 		recipe_row.add_theme_constant_override("separation", 8)
@@ -1810,7 +1858,7 @@ func _open_harbor():
 	contract.add_child(contract_claim)
 	market.add_child(contract)
 	var local_stock = GameData.port_stock(port_id)
-	market.add_child(_small_caption("本港货栈 · 只可买入以下货物"))
+	market.add_child(_small_caption("本港产地货栈 · 每种货物只在原产港出售"))
 	for good_id in local_stock:
 		_add_journal_trade_good_card(market, str(good_id), true)
 	var foreign_cargo = []
@@ -1871,7 +1919,7 @@ func _add_journal_trade_good_card(market, good_id, can_buy):
 	var estimate = state.trade_sell_price(good_id) - average if held > 0 else 0
 	var origin_id = str(good.get("origin", ""))
 	var origin_name = str(GameData.TRADE_PORTS.get(origin_id, {"name": "未知港口"}).name)
-	var stock_tag = "本港特产" if origin_id == str(state.player.location) else ("港内进口" if can_buy else "外来货")
+	var stock_tag = "本港出产" if can_buy else "外来货"
 	stack.add_child(_label("%s · %s · 产地%s · %d格/%s" % [good.name, stock_tag, origin_name, int(good.space), good.unit], 13, INK))
 	var price_text = "买%d / 卖%d" % [state.trade_buy_price(good_id), state.trade_sell_price(good_id)] if can_buy else "本港收购%d" % state.trade_sell_price(good_id)
 	stack.add_child(_label("%s · 持有%d%s · 均价%d · 单件预估%+d" % [price_text, held, good.unit, average, estimate], 11, GOLD))

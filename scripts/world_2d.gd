@@ -740,6 +740,10 @@ func _update_nearest_actor():
 			action_button.text = "%s · %s" % [service_title, str(nearest_actor.name)]
 		elif nearest_actor.kind == "npc" and _npc_service(str(nearest_actor.id)) == "rest" and not _is_current_talk_target(str(nearest_actor.id)):
 			action_button.text = "住宿休息 · %s" % str(nearest_actor.name)
+		elif nearest_actor.kind == "npc" and _npc_service(str(nearest_actor.id)) == "jewelry_shop" and not _is_current_talk_target(str(nearest_actor.id)):
+			action_button.text = "选购珠宝 · %s" % str(nearest_actor.name)
+		elif nearest_actor.kind == "npc" and _npc_service(str(nearest_actor.id)) == "tavern_shop" and not _is_current_talk_target(str(nearest_actor.id)):
+			action_button.text = "购买食物 · %s" % str(nearest_actor.name)
 		else:
 			action_button.text = ("交谈 · " if nearest_actor.kind == "npc" else "挑战 · ") + nearest_actor.name
 
@@ -847,6 +851,9 @@ func _interact():
 			var rest_result = state.rest()
 			_refresh_hud()
 			_show_message("旅店休息", str(rest_result.message))
+			return
+		if service in ["jewelry_shop", "tavern_shop"] and not _is_current_talk_target(npc_id):
+			_open_vendor_shop_2d(npc_id)
 			return
 		var result = state.talk_to(npc_id)
 		_refresh_hud()
@@ -1717,6 +1724,9 @@ func _finish_task_navigation_leg():
 		return
 	var target_name = str(task_navigation_target.get("name", "任务目标"))
 	var open_service = task_navigation_open_service
+	has_move_target = false
+	move_target = player_actor.position
+	player_actor.set_motion(Vector2.ZERO)
 	task_navigation_active = false
 	task_navigation_target = {}
 	task_navigation_path = PackedVector2Array()
@@ -1940,6 +1950,89 @@ func _finish_sailing_voyage():
 	else:
 		_show_message("航行抵达", str(result.get("message", "海燕号平安抵港。")))
 
+func _open_vendor_shop_2d(npc_id):
+	var vendor_id = str(npc_id)
+	if not GameData.VENDOR_SHOPS.has(vendor_id):
+		_show_message("商店尚未营业", "这位人物暂时没有可出售的商品。")
+		return
+	var shop = GameData.VENDOR_SHOPS[vendor_id]
+	var content = VBoxContainer.new()
+	content.add_theme_constant_override("separation", 11)
+	content.add_child(_label(str(shop.name), 25, GOLD))
+	var intro = _label("%s\n持有银币：%d" % [str(shop.description), int(state.player.silver)], 15, TEAL)
+	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(intro)
+	if inventory_notice != "":
+		content.add_child(_label(inventory_notice, 14, GOLD))
+		inventory_notice = ""
+	var scroll = ScrollContainer.new()
+	scroll.custom_minimum_size.y = 440
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	content.add_child(scroll)
+	var stock_list = VBoxContainer.new()
+	stock_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	stock_list.add_theme_constant_override("separation", 9)
+	scroll.add_child(stock_list)
+	for item_id in GameData.vendor_stock(vendor_id):
+		var item = GameData.ITEMS[str(item_id)]
+		var row = HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		var text_stack = VBoxContainer.new()
+		text_stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(text_stack)
+		text_stack.add_child(_label("%s · %s" % [str(item.name), str(item.rarity)], 15, INK))
+		var description = _label(str(item.description), 12, MUTED)
+		description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		text_stack.add_child(description)
+		if str(item.type) == "equipment":
+			text_stack.add_child(_label(_item_stats_text_2d(item.get("stats", {})), 12, TEAL))
+		text_stack.add_child(_label("持有%d件" % int(state.inventory.get(str(item_id), 0)), 12, MUTED))
+		var buy = _button("%d银\n购买" % int(item.price), "gold")
+		buy.custom_minimum_size.x = 116
+		buy.disabled = int(state.player.silver) < int(item.price)
+		buy.pressed.connect(_buy_vendor_item_2d.bind(vendor_id, str(item_id)))
+		row.add_child(buy)
+		var card = PanelContainer.new()
+		card.add_theme_stylebox_override("panel", _style(Color(0.04, 0.13, 0.16, 0.92), 10, Color(TEAL, 0.32), 1, 10))
+		card.add_child(row)
+		stock_list.add_child(card)
+	if vendor_id == "jeweler":
+		var unknown_count = int(state.inventory.get("unknown_equipment", 0))
+		var identify = _button("鉴定未知道具 · 持有%d件 · 每件5银" % unknown_count, "primary")
+		identify.disabled = unknown_count <= 0 or int(state.player.silver) < 5
+		identify.pressed.connect(_identify_at_jeweler_2d)
+		content.add_child(identify)
+	elif vendor_id == "tavern_keeper":
+		var rest_button = _button("在酒馆免费休息 · 恢复全部体力与状态", "primary")
+		rest_button.pressed.connect(_rest_at_vendor_2d)
+		content.add_child(rest_button)
+	var close = _button("返回地图", "ghost")
+	close.pressed.connect(_close_overlay)
+	content.add_child(close)
+	_open_overlay(content, true, Vector2(666, 870))
+
+func _buy_vendor_item_2d(npc_id, item_id):
+	var result = state.buy_vendor_item(npc_id, item_id)
+	inventory_notice = ("✓ " if bool(result.ok) else "！") + str(result.message)
+	_refresh_hud()
+	_close_overlay()
+	call_deferred("_open_vendor_shop_2d", npc_id)
+
+func _identify_at_jeweler_2d():
+	var result = state.identify_unknown()
+	inventory_notice = ("✓ " if bool(result.ok) else "！") + str(result.message)
+	_refresh_hud()
+	_close_overlay()
+	call_deferred("_open_vendor_shop_2d", "jeweler")
+
+func _rest_at_vendor_2d():
+	var result = state.rest()
+	if bool(result.ok):
+		AudioDirector.play_sfx("heal")
+	_refresh_hud()
+	_close_overlay()
+	call_deferred("_open_vendor_shop_2d", "tavern_keeper")
+
 func _open_trade_2d():
 	if not state.is_trade_unlocked():
 		_show_message("港口尚未开放", "完成威尼斯四层试炼后，船老板会将贸易船海燕号交给你。")
@@ -2014,7 +2107,8 @@ func _open_trade_2d():
 		for good_id in recipe.cargo:
 			var need = int(recipe.cargo[good_id])
 			var held = int(state.cargo.get(good_id, 0))
-			ingredients.append("%s %d/%d" % [GameData.TRADE_GOODS[good_id].name, held, need])
+			var source_port = str(GameData.TRADE_GOODS[good_id].origin)
+			ingredients.append("%s %d/%d（%s）" % [GameData.TRADE_GOODS[good_id].name, held, need, GameData.TRADE_PORTS[source_port].name])
 			can_cook = can_cook and held >= need
 		var recipe_card = VBoxContainer.new()
 		recipe_card.add_theme_constant_override("separation", 6)
@@ -2048,7 +2142,7 @@ func _open_trade_2d():
 	contract.add_child(contract_claim)
 	list.add_child(contract)
 	var local_stock = GameData.port_stock(port_id)
-	list.add_child(_label("本港货栈 · 只可买入以下货物", 16, GOLD))
+	list.add_child(_label("本港产地货栈 · 每种货物只在原产港出售", 16, GOLD))
 	for good_id in local_stock:
 		_add_trade_good_card_2d(list, str(good_id), true)
 	var foreign_cargo = []
@@ -2097,7 +2191,7 @@ func _add_trade_good_card_2d(list, good_id, can_buy):
 	var estimate = state.trade_sell_price(good_id) - average if held > 0 else 0
 	var origin_id = str(good.get("origin", ""))
 	var origin_name = str(GameData.TRADE_PORTS.get(origin_id, {"name": "未知港口"}).name)
-	var stock_tag = "本港特产" if origin_id == str(state.player.location) else ("港内进口" if can_buy else "外来货")
+	var stock_tag = "本港出产" if can_buy else "外来货"
 	var price_text = "买%d / 卖%d" % [state.trade_buy_price(good_id), state.trade_sell_price(good_id)] if can_buy else "本港收购%d" % state.trade_sell_price(good_id)
 	stack.add_child(_label("%s · %s｜产地%s\n%s · 持有%d%s · 均价%d · 单件预估%+d" % [good.name, stock_tag, origin_name, price_text, held, good.unit, average, estimate], 14, INK))
 	var row = HBoxContainer.new()

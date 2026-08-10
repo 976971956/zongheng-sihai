@@ -35,6 +35,14 @@ func _run():
 	await process_frame
 	_check(scene.state.active_card == "ghost_card" and _has_text(scene.modal_layer, "当前怪物卡"), "完整日志必须显示已启用怪物卡")
 	scene._close_modal()
+	scene.state.player.location = "venice_market"
+	scene.state.player.silver = 500
+	scene._open_vendor_shop("jeweler")
+	_check(_has_text(scene.modal_layer, "贝里昂珠宝铺") and _has_text(scene.modal_layer, "红珊瑚指环") and _has_button(scene.modal_layer, "购买"), "完整日志中的珠宝商也必须打开真实珠宝货柜")
+	scene._buy_from_vendor("jeweler", "coral_ring")
+	await process_frame
+	_check(int(scene.state.inventory.get("coral_ring", 0)) == 1, "完整日志购买珠宝必须同步背包")
+	scene._close_modal()
 
 	scene.state.quest_index = GameData.QUESTS.size()
 	scene.state.bounty_progress = int(scene.state.get_bounty().need)
@@ -55,7 +63,7 @@ func _run():
 	scene.state.player.location = "malta_dock"
 	scene.state.cargo = {"citrus": 2, "olive_oil": 1, "spices": 1}
 	scene._open_harbor()
-	_check(_has_text(scene.modal_layer, "马耳他港口市场") and _has_text(scene.modal_layer, "交易商人｜伊莎贝拉") and _has_text(scene.modal_layer, "本港特产｜金岛柑橘") and _has_text(scene.modal_layer, "港口厨房") and _has_button(scene.modal_layer, "烹制"), "马耳他贸易页必须显示当地商人、柑橘特产、厨房配方与烹制操作")
+	_check(_has_text(scene.modal_layer, "马耳他港口市场") and _has_text(scene.modal_layer, "交易商人｜伊莎贝拉") and _has_text(scene.modal_layer, "本港特产｜金岛柑橘") and _has_text(scene.modal_layer, "港口厨房") and _has_text(scene.modal_layer, "亚得里亚橄榄油 1/1（拉古萨）") and _has_text(scene.modal_layer, "亚历山大香料 1/1（亚历山大）") and _has_button(scene.modal_layer, "烹制"), "马耳他贸易页必须显示当地特产，并明确标出厨房原料的跨港采购地")
 
 	if failures.is_empty():
 		print("JOURNAL_OK: 完整日志的任务、怪物卡、悬赏与贸易入口全部通过")

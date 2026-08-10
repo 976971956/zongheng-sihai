@@ -282,6 +282,28 @@ func buy_item(item_id):
 	save_game()
 	return {"ok": true, "message": "购买成功：%s" % item.name}
 
+func buy_vendor_item(npc_id, item_id):
+	var vendor_id = str(npc_id)
+	var resolved_item_id = str(item_id)
+	if not GameData.VENDOR_SHOPS.has(vendor_id) or not GameData.vendor_sells_item(vendor_id, resolved_item_id):
+		return {"ok": false, "message": "这位商人不出售该物品。"}
+	var current_location = GameData.LOCATIONS.get(str(player.location), {})
+	if current_location.is_empty() or vendor_id not in current_location.get("npcs", []):
+		return {"ok": false, "message": "需要到商人面前才能购买。"}
+	if not GameData.ITEMS.has(resolved_item_id):
+		return {"ok": false, "message": "商品不存在。"}
+	var item = GameData.ITEMS[resolved_item_id]
+	var price = int(item.get("price", 0))
+	if int(player.silver) < price:
+		return {"ok": false, "message": "银币不足，还差 %d。" % (price - int(player.silver))}
+	player.silver -= price
+	_add_item(resolved_item_id, 1)
+	var shop_name = str(GameData.VENDOR_SHOPS[vendor_id].name)
+	message_history.push_front("在%s购买了%s。" % [shop_name, item.name])
+	_trim_history()
+	save_game()
+	return {"ok": true, "message": "购买成功：%s（-%d银币）" % [item.name, price], "item_id": resolved_item_id, "price": price}
+
 func identify_unknown():
 	if int(inventory.get("unknown_equipment", 0)) <= 0:
 		return {"ok": false, "message": "没有需要鉴定的未知道具。"}

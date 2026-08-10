@@ -104,6 +104,29 @@ func _run():
 	_check(scene.state.active_card == "ghost_card" and _has_button_text(scene.overlay, "已启用"), "怪物卡启用后必须更新实际状态和背包显示")
 	scene._close_overlay()
 
+	# 威尼斯的珠宝商与酒馆老板必须拥有各自独立、可真实购买的货柜。
+	scene.state.quest_index = GameData.QUESTS.size()
+	scene.state.player.silver = 500
+	scene._switch_region("city", "venice_market")
+	scene.player_actor.position = _actor_position(scene, "jeweler")
+	scene._update_nearest_actor()
+	_check("选购珠宝" in scene.action_button.text, "靠近珠宝商时互动按钮必须明确显示珠宝服务")
+	scene._interact()
+	_check(_has_label_text(scene.overlay, "贝里昂珠宝铺") and _has_label_text(scene.overlay, "红珊瑚指环") and _has_button_text(scene.overlay, "购买"), "珠宝商必须打开包含真实珠宝商品和价格的货柜")
+	var jewel_silver_before = int(scene.state.player.silver)
+	scene._buy_vendor_item_2d("jeweler", "coral_ring")
+	await process_frame
+	await process_frame
+	_check(int(scene.state.inventory.get("coral_ring", 0)) == 1 and int(scene.state.player.silver) < jewel_silver_before, "购买珠宝必须扣除银币并放入背包")
+	scene._close_overlay()
+	scene._switch_region("city", "venice_tavern")
+	scene.player_actor.position = _actor_position(scene, "tavern_keeper")
+	scene._update_nearest_actor()
+	_check("购买食物" in scene.action_button.text, "没有酒馆对话任务时互动按钮必须显示食物服务")
+	scene._interact()
+	_check(_has_label_text(scene.overlay, "老海鸥酒馆食柜") and _has_label_text(scene.overlay, "海盐面包") and _has_label_text(scene.overlay, "香草鱼汤"), "酒馆老板必须出售可使用的食物，而不是只有对话")
+	scene._close_overlay()
+
 	# Every mid/late-game objective must exist in a reachable 2D region.
 	scene.state.quest_index = 4
 	scene.state.quest_progress = 0
@@ -113,6 +136,7 @@ func _run():
 	_check(scene.task_navigation_active and scene.current_region == "city" and scene.player_actor.position.distance_to(navigation_start_position) < 1.0, "点击任务导航后必须从当前位置开始走，不能直接跳到目标区域")
 	await _walk_task_navigation(scene)
 	_check(scene.current_region == "field" and scene.state.player.location == "venice_mine", "失窃矿石任务导航必须进入城外废矿山")
+	_check(not scene.has_move_target and scene.player_actor.motion_direction == Vector2.ZERO, "任务导航抵达目的地后必须清除目标并停止走路动画")
 	_check(_has_actor(scene, "mine_thief"), "城外2D地图必须实际生成偷矿者")
 	_check(_actor_model_id(scene, "mine_thief") == "mine_thief", "不同敌人必须绑定各自的新版人物或怪物模型")
 	scene._update_nearest_actor()
@@ -269,7 +293,7 @@ func _run():
 	scene._open_trade_2d()
 	_check(is_instance_valid(scene.overlay), "主线完成后必须能从2D地图打开港口市场")
 	_check(_has_button_text(scene.overlay, "买1") and _has_button_text(scene.overlay, "买满") and _has_button_text(scene.overlay, "全卖") and _has_button_text(scene.overlay, "拉古萨") and _has_button_text(scene.overlay, "商会交付") and _has_button_text(scene.overlay, "护航物资") and _has_label_text(scene.overlay, "持有银币") and _has_label_text(scene.overlay, "总声望") and _has_label_text(scene.overlay, "今日行情"), "2D港口市场必须包含资产、批量买卖、订单声望、护航、跨港航线和动态行情")
-	_check(_has_label_text(scene.overlay, "交易商人｜蕾娜") and _has_label_text(scene.overlay, "本港特产｜威尼斯玻璃") and _has_label_text(scene.overlay, "本港货栈 · 只可买入以下货物") and not _has_label_text(scene.overlay, "石墙羊毛布"), "威尼斯必须由专属贸易NPC只出售本地货单，不能展示全球商品总目录")
+	_check(_has_label_text(scene.overlay, "交易商人｜蕾娜") and _has_label_text(scene.overlay, "本港特产｜威尼斯玻璃") and _has_label_text(scene.overlay, "本港产地货栈 · 每种货物只在原产港出售") and not _has_label_text(scene.overlay, "石墙羊毛布"), "威尼斯必须由专属贸易NPC只出售本地货单，不能展示全球商品总目录")
 	var silver_before = int(scene.state.player.silver)
 	scene._trade_buy_2d("venetian_glass")
 	_check(int(scene.state.cargo.get("venetian_glass", 0)) == 1 and int(scene.state.player.silver) < silver_before, "2D市场买货必须同步货舱和银币")

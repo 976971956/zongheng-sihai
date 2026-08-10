@@ -163,7 +163,7 @@ const LOCATIONS = {
 		"name": "拉古萨 · 石墙港",
 		"tag": "贸易港",
 		"chapter": "远洋篇 · 亚得里亚航线",
-		"description": "高耸的石墙守着天然深港。来自巴尔干内陆的羊毛与橄榄油在仓栈中堆成小山。",
+		"description": "高耸的石墙守着天然深港。来自巴尔干内陆的羊毛与亚得里亚沿岸的橄榄油在仓栈中堆成小山。",
 		"flavor": "拉古萨盛产羊毛布与橄榄油，威尼斯玻璃在这里很受欢迎。通过港口柜台可返回其他城市。",
 		"exits": [],
 		"npcs": ["ragusa_broker", "ragusa_harbormaster", "ragusa_innkeeper"], "enemies": [], "services": ["harbor"]
@@ -172,7 +172,7 @@ const LOCATIONS = {
 		"name": "亚历山大 · 灯塔港",
 		"tag": "贸易港",
 		"chapter": "远洋篇 · 地中海航线",
-		"description": "沙色仓库沿海岸铺开，香料、油料和玻璃器皿在不同语言的叫卖声中成交。",
+		"description": "沙色仓库沿海岸铺开，本地香料与各国运来的玻璃器皿在不同语言的叫卖声中成交。",
 		"flavor": "亚历山大香料价格低，但返航路程更长。留足航费，别让满舱货物困在异乡。",
 		"exits": [],
 		"npcs": ["alexandria_merchant", "alex_lighthouse_keeper", "alex_shipwright"], "enemies": [], "services": ["harbor"]
@@ -195,7 +195,7 @@ const LOCATIONS = {
 	},
 	"athens_dock": {
 		"name": "雅典 · 银帆港", "tag": "远征港", "chapter": "第十六章 · 地魔宝藏",
-		"description": "古老石柱俯瞰海湾，祭司卡珊德拉把潮汐星盘嵌进一块裂开的地脉石。", "flavor": "神庙橄榄园的油适合烹饪与长明灯，是稳定的远航货物。",
+		"description": "古老石柱俯瞰海湾，祭司卡珊德拉把潮汐星盘嵌进一块裂开的地脉石。", "flavor": "银帆坡地的新酿只在雅典装桶，是宴席与祭典都需要的远航货物。",
 		"exits": [], "npcs": ["athens_oracle", "athens_smith", "athens_innkeeper"], "enemies": [], "services": ["harbor"]
 	},
 	"yangzhou_dock": {
@@ -262,16 +262,16 @@ const LOCATIONS = {
 
 const NPCS = {
 	"alisa": {"name": "艾丽莎", "role": "救命恩人", "dialogue": "父亲在沙滩上发现了你。你什么都不记得了吗？拿好这片鳞，去威尼斯酒馆问问老板吧。"},
-	"tavern_keeper": {"name": "酒馆老板", "role": "主线复命人", "dialogue": "这片鳞来自很深的海域。想知道自己是谁，先证明你能在这片大陆活下去——北门正缺人手。"},
+	"tavern_keeper": {"name": "酒馆老板", "role": "主线复命人与餐食商", "service": "tavern_shop", "dialogue": "这片鳞来自很深的海域。想知道自己是谁，先证明你能在这片大陆活下去——北门正缺人手。平时也可以来买热食和旅行干粮。"},
 	"guard_captain": {"name": "守卫队长", "role": "城市守卫", "dialogue": "城内地图能带你快速去往各处。出了北门，可就要留意自己的体力和状态了。"},
-	"jeweler": {"name": "珠宝匠贝里昂", "role": "鉴定与宝石", "dialogue": "怪物身上掉下来的未知道具，只有鉴定后才知道属性。真正的宝石系统要到后面才会开放。"},
+	"jeweler": {"name": "珠宝匠贝里昂", "role": "珠宝售卖与鉴定", "service": "jewelry_shop", "dialogue": "我这里有能直接佩戴的珊瑚指环和海蓝石吊坠，也能替你鉴定怪物身上掉下来的未知道具。"},
 	"ship_owner": {"name": "船老板", "role": "船只与航行", "service": "harbor", "dialogue": "完成威尼斯试炼后，我会把海燕号交给你。比较各港价格、控制货舱，再决定把银币压在哪批货上。"},
 	"ragusa_broker": {"name": "拉古萨经纪人", "role": "港口商人", "service": "harbor", "dialogue": "这里的羊毛和橄榄油便宜。若你从威尼斯带来玻璃，我能给出不错的价钱。"},
 	"alexandria_merchant": {"name": "香料商萨米尔", "role": "港口商人", "service": "harbor", "dialogue": "季风改变的不只是航期，也会改变香料的价格。低买高卖，但别忘了返航的费用。"},
 	"malta_keeper": {"name": "伊莎贝拉", "role": "守钟人与柑橘商会代表", "service": "harbor", "dialogue": "我守着这口船钟，也替岛上的果农经营柑橘货栈。若你真要寻找白鲸号，就先学会让同行的人平安吃上一顿饭。"},
 	"cape_keeper": {"name": "阿曼达", "role": "北河向导", "service": "harbor", "dialogue": "风暴角不相信传说，只相信能从北河活着回来的人。"},
 	"quanzhou_scholar": {"name": "沈砚", "role": "封妖录守卷人", "service": "harbor", "dialogue": "海上的妖气与长安旧案来自同一道裂隙，我一直在等星盘的持有者。"},
-	"athens_oracle": {"name": "卡珊德拉", "role": "地脉祭司与橄榄商会代表", "service": "harbor", "dialogue": "石柱记得海水尚未来临前的战争，神庙橄榄园也仍沿用古老的榨油法。"},
+	"athens_oracle": {"name": "卡珊德拉", "role": "地脉祭司与银帆酒商会代表", "service": "harbor", "dialogue": "石柱记得海水尚未来临前的战争，神庙坡地的葡萄园也仍沿用古老的酿造法。"},
 	"yangzhou_weaver": {"name": "苏绫", "role": "玉纱织师", "service": "harbor", "dialogue": "丝线会说谎，但断口不会。让我看看你从潮门带回的历史。"},
 	"amsterdam_cartographer": {"name": "范德海", "role": "七海制图师", "service": "harbor", "dialogue": "基德的藏宝图从来不是指向黄金，而是指向天魔舰队的补给航线。"}
 	,"venice_quartermaster": {"name": "蕾娜", "role": "码头仓库管理员", "service": "harbor", "dialogue": "货物要按占舱大小算，不要只看单件差价。真正的好商路，是返程也不空舱。"}
@@ -296,12 +296,12 @@ const NPCS = {
 
 const TRADE_PORTS = {
 	"venice_dock": {"name": "威尼斯", "specialty": "威尼斯玻璃", "specialty_good": "venetian_glass", "stock": ["venetian_glass"], "merchant_npc": "venice_quartermaster", "note": "蕾娜只出售本地玻璃；香料和东方货在此溢价", "order_npc": "ship_owner"},
-	"ragusa_dock": {"name": "拉古萨", "specialty": "石墙羊毛布", "specialty_good": "wool_cloth", "stock": ["wool_cloth", "olive_oil"], "merchant_npc": "ragusa_broker", "note": "经纪人主营羊毛布，也供应少量亚得里亚橄榄油", "order_npc": "ragusa_harbormaster"},
-	"alexandria_dock": {"name": "亚历山大", "specialty": "亚历山大香料", "specialty_good": "spices", "stock": ["spices", "olive_oil"], "merchant_npc": "alexandria_merchant", "note": "萨米尔的香料价格最低，玻璃和北海货需求旺盛", "order_npc": "alex_lighthouse_keeper"},
-	"malta_dock": {"name": "马耳他", "specialty": "金岛柑橘", "specialty_good": "citrus", "stock": ["citrus", "olive_oil", "spices"], "merchant_npc": "malta_keeper", "note": "柑橘是本地特产，厨房原料属于高价进口补给", "order_npc": "malta_keeper"},
+	"ragusa_dock": {"name": "拉古萨", "specialty": "石墙羊毛布与亚得里亚橄榄油", "specialty_good": "wool_cloth", "stock": ["wool_cloth", "olive_oil"], "merchant_npc": "ragusa_broker", "note": "羊毛布和橄榄油只在拉古萨出产；把它们运往缺货港口才能赚取货差", "order_npc": "ragusa_harbormaster"},
+	"alexandria_dock": {"name": "亚历山大", "specialty": "亚历山大香料", "specialty_good": "spices", "stock": ["spices"], "merchant_npc": "alexandria_merchant", "note": "萨米尔只出售本地香料；玻璃和北海货在这里仅收购、不出售", "order_npc": "alex_lighthouse_keeper"},
+	"malta_dock": {"name": "马耳他", "specialty": "金岛柑橘", "specialty_good": "citrus", "stock": ["citrus"], "merchant_npc": "malta_keeper", "note": "这里只出售金岛柑橘；烹饪所需的油和香料必须从产地装船运来", "order_npc": "malta_keeper"},
 	"cape_town_dock": {"name": "开普敦", "specialty": "风暴角金砂", "specialty_good": "cape_gold_dust", "stock": ["cape_gold_dust"], "merchant_npc": "cape_quartermaster", "note": "北河金砂便宜，运往地中海与东方能卖出高价", "npc": "cape_keeper", "order_npc": "cape_quartermaster"},
 	"quanzhou_dock": {"name": "泉州", "specialty": "刺桐青瓷", "specialty_good": "quanzhou_porcelain", "stock": ["quanzhou_porcelain"], "merchant_npc": "quanzhou_merchant", "note": "海商林香专营青瓷，西方港口愿为完整瓷器支付高价", "npc": "quanzhou_scholar", "order_npc": "quanzhou_merchant"},
-	"athens_dock": {"name": "雅典", "specialty": "神庙橄榄油", "specialty_good": "olive_oil", "stock": ["olive_oil"], "merchant_npc": "athens_oracle", "note": "神庙橄榄园稳定出产优质灯油和食用油", "npc": "athens_oracle", "order_npc": "athens_smith"},
+	"athens_dock": {"name": "雅典", "specialty": "银帆葡萄酒", "specialty_good": "athens_wine", "stock": ["athens_wine"], "merchant_npc": "athens_oracle", "note": "银帆葡萄酒只在雅典装桶，西方庆典和东方宴席都有高价需求", "npc": "athens_oracle", "order_npc": "athens_smith"},
 	"yangzhou_dock": {"name": "扬州", "specialty": "运河玉纱", "specialty_good": "yangzhou_silk", "stock": ["yangzhou_silk"], "merchant_npc": "yangzhou_merchant", "note": "玉纱轻且昂贵，适合装满快船远销北海", "npc": "yangzhou_weaver", "order_npc": "yangzhou_merchant"},
 	"amsterdam_dock": {"name": "阿姆斯特丹", "specialty": "风车港航海仪", "specialty_good": "amsterdam_instruments", "stock": ["amsterdam_instruments"], "merchant_npc": "amsterdam_auctioneer", "note": "精密航海仪在东方稀缺，拍卖行也高价收购丝绸", "npc": "amsterdam_cartographer", "order_npc": "amsterdam_auctioneer"}
 }
@@ -315,13 +315,14 @@ const PORT_UNLOCK_QUEST = {
 const TRADE_GOODS = {
 	"venetian_glass": {"name": "威尼斯玻璃", "unit": "箱", "space": 2, "origin": "venice_dock", "prices": {"venice_dock": 24, "ragusa_dock": 46, "alexandria_dock": 61, "malta_dock": 52, "cape_town_dock": 74, "quanzhou_dock": 66, "athens_dock": 48, "yangzhou_dock": 71, "amsterdam_dock": 86}},
 	"wool_cloth": {"name": "石墙羊毛布", "unit": "捆", "space": 1, "origin": "ragusa_dock", "prices": {"venice_dock": 43, "ragusa_dock": 25, "alexandria_dock": 47, "malta_dock": 42, "cape_town_dock": 58, "quanzhou_dock": 72, "athens_dock": 38, "yangzhou_dock": 78, "amsterdam_dock": 49}},
-	"olive_oil": {"name": "神庙橄榄油", "unit": "桶", "space": 2, "origin": "athens_dock", "prices": {"venice_dock": 48, "ragusa_dock": 30, "alexandria_dock": 24, "malta_dock": 36, "cape_town_dock": 54, "quanzhou_dock": 63, "athens_dock": 22, "yangzhou_dock": 68, "amsterdam_dock": 57}},
+	"olive_oil": {"name": "亚得里亚橄榄油", "unit": "桶", "space": 2, "origin": "ragusa_dock", "prices": {"venice_dock": 48, "ragusa_dock": 24, "alexandria_dock": 42, "malta_dock": 46, "cape_town_dock": 54, "quanzhou_dock": 63, "athens_dock": 38, "yangzhou_dock": 68, "amsterdam_dock": 57}},
 	"spices": {"name": "亚历山大香料", "unit": "袋", "space": 1, "origin": "alexandria_dock", "prices": {"venice_dock": 82, "ragusa_dock": 61, "alexandria_dock": 32, "malta_dock": 57, "cape_town_dock": 76, "quanzhou_dock": 69, "athens_dock": 69, "yangzhou_dock": 84, "amsterdam_dock": 91}},
 	"citrus": {"name": "金岛柑橘", "unit": "筐", "space": 1, "origin": "malta_dock", "prices": {"venice_dock": 42, "ragusa_dock": 38, "alexandria_dock": 45, "malta_dock": 20, "cape_town_dock": 52, "quanzhou_dock": 61, "athens_dock": 44, "yangzhou_dock": 66, "amsterdam_dock": 58}},
 	"cape_gold_dust": {"name": "风暴角金砂", "unit": "袋", "space": 1, "origin": "cape_town_dock", "prices": {"venice_dock": 112, "ragusa_dock": 105, "alexandria_dock": 91, "malta_dock": 86, "cape_town_dock": 45, "quanzhou_dock": 118, "athens_dock": 98, "yangzhou_dock": 128, "amsterdam_dock": 120}},
 	"quanzhou_porcelain": {"name": "刺桐青瓷", "unit": "箱", "space": 2, "origin": "quanzhou_dock", "prices": {"venice_dock": 85, "ragusa_dock": 78, "alexandria_dock": 92, "malta_dock": 88, "cape_town_dock": 110, "quanzhou_dock": 38, "athens_dock": 82, "yangzhou_dock": 52, "amsterdam_dock": 96}},
 	"yangzhou_silk": {"name": "运河玉纱", "unit": "匹", "space": 1, "origin": "yangzhou_dock", "prices": {"venice_dock": 95, "ragusa_dock": 88, "alexandria_dock": 102, "malta_dock": 98, "cape_town_dock": 126, "quanzhou_dock": 58, "athens_dock": 90, "yangzhou_dock": 42, "amsterdam_dock": 110}},
-	"amsterdam_instruments": {"name": "风车港航海仪", "unit": "箱", "space": 2, "origin": "amsterdam_dock", "prices": {"venice_dock": 88, "ragusa_dock": 92, "alexandria_dock": 118, "malta_dock": 105, "cape_town_dock": 130, "quanzhou_dock": 142, "athens_dock": 96, "yangzhou_dock": 124, "amsterdam_dock": 55}}
+	"amsterdam_instruments": {"name": "风车港航海仪", "unit": "箱", "space": 2, "origin": "amsterdam_dock", "prices": {"venice_dock": 88, "ragusa_dock": 92, "alexandria_dock": 118, "malta_dock": 105, "cape_town_dock": 130, "quanzhou_dock": 142, "athens_dock": 96, "yangzhou_dock": 124, "amsterdam_dock": 55}},
+	"athens_wine": {"name": "银帆葡萄酒", "unit": "桶", "space": 2, "origin": "athens_dock", "prices": {"venice_dock": 86, "ragusa_dock": 76, "alexandria_dock": 72, "malta_dock": 68, "cape_town_dock": 104, "quanzhou_dock": 116, "athens_dock": 34, "yangzhou_dock": 108, "amsterdam_dock": 92}}
 }
 
 const TRADE_ROUTES = {
@@ -355,7 +356,8 @@ const TRADE_EVENTS = [
 	{"name": "北河淘金季", "description": "开普敦金砂集中上市，适合装船远销。", "port": "cape_town_dock", "good": "cape_gold_dust", "multiplier": 0.76},
 	{"name": "刺桐开窑", "description": "泉州新一批青瓷出窑，采购价下降。", "port": "quanzhou_dock", "good": "quanzhou_porcelain", "multiplier": 0.78},
 	{"name": "运河织造节", "description": "扬州玉纱集中交货，采购价下降。", "port": "yangzhou_dock", "good": "yangzhou_silk", "multiplier": 0.80},
-	{"name": "北海仪器展", "description": "阿姆斯特丹航海仪工坊开放批发。", "port": "amsterdam_dock", "good": "amsterdam_instruments", "multiplier": 0.80}
+	{"name": "北海仪器展", "description": "阿姆斯特丹航海仪工坊开放批发。", "port": "amsterdam_dock", "good": "amsterdam_instruments", "multiplier": 0.80},
+	{"name": "银帆新酿", "description": "雅典山坡的新酒集中装桶，适合远销。", "port": "athens_dock", "good": "athens_wine", "multiplier": 0.78}
 ]
 
 const RECIPES = {
@@ -390,7 +392,7 @@ const TRADE_ORDERS = {
 	"malta_glass_lanterns": {"title": "守钟塔风灯", "port": "malta_dock", "good": "venetian_glass", "amount": 2, "bonus": 125, "reputation": 2, "description": "守钟塔需要经得住海风的新玻璃灯罩。"}
 	,"basin_supplies": {"title": "北河驱兽香", "port": "cape_town_dock", "good": "spices", "amount": 4, "bonus": 420, "reputation": 3, "description": "向导队需要香料驱散北河洞窟中的毒虫。"}
 	,"changan_seals": {"title": "镇妖镜片", "port": "quanzhou_dock", "good": "venetian_glass", "amount": 3, "bonus": 520, "reputation": 3, "description": "沈砚要用纯净玻璃重制照破妖气的古镜。"}
-	,"earth_lamps": {"title": "地脉长明油", "port": "athens_dock", "good": "olive_oil", "amount": 4, "bonus": 620, "reputation": 3, "description": "王陵远征需要不会被地气吹灭的祭灯。"}
+	,"earth_lamps": {"title": "地脉长明油", "port": "athens_dock", "good": "olive_oil", "amount": 4, "bonus": 620, "reputation": 3, "description": "王陵远征需要从拉古萨运来的优质橄榄油点亮祭灯。"}
 	,"tira_forge": {"title": "剑冢裹刃布", "port": "venice_dock", "good": "wool_cloth", "amount": 4, "bonus": 720, "reputation": 3, "description": "旧锻炉需要厚布包裹刚出潮火的剑刃。"}
 	,"demon_sails": {"title": "裂隙观测镜", "port": "yangzhou_dock", "good": "venetian_glass", "amount": 3, "bonus": 820, "reputation": 3, "description": "玉纱织师需要镜片观测天魔舰队穿越裂隙的轨迹。"}
 	,"jade_calendar": {"title": "玉历醒梦香", "port": "amsterdam_dock", "good": "spices", "amount": 4, "bonus": 920, "reputation": 3, "description": "制图师用不同香气标记被篡改的年份。"}
@@ -401,7 +403,7 @@ const TRADE_ORDERS = {
 	,"cape_citrus_rations": {"title": "风暴角防坏血病补给", "port": "cape_town_dock", "good": "citrus", "amount": 5, "bonus": 460, "reputation": 3, "description": "远征队需要从马耳他运来的柑橘。"}
 	,"quanzhou_gold_leaf": {"title": "镇妖金箔", "port": "quanzhou_dock", "good": "cape_gold_dust", "amount": 3, "bonus": 560, "reputation": 3, "description": "封妖古镜需要风暴角金砂锤成的金箔。"}
 	,"athens_porcelain_archive": {"title": "神庙青瓷档案罐", "port": "athens_dock", "good": "quanzhou_porcelain", "amount": 2, "bonus": 680, "reputation": 3, "description": "祭司要用青瓷罐封存地脉档案。"}
-	,"yangzhou_olive_lamps": {"title": "运河长明灯", "port": "yangzhou_dock", "good": "olive_oil", "amount": 4, "bonus": 880, "reputation": 3, "description": "月港需要雅典橄榄油点亮守夜灯。"}
+	,"yangzhou_olive_lamps": {"title": "运河长明灯", "port": "yangzhou_dock", "good": "olive_oil", "amount": 4, "bonus": 880, "reputation": 3, "description": "月港需要拉古萨橄榄油点亮守夜灯。"}
 	,"amsterdam_silk_auction": {"title": "北海玉纱拍卖", "port": "amsterdam_dock", "good": "yangzhou_silk", "amount": 4, "bonus": 980, "reputation": 3, "description": "拍卖行正在征集完整的扬州玉纱。"}
 }
 
@@ -466,7 +468,10 @@ const ITEMS = {
 	"corsair_card": {"name": "精英·黑帆卡片", "type": "card", "rarity": "史诗", "description": "启用后攻击+4，航行风险降低4%。", "card_effect": "corsair", "price": 320},
 	"unknown_equipment": {"name": "未知道具", "type": "mystery", "rarity": "未知", "description": "回海风市场花费 5 银币鉴定，可能发现一件装备。", "price": 0},
 	"small_milk": {"name": "小奶瓶", "type": "consumable", "rarity": "补给", "description": "恢复 45 点体力，可在战斗中使用。", "heal": 45, "price": 18},
-	"sea_salt_bread": {"name": "肉夹馍", "type": "consumable", "rarity": "补给", "description": "恢复 24 点体力。", "heal": 24, "price": 9},
+	"sea_salt_bread": {"name": "海盐面包", "type": "consumable", "rarity": "酒馆食物", "description": "便于携带的旅行干粮，恢复24点体力。", "heal": 24, "price": 9},
+	"herb_fish_stew": {"name": "香草鱼汤", "type": "consumable", "rarity": "酒馆热食", "description": "酒馆老板现煮的热汤，恢复70点体力。", "heal": 70, "price": 28},
+	"coral_ring": {"name": "红珊瑚指环", "type": "equipment", "slot": "charm", "rarity": "优秀", "description": "贝里昂打磨的入门护身珠宝，提高体力与防御。", "stats": {"max_hp": 20, "defense": 2}, "price": 85},
+	"aquamarine_pendant": {"name": "海蓝石吊坠", "type": "equipment", "slot": "charm", "rarity": "珍稀", "description": "水色宝石会随潮汐发亮，提高攻击与行动速度。", "stats": {"max_hp": 12, "attack": 3, "speed": 2}, "price": 160},
 	"stamina_tonic": {"name": "体力宝", "type": "consumable", "rarity": "稀有补给", "description": "恢复 160 点体力。", "heal": 160, "price": 200},
 	"universal_medicine": {"name": "万能药", "type": "consumable", "rarity": "补给", "description": "解除中毒、虚弱、缓慢和诅咒。", "heal": 0, "cure_status": true, "price": 16}
 	,"corsair_cutlass": {"name": "黑帆弯刀", "type": "equipment", "slot": "weapon", "rarity": "史诗", "description": "从远洋海盗手中缴获的弯刀。", "stats": {"attack": 18, "speed": 3}, "price": 360}
@@ -490,6 +495,11 @@ const ITEMS = {
 	,"demon_crown": {"name": "九港守夜冠", "type": "equipment", "slot": "head", "rarity": "神话", "description": "九港居民共同重铸的王冠，不属于任何一位国王。", "stats": {"max_hp": 210, "attack": 32, "defense": 48, "speed": 25}, "price": 10200}
 	,"divine_shears": {"name": "天工神剪", "type": "equipment", "slot": "weapon", "rarity": "神话", "description": "能剪断谎言，也能把破裂的命运重新裁合。", "stats": {"max_hp": 160, "attack": 78, "defense": 20, "speed": 29}, "price": 11800}
 	,"tidekeeper_regalia": {"name": "四海守潮圣装", "type": "equipment", "slot": "body", "rarity": "唯一", "description": "十三卷航海日志与九港誓言共同织成的最终圣装。", "stats": {"max_hp": 420, "attack": 42, "defense": 72, "speed": 32}, "price": 15000}
+}
+
+const VENDOR_SHOPS = {
+	"jeweler": {"name": "贝里昂珠宝铺", "description": "出售可直接装备的护身珠宝；未知道具仍可在海风市场鉴定。", "stock": ["coral_ring", "aquamarine_pendant"]},
+	"tavern_keeper": {"name": "老海鸥酒馆食柜", "description": "出售能在背包中使用的热食和旅行干粮，也可以在这里免费休息。", "stock": ["sea_salt_bread", "herb_fish_stew", "small_milk"]}
 }
 
 const IDENTIFY_POOL = ["linen_cap", "traveler_boots", "bronze_charm", "guard_belt", "spider_knife"]
@@ -577,7 +587,7 @@ const EARLY_QUESTS = [
 	,{"id": "white_whale_news", "title": "白鲸号的消息", "story": "回海边小屋告诉艾丽莎：她的父亲最后搭乘白鲸号去了马耳他。", "objective": {"type": "talk", "target": "alisa", "need": 1}, "reward": {"exp": 7000, "silver": 700, "item": "stamina_tonic"}}
 	,{"id": "sail_malta", "title": "驶向马耳他", "story": "驾驶海燕号抵达马耳他蜂蜜石港，寻找白鲸号守钟人。", "objective": {"type": "visit", "target": "malta_dock", "need": 1}, "reward": {"exp": 7500, "silver": 760}}
 	,{"id": "meet_isabella", "title": "守钟人伊莎贝拉", "story": "在马耳他港与伊莎贝拉交谈，查阅白鲸号最后的船员名册。", "objective": {"type": "talk", "target": "malta_keeper", "need": 1}, "reward": {"exp": 8000, "silver": 820}}
-	,{"id": "island_feast", "title": "美味任务·海风炖汤", "story": "购齐两筐柑橘、一桶橄榄油和一袋香料，在马耳他厨房烹制海风炖汤。", "objective": {"type": "cook", "target": "maltese_stew", "need": 1}, "reward": {"exp": 8500, "silver": 880, "item": "maltese_stew"}}
+	,{"id": "island_feast", "title": "美味任务·海风炖汤", "story": "先到拉古萨装一桶橄榄油、亚历山大装一袋香料，再带回马耳他与两筐本地柑橘一起烹制海风炖汤。每种货物只能在产地买入。", "objective": {"type": "cook", "target": "maltese_stew", "need": 1}, "reward": {"exp": 8500, "silver": 880, "item": "maltese_stew"}}
 	,{"id": "wreck_entry", "title": "白鲸残骸", "story": "带着远航餐食前往马耳他外海，登上白鲸号残骸的礁岸。", "objective": {"type": "visit", "target": "white_whale_1", "need": 1}, "reward": {"exp": 9000, "silver": 940}}
 	,{"id": "clear_reef", "title": "清理礁岸", "story": "击败盘踞登船板的覆甲礁蟹，打开通往沉水甲板的道路。", "objective": {"type": "kill", "target": "wreck_crab", "need": 1}, "reward": {"exp": 10000, "silver": 1000, "item": "whale_bone_sabre"}}
 	,{"id": "drowned_deck", "title": "未完成的值夜", "story": "击败沉水甲板上的溺潮水手，让他的灵魂结束最后一次值夜。", "objective": {"type": "kill", "target": "drowned_sailor", "need": 1}, "reward": {"exp": 11000, "silver": 1100, "item": "survivor_coat"}}
@@ -762,6 +772,14 @@ static func port_stock(port_id):
 
 static func port_sells_good(port_id, good_id):
 	return str(good_id) in port_stock(str(port_id))
+
+static func vendor_stock(npc_id):
+	if not VENDOR_SHOPS.has(str(npc_id)):
+		return []
+	return Array(VENDOR_SHOPS[str(npc_id)].get("stock", [])).duplicate()
+
+static func vendor_sells_item(npc_id, item_id):
+	return str(item_id) in vendor_stock(str(npc_id))
 
 static func trade_market_price(port_id, good_id, day):
 	if not TRADE_GOODS.has(good_id) or not TRADE_PORTS.has(port_id):

@@ -28,12 +28,19 @@ func _init():
 		var stock = GameData.port_stock(str(port_id))
 		_check(merchant_npc != "" and merchant_npc in GameData.LOCATIONS[port_id].npcs and str(GameData.NPCS.get(merchant_npc, {}).get("service", "")) == "harbor", "%s必须有可在地图互动的专属贸易NPC" % port.name)
 		_check(specialty_good != "" and specialty_good in stock and str(GameData.TRADE_GOODS.get(specialty_good, {}).get("origin", "")) == str(port_id), "%s必须出售产地归属明确的本港特色商品" % port.name)
+		for stock_good_id in stock:
+			_check(str(GameData.TRADE_GOODS.get(str(stock_good_id), {}).get("origin", "")) == str(port_id), "%s货栈不能混入其他城市出产的%s" % [port.name, GameData.TRADE_GOODS[str(stock_good_id)].name])
 		specialty_goods[specialty_good] = true
 		if port_id != "venice_dock":
 			_check(GameData.LOCATIONS[port_id].npcs.size() >= 3, "%s至少需要剧情、贸易和港口服务三名可互动人物" % GameData.TRADE_PORTS[port_id].name)
 	_check(specialty_goods.size() == GameData.TRADE_PORTS.size(), "九座城市必须各有不同的特色商品，不能重复套用同一批特产")
 	for good_id in GameData.TRADE_GOODS:
 		_check(GameData.TRADE_GOODS[good_id].prices.size() == GameData.TRADE_PORTS.size(), "%s必须在九港都有独立收购价" % GameData.TRADE_GOODS[good_id].name)
+		var selling_ports = []
+		for port_id in GameData.TRADE_PORTS:
+			if GameData.port_sells_good(str(port_id), str(good_id)):
+				selling_ports.append(str(port_id))
+		_check(selling_ports == [str(GameData.TRADE_GOODS[good_id].origin)], "%s只能在唯一原产港买入，其他城市只负责收购" % GameData.TRADE_GOODS[good_id].name)
 	var route_market = TestState.new()
 	route_market.quest_index = GameData.QUESTS.size()
 	route_market.player.silver = 9999
@@ -48,6 +55,16 @@ func _init():
 	var power_before_recommend = gear_state.get_power()
 	var recommend_result = gear_state.equip_recommended()
 	_check(bool(recommend_result.ok) and str(gear_state.equipment.weapon) == "warrior_blade" and gear_state.get_power() > power_before_recommend, "一键推荐必须自动换上背包中更强的装备")
+	var vendor_state = TestState.new()
+	vendor_state.player.silver = 500
+	vendor_state.player.location = "venice_market"
+	var jewelry_purchase = vendor_state.buy_vendor_item("jeweler", "coral_ring")
+	_check(bool(jewelry_purchase.ok) and int(vendor_state.inventory.get("coral_ring", 0)) == 1 and vendor_state.equip_item("coral_ring").ok, "珠宝商必须真实出售可穿戴珠宝")
+	vendor_state.player.location = "venice_tavern"
+	var food_purchase = vendor_state.buy_vendor_item("tavern_keeper", "herb_fish_stew")
+	vendor_state.player.hp = max(1, int(vendor_state.get_stats().max_hp) - 70)
+	_check(bool(food_purchase.ok) and vendor_state.use_item("herb_fish_stew").ok, "酒馆老板必须真实出售可在背包使用的食物")
+	_check(not vendor_state.buy_vendor_item("tavern_keeper", "coral_ring").ok, "不同NPC货柜必须隔离，酒馆不能出售珠宝")
 
 	var first_talk = state.talk_to("alisa")
 	_check(bool(first_talk.get("quest_completed", false)), "任务首次达成时必须返回自动领奖触发标记")
@@ -163,9 +180,9 @@ func _init():
 	var lighthouse_order = state.claim_trade_order()
 	_check(bool(lighthouse_order.ok) and state.port_reputation_value("alexandria_dock") == 2, "灯塔订单必须交付货物并提升亚历山大声望")
 	_claim(state, "lighthouse_repairs")
-	state.buy_cargo("olive_oil", 4)
 	state.buy_voyage_protection()
 	state.sail_to("ragusa_dock")
+	state.buy_cargo("olive_oil", 4)
 	var ragusa_order = state.claim_trade_order()
 	_check(bool(ragusa_order.ok) and state.total_trade_reputation() >= 4, "拉古萨剧情订单必须形成第二条跨港交付路线")
 	_claim(state, "ragusa_nightwatch")
@@ -204,9 +221,15 @@ func _init():
 	_claim(state, "sail_malta")
 	state.talk_to("malta_keeper")
 	_claim(state, "meet_isabella")
-	state.buy_cargo("citrus", 2)
+	state.buy_voyage_protection()
+	state.sail_to("ragusa_dock")
 	state.buy_cargo("olive_oil", 1)
+	state.buy_voyage_protection()
+	state.sail_to("alexandria_dock")
 	state.buy_cargo("spices", 1)
+	state.buy_voyage_protection()
+	state.sail_to("malta_dock")
+	state.buy_cargo("citrus", 2)
 	var cooking = state.cook_provision("maltese_stew")
 	_check(bool(cooking.ok) and bool(cooking.quest_completed) and int(state.inventory.get("maltese_stew", 0)) == 1, "马耳他厨房必须消耗贸易货物并产出可用餐食")
 	_claim(state, "island_feast")
