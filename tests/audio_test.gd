@@ -45,6 +45,8 @@ func _run():
 
 	audio.set_region("field")
 	_check(audio.current_track == "field", "进入野外必须切换野外音乐")
+	audio.set_region("sea")
+	_check(audio.current_track == "sea", "正常出航进入海域后必须切换航海音乐")
 	audio.enter_battle()
 	_check(audio.battle_active and audio.current_track == "battle", "进入战斗必须切换战斗音乐")
 	audio.end_battle(true, false, "field")
@@ -63,7 +65,7 @@ func _check(condition, message):
 
 func _finish(total_bytes = 0):
 	if failures.is_empty():
-		print("AUDIO_OK: 5套场景音乐、12类音效、战斗切换与静音设置全部通过（%d KB）" % int(total_bytes / 1024))
+		print("AUDIO_OK: 6类场景音乐映射、12类音效、海域与战斗切换全部通过（%d KB）" % int(total_bytes / 1024))
 		quit(0)
 	else:
 		for failure in failures:

@@ -30,6 +30,7 @@ var port_reputation = {}
 var trade_order_cycles = {}
 var completed_trade_orders = {}
 var voyage_protection = 0
+var active_voyage = {}
 var battle_stance = "balanced"
 var auto_heal_threshold = 35
 var auto_cure_status = true
@@ -78,6 +79,7 @@ func new_game():
 		trade_order_cycles[str(port_id)] = 0
 	completed_trade_orders = {}
 	voyage_protection = 0
+	active_voyage = {}
 	battle_stance = "balanced"
 	auto_heal_threshold = 35
 	auto_cure_status = true
@@ -508,7 +510,8 @@ func start_battle(enemy_id):
 	if not GameData.ENEMIES.has(enemy_id):
 		return {"ok": false, "message": "敌人不存在。"}
 	var location = GameData.LOCATIONS[player.location]
-	if not enemy_id in location.enemies:
+	var sea_encounter = not active_voyage.is_empty() and bool(GameData.ENEMIES[enemy_id].get("sea_enemy", false))
+	if not sea_encounter and not enemy_id in location.enemies:
 		return {"ok": false, "message": "这个敌人不在当前区域。"}
 	var respawn_remaining = enemy_respawn_remaining(enemy_id)
 	if respawn_remaining > 0.0:
@@ -769,7 +772,10 @@ func _finish_battle_win(enemy_id, round_logs):
 	defeated[enemy_id] = int(defeated.get(enemy_id, 0)) + 1
 	if _is_dungeon_location(str(player.location)):
 		dungeon_cleared[enemy_id] = true
-	if not _is_dungeon_location(str(player.location)):
+	var sea_victory = not active_voyage.is_empty() and bool(enemy.get("sea_enemy", false))
+	if sea_victory:
+		active_voyage.pirate_defeated = true
+	elif not _is_dungeon_location(str(player.location)):
 		enemy_respawns[str(enemy_id)] = float(Time.get_unix_time_from_system()) + ENEMY_RESPAWN_SECONDS
 	var quest_completed = _advance_quest("kill", enemy_id)
 	var bounty_completed = _advance_bounty(enemy_id)
@@ -800,17 +806,21 @@ func _finish_battle_win(enemy_id, round_logs):
 
 func _finish_battle_loss(enemy_id, round_logs):
 	var enemy = GameData.ENEMIES[enemy_id]
+	var voyage_origin = str(active_voyage.get("origin", ""))
+	var lost_at_sea = voyage_origin in GameData.TRADE_PORTS
 	var remaining_enemy_hp = int(active_battle.get("enemy_hp", enemy.hp))
 	var defeated_player_hp = int(player.hp)
 	player.hp = max(1, int(get_stats().max_hp * 0.35))
 	var recovered_hp = int(player.hp)
-	player.location = "venice_tavern"
+	player.location = voyage_origin if lost_at_sea else "venice_tavern"
+	if lost_at_sea:
+		active_voyage = {}
 	statuses = {}
 	active_battle = {}
 	dungeon_cleared = {}
 	_consume_meal_battle()
-	round_logs.append("你失去了意识。巡逻队把你送回酒馆，未损失装备和银币。")
-	message_history.push_front("挑战%s失败，被送回威尼斯酒馆。" % enemy.name)
+	round_logs.append("你失去了意识。护航船把你送回%s，未损失装备和银币。" % GameData.TRADE_PORTS[voyage_origin].name if lost_at_sea else "你失去了意识。巡逻队把你送回酒馆，未损失装备和银币。")
+	message_history.push_front("挑战%s失败，被送回%s。" % [enemy.name, GameData.TRADE_PORTS[voyage_origin].name] if lost_at_sea else "挑战%s失败，被送回威尼斯酒馆。" % enemy.name)
 	_trim_history()
 	save_game()
 	return {
@@ -818,7 +828,8 @@ func _finish_battle_loss(enemy_id, round_logs):
 		"enemy_id": enemy_id, "enemy_name": enemy.name, "enemy_rank": enemy.rank, "enemy_level": int(enemy.level),
 		"enemy_hp": remaining_enemy_hp, "enemy_max_hp": int(enemy.hp), "player_level": int(player.level),
 		"player_hp": defeated_player_hp, "player_max_hp": int(get_stats().max_hp), "recovered_hp": recovered_hp, "round": 0, "statuses": {},
-		"logs": round_logs, "exp": 0, "silver": 0, "drop": "", "leveled": false, "new_level": int(player.level)
+		"logs": round_logs, "exp": 0, "silver": 0, "drop": "", "leveled": false, "new_level": int(player.level),
+		"return_port": voyage_origin if lost_at_sea else "venice_tavern", "lost_at_sea": lost_at_sea
 	}
 
 func _roll_attack(attack, defense, attacker_level, defender_level):
@@ -1094,7 +1105,8 @@ func best_trade_opportunity():
 			var buy_price = trade_buy_price(good_id)
 			var sell_price = trade_sell_price_at(str(destination), str(good_id), trade_day + days)
 			var units = max(1, int(floor(float(cargo_capacity()) / float(good.space))))
-			var total_profit = (sell_price - buy_price) * units - int(route.fee)
+			# 商会默认推荐正常出航；只有主动选择快捷传送时才扣传送费。
+			var total_profit = (sell_price - buy_price) * units
 			if best.is_empty() or total_profit > int(best.total_profit):
 				best = {"good_id": str(good_id), "destination": str(destination), "days": days, "units": units, "buy": buy_price, "sell": sell_price, "total_profit": total_profit}
 	return best
@@ -1264,6 +1276,147 @@ func voyage_risk(port_id):
 	var protection_bonus = 8 if voyage_protection > 0 else 0
 	return max(4, int(route.get("risk", 15)) - int(ship.get("armor", 0)) * 6 - card_risk_bonus - protection_bonus)
 
+func begin_voyage(port_id):
+	var destination = str(port_id)
+	if not is_trade_unlocked():
+		return {"ok": false, "message": "航海尚未解锁。"}
+	if not active_voyage.is_empty():
+		return {"ok": false, "message": "海燕号已经在航行中。"}
+	if not GameData.TRADE_PORTS.has(str(player.location)) or not GameData.TRADE_PORTS.has(destination):
+		return {"ok": false, "message": "必须从真实港口出航。"}
+	if destination == str(player.location):
+		return {"ok": false, "message": "海燕号已经停泊在这里。"}
+	if not is_port_unlocked(destination):
+		return {"ok": false, "message": "该港口尚未从主线海图中解锁。"}
+	var route = GameData.trade_route(str(player.location), destination)
+	if route.is_empty():
+		return {"ok": false, "message": "两座港口之间没有直达航线，需要中转。"}
+	var days = max(1, int(route.days) - (int(ship.get("speed", 1)) - 1))
+	active_voyage = {
+		"origin": str(player.location), "destination": destination,
+		"region": GameData.sea_region_for_route(str(player.location), destination),
+		"days": days, "risk": voyage_risk(destination),
+		"x": 540.0, "y": 1580.0, "pirate_defeated": false,
+		"treasure_claimed": false, "storm_resolved": false
+	}
+	message_history.push_front("海燕号从%s正常出航，驶入%s。" % [GameData.TRADE_PORTS[str(player.location)].name, GameData.SEA_REGIONS[str(active_voyage.region)].name])
+	_trim_history()
+	save_game()
+	return {"ok": true, "message": "已驶入%s。驾驶海燕号抵达%s；正常出航不收传送费。" % [GameData.SEA_REGIONS[str(active_voyage.region)].name, GameData.TRADE_PORTS[destination].name], "voyage": active_voyage.duplicate(true)}
+
+func update_voyage_position(position, persist = false):
+	if active_voyage.is_empty():
+		return
+	var point = Vector2(position)
+	active_voyage.x = float(point.x)
+	active_voyage.y = float(point.y)
+	if persist:
+		save_game()
+
+func voyage_position():
+	if active_voyage.is_empty():
+		return Vector2.ZERO
+	return Vector2(float(active_voyage.get("x", 540.0)), float(active_voyage.get("y", 1580.0)))
+
+func sea_enemy_id():
+	if active_voyage.is_empty():
+		return ""
+	var risk = int(active_voyage.get("risk", 15))
+	if risk >= 34 or int(player.level) >= 45:
+		return "black_flag_privateer"
+	if risk >= 25 or int(player.level) >= 18:
+		return "ocean_raider"
+	return "coastal_pirate"
+
+func mark_sea_pirate_defeated():
+	if active_voyage.is_empty():
+		return
+	active_voyage.pirate_defeated = true
+	save_game()
+
+func claim_sea_treasure():
+	if active_voyage.is_empty():
+		return {"ok": false, "message": "这里没有正在进行的航程。"}
+	if bool(active_voyage.get("treasure_claimed", false)):
+		return {"ok": false, "message": "漂流货箱已经打捞过了。"}
+	var silver = 18 + int(active_voyage.get("days", 1)) * 5
+	active_voyage.treasure_claimed = true
+	player.silver += silver
+	message_history.push_front("航途中打捞漂流货箱，获得%d银币。" % silver)
+	_trim_history()
+	save_game()
+	return {"ok": true, "message": "水手从漂流货箱里找到%d银币。" % silver, "silver": silver}
+
+func resolve_sea_storm():
+	if active_voyage.is_empty():
+		return {"ok": false, "message": "这里没有正在进行的航程。"}
+	if bool(active_voyage.get("storm_resolved", false)):
+		return {"ok": false, "message": "这片风暴已经穿过。"}
+	active_voyage.storm_resolved = true
+	if voyage_protection > 0:
+		voyage_protection = 0
+		save_game()
+		return {"ok": true, "message": "风暴袭来，护航物资固定住桅杆和货舱，没有损失。", "protected": true}
+	var cargo_ids = cargo.keys()
+	cargo_ids.sort()
+	if not cargo_ids.is_empty():
+		var lost_id = str(cargo_ids[0])
+		_remove_item_from_cargo(lost_id, 1)
+		save_game()
+		return {"ok": true, "message": "巨浪打进货舱，损失1%s%s。" % [GameData.TRADE_GOODS[lost_id].unit, GameData.TRADE_GOODS[lost_id].name], "protected": false}
+	var repair_cost = min(int(player.silver), 12 + int(active_voyage.get("risk", 15)))
+	player.silver -= repair_cost
+	trade_profit -= repair_cost
+	save_game()
+	return {"ok": true, "message": "船体被巨浪擦伤，靠岸前需要预留%d银币修理。" % repair_cost, "protected": false}
+
+func complete_voyage():
+	if active_voyage.is_empty():
+		return {"ok": false, "message": "没有可以结算的航程。"}
+	var voyage = active_voyage.duplicate(true)
+	var destination = str(voyage.destination)
+	var origin = str(voyage.origin)
+	trade_day += int(voyage.days)
+	player.location = destination
+	active_voyage = {}
+	var quest_completed = _advance_quest("visit", destination)
+	message_history.push_front("海燕号从%s航行%d日，抵达%s。" % [GameData.TRADE_PORTS[origin].name, int(voyage.days), GameData.TRADE_PORTS[destination].name])
+	_trim_history()
+	save_game()
+	return {"ok": true, "message": "抵达%s · 正常出航免费 · 用时%d日\n海盗、风暴和打捞均已在海域中即时结算。" % [GameData.TRADE_PORTS[destination].name, int(voyage.days)], "days": int(voyage.days), "from": origin, "destination": destination, "quest_completed": quest_completed}
+
+func abort_voyage():
+	if active_voyage.is_empty():
+		return {"ok": false, "message": "当前没有航程。"}
+	var origin = str(active_voyage.origin)
+	active_voyage = {}
+	player.location = origin
+	save_game()
+	return {"ok": true, "origin": origin, "message": "海燕号返航至%s。" % GameData.TRADE_PORTS[origin].name}
+
+func transfer_to(port_id):
+	var destination = str(port_id)
+	if not is_trade_unlocked() or not GameData.TRADE_PORTS.has(str(player.location)) or not GameData.TRADE_PORTS.has(destination):
+		return {"ok": false, "message": "现在无法使用港口传送。"}
+	if not is_port_unlocked(destination):
+		return {"ok": false, "message": "该港口尚未发现。"}
+	var route = GameData.trade_route(str(player.location), destination)
+	if route.is_empty():
+		return {"ok": false, "message": "两座港口之间没有直达传送船。"}
+	var fee = int(route.fee)
+	if int(player.silver) < fee:
+		return {"ok": false, "message": "还需要%d银币支付传送费。" % (fee - int(player.silver))}
+	var origin = str(player.location)
+	player.silver -= fee
+	trade_profit -= fee
+	trade_day += 1
+	player.location = destination
+	var quest_completed = _advance_quest("visit", destination)
+	message_history.push_front("支付%d银币，从%s传送至%s。" % [fee, GameData.TRADE_PORTS[origin].name, GameData.TRADE_PORTS[destination].name])
+	_trim_history()
+	save_game()
+	return {"ok": true, "message": "已传送至%s · 费用%d银币 · 用时1日\n传送不会触发海上战斗与打捞。" % [GameData.TRADE_PORTS[destination].name, fee], "fee": fee, "days": 1, "from": origin, "destination": destination, "quest_completed": quest_completed}
+
 func is_port_unlocked(port_id):
 	var resolved_port = str(port_id)
 	if not GameData.TRADE_PORTS.has(resolved_port):
@@ -1398,7 +1551,7 @@ func save_game():
 		"trade_day": trade_day, "trade_profit": trade_profit, "trade_volume": trade_volume,
 		"trade_lifetime_profit": trade_lifetime_profit, "port_reputation": port_reputation,
 		"trade_order_cycles": trade_order_cycles, "completed_trade_orders": completed_trade_orders,
-		"voyage_protection": voyage_protection,
+		"voyage_protection": voyage_protection, "active_voyage": active_voyage,
 		"battle_stance": battle_stance, "auto_heal_threshold": auto_heal_threshold, "auto_cure_status": auto_cure_status,
 		"equipment_upgrades": equipment_upgrades, "trade_contract_claimed": trade_contract_claimed,
 		"trade_contract_count": trade_contract_count, "active_card": active_card, "discoveries": discoveries,
@@ -1469,6 +1622,16 @@ func load_game():
 	if typeof(completed_trade_orders) != TYPE_DICTIONARY:
 		completed_trade_orders = {}
 	voyage_protection = clamp(int(parsed.get("voyage_protection", 0)), 0, 1)
+	active_voyage = parsed.get("active_voyage", {})
+	if typeof(active_voyage) != TYPE_DICTIONARY:
+		active_voyage = {}
+	elif not active_voyage.is_empty():
+		var saved_origin = str(active_voyage.get("origin", ""))
+		var saved_destination = str(active_voyage.get("destination", ""))
+		if not GameData.TRADE_PORTS.has(saved_origin) or not GameData.TRADE_PORTS.has(saved_destination) or GameData.trade_route(saved_origin, saved_destination).is_empty():
+			active_voyage = {}
+		else:
+			player.location = saved_origin
 	meal_buff_battles = clamp(int(parsed.get("meal_buff_battles", 0)), 0, 3)
 	for trade_port_id in GameData.TRADE_PORTS:
 		port_reputation[str(trade_port_id)] = clamp(int(port_reputation.get(str(trade_port_id), 0)), 0, 30)

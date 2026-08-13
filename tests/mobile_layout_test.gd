@@ -78,9 +78,11 @@ func _run():
 	_check(is_instance_valid(world_scene.overlay) and is_instance_valid(world_scene.sailing_map), "手机2D模式必须能打开九港可视化航海图")
 	_check(world_scene.sailing_map.custom_minimum_size.x <= 620.0 and world_scene.sailing_map.custom_minimum_size.y <= 520.0, "九港航海图必须保持在竖屏触控区域内")
 	_check(world_scene.sailing_map.port_buttons.size() == 9, "手机航海图必须显示九座可点击港口")
+	world_scene.sailing_map.select_port("ragusa_dock")
+	_check(is_instance_valid(world_scene.sailing_transfer_button) and "正常出航" in world_scene.sailing_confirm_button.text and "付费传送" in world_scene.sailing_transfer_button.text, "手机航海图必须把正常出航与付费传送显示为两个独立触控按钮")
 
 	if failures.is_empty():
-		print("MOBILE_OK: 竖屏单栏、任务领奖弹窗、触控战斗、九港航海图与货物贸易页面全部通过")
+		print("MOBILE_OK: 竖屏单栏、任务领奖弹窗、触控战斗、出航/传送双入口与货物贸易页面全部通过")
 		quit(0)
 	else:
 		for failure in failures:

@@ -346,6 +346,32 @@ const TRADE_ROUTES = {
 	,"quanzhou_dock|yangzhou_dock": {"days": 3, "fee": 18, "risk": 16}
 }
 
+# 旧版码头把世界先分成海域，再在海域内选择城市。2D版保留九港剧情，
+# 但把每条现有航线放回对应海域，让“出航”进入可驾驶地图而非抵港动画。
+const SEA_REGIONS = {
+	"mediterranean": {"name": "地中海", "ports": ["venice_dock", "ragusa_dock", "athens_dock", "malta_dock", "alexandria_dock"]},
+	"north_sea": {"name": "北海", "ports": ["amsterdam_dock", "venice_dock"]},
+	"africa": {"name": "非洲海域", "ports": ["alexandria_dock", "malta_dock", "cape_town_dock"]},
+	"indian_ocean": {"name": "印度洋", "ports": ["cape_town_dock", "quanzhou_dock", "athens_dock", "yangzhou_dock"]},
+	"east_asia": {"name": "东亚海域", "ports": ["quanzhou_dock", "yangzhou_dock", "amsterdam_dock"]},
+	"new_world": {"name": "新大陆", "ports": []}
+}
+
+static func sea_region_for_route(origin, destination):
+	var a = str(origin)
+	var b = str(destination)
+	for region_id in SEA_REGIONS:
+		var ports = Array(SEA_REGIONS[region_id].ports)
+		if a in ports and b in ports:
+			return str(region_id)
+	if "cape_town_dock" in [a, b]:
+		return "indian_ocean"
+	if "amsterdam_dock" in [a, b]:
+		return "north_sea"
+	if a in ["quanzhou_dock", "yangzhou_dock"] or b in ["quanzhou_dock", "yangzhou_dock"]:
+		return "east_asia"
+	return "mediterranean"
+
 const TRADE_EVENTS = [
 	{"name": "风平浪静", "description": "各港行情保持稳定。", "port": "", "good": "", "multiplier": 1.0},
 	{"name": "威尼斯庆典", "description": "威尼斯庆典大量收购东方香料。", "port": "venice_dock", "good": "spices", "multiplier": 1.30},
@@ -433,6 +459,9 @@ const ENEMIES = {
 	,"corsair_raider": {"name": "黑帆袭击者", "level": 8, "rank": "副本精英", "hp": 260, "attack": 31, "defense": 16, "speed": 16, "exp": 230, "silver": [58, 78], "drops": ["corsair_cutlass", "gunner_coat", "universal_medicine", "corsair_card"], "effect": {"name": "中毒", "chance": 0.16, "rounds": 3}, "intro": "袭击者在火药桶之间疾行，淬毒短刃闪着冷光。"}
 	,"corsair_guard": {"name": "黑帆重卫", "level": 10, "rank": "副本精英", "hp": 380, "attack": 38, "defense": 24, "speed": 12, "exp": 340, "silver": [78, 108], "drops": ["gunner_coat", "captain_hat", "stamina_tonic"], "special": {"name": "破阵冲锋", "every": 3, "damage_multiplier": 1.40}, "intro": "重卫架起盾牌，沉重脚步震落洞顶的细沙。"}
 	,"corsair_captain": {"name": "黑帆船长雷蒙", "level": 12, "rank": "副本 Boss", "hp": 620, "attack": 48, "defense": 29, "speed": 18, "exp": 620, "silver": [150, 210], "drops": ["corsair_cutlass", "gunner_coat", "captain_hat", "black_sail_charm"], "effect": {"name": "诅咒", "chance": 0.20, "rounds": 3}, "special": {"name": "黑潮连斩", "every": 3, "damage_multiplier": 1.60}, "intro": "雷蒙展开黑帆海图，拔剑宣告这里将是你的终点。"}
+	,"coastal_pirate": {"name": "近海海盗", "level": 5, "rank": "海上敌人", "sea_enemy": true, "hp": 148, "attack": 20, "defense": 8, "speed": 12, "exp": 95, "silver": [34, 52], "drops": ["unknown_equipment", "sea_salt_bread", "small_milk"], "intro": "一艘挂着旧黑旗的快艇切入航道，海盗抛钩准备登船。"}
+	,"ocean_raider": {"name": "远洋掠夺者", "level": 24, "rank": "海上精英", "sea_enemy": true, "hp": 720, "attack": 54, "defense": 34, "speed": 28, "exp": 1450, "silver": [170, 240], "drops": ["unknown_equipment", "universal_medicine", "corsair_card"], "effect": {"name": "缓慢", "chance": 0.18, "rounds": 2}, "intro": "远洋掠夺船借着逆光逼近，弩手已经占据上风位。"}
+	,"black_flag_privateer": {"name": "黑旗私掠舰", "level": 52, "rank": "海上首领", "sea_enemy": true, "hp": 2350, "attack": 108, "defense": 80, "speed": 58, "exp": 16500, "silver": [900, 1180], "drops": ["unknown_equipment", "stamina_tonic", "black_sail_charm"], "special": {"name": "舷炮齐射", "every": 3, "damage_multiplier": 1.48}, "intro": "三层黑帆同时升起，私掠舰封死航道并亮出整排舷炮。"}
 	,"wreck_crab": {"name": "覆甲礁蟹", "level": 21, "rank": "副本", "hp": 640, "attack": 48, "defense": 32, "speed": 16, "exp": 1100, "silver": [120, 170], "drops": ["stamina_tonic", "whale_bone_sabre"], "intro": "覆满船钉的巨蟹从白鲸号龙骨下爬出，铁螯砸向礁石。"}
 	,"drowned_sailor": {"name": "溺潮水手", "level": 24, "rank": "副本精英", "hp": 760, "attack": 54, "defense": 36, "speed": 23, "exp": 1500, "silver": [150, 210], "drops": ["survivor_coat", "universal_medicine"], "effect": {"name": "缓慢", "chance": 0.20, "rounds": 2}, "intro": "水手幻影攥着腐朽缆绳，仍在执行二十年前没有完成的封舱命令。"}
 	,"fog_siren": {"name": "雾歌海妖", "level": 27, "rank": "副本精英", "hp": 900, "attack": 60, "defense": 40, "speed": 31, "exp": 2100, "silver": [190, 260], "drops": ["siren_charm", "stamina_tonic"], "effect": {"name": "诅咒", "chance": 0.24, "rounds": 3}, "intro": "白雾凝成披着船帆的身影，歌声正一点点抹去你的名字。"}

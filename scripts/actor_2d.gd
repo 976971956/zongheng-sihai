@@ -100,6 +100,10 @@ func _process(delta):
 
 func set_motion(direction):
 	motion_direction = Vector2(direction)
+	if display_id == "player_ship" or display_id in ["coastal_pirate", "ocean_raider", "black_flag_privateer"]:
+		if motion_direction.length() > 0.05:
+			rotation = motion_direction.angle() + PI * 0.5
+		return
 	if display_id == "player":
 		if motion_direction.length() > 0.05:
 			if abs(motion_direction.x) > abs(motion_direction.y) * 0.72:
@@ -176,6 +180,9 @@ func _art_scale():
 		_: return 0.27
 
 func _draw():
+	if display_id == "player_ship" or display_id in ["coastal_pirate", "ocean_raider", "black_flag_privateer"]:
+		_draw_ship()
+		return
 	var bob = sin(bob_time * 2.7) * 1.35
 	var large = display_id in ["giant_bear", "stone_puppet", "tide_beast", "vermilion_phantom"] or display_id in LEGACY_BOSS_IDS
 	_draw_oval(Vector2(0, 34 if large else 31), Vector2(31, 9) if large else Vector2(25, 7), Color(0.005, 0.02, 0.025, 0.38))
@@ -187,14 +194,38 @@ func _draw():
 		draw_circle(sparkle, 4, Color("fff1ad"))
 	draw_set_transform(Vector2(0, bob))
 	if not ATLAS_CELLS.has(display_id) and not HARBOR_NPC_CELLS.has(display_id):
-		if actor_kind == "travel":
+		if actor_kind in ["travel", "sea_port", "sea_return"]:
 			_draw_travel_marker()
-		elif actor_kind == "discovery":
+		elif actor_kind in ["discovery", "sea_treasure"]:
 			_draw_discovery_marker()
 		elif display_id in ["sewer_rat", "giant_bear", "wildwood_ghost", "stone_puppet", "tide_beast", "vermilion_phantom"] or display_id in LEGACY_BOSS_IDS:
 			_draw_monster()
 		else:
 			_draw_person()
+	draw_set_transform(Vector2.ZERO)
+
+func _draw_ship():
+	var bob = sin(bob_time * 3.1) * 2.0
+	var pirate_ship = display_id in ["coastal_pirate", "ocean_raider", "black_flag_privateer"]
+	var hull_color = Color("3b3035") if pirate_ship else Color("8d5837")
+	var sail_color = Color("161821") if pirate_ship else Color("f0dfb5")
+	var small_sail_color = Color("7c2635") if pirate_ship else Color("39bfb1")
+	draw_set_transform(Vector2(0, bob))
+	draw_ellipse_shadow(Vector2(0, 22), Vector2(43, 14), Color(0.005, 0.02, 0.025, 0.34))
+	draw_colored_polygon(PackedVector2Array([Vector2(-31, 8), Vector2(31, 8), Vector2(20, 39), Vector2(-20, 39)]), hull_color)
+	draw_polyline(PackedVector2Array([Vector2(-31, 8), Vector2(31, 8), Vector2(20, 39), Vector2(-20, 39), Vector2(-31, 8)]), Color("e2b966"), 4.0)
+	draw_line(Vector2(0, 16), Vector2(0, -48), Color("4b3427"), 6.0)
+	draw_colored_polygon(PackedVector2Array([Vector2(4, -43), Vector2(38, -2), Vector2(4, 4)]), sail_color)
+	draw_colored_polygon(PackedVector2Array([Vector2(-4, -35), Vector2(-29, -5), Vector2(-4, 0)]), small_sail_color)
+	draw_line(Vector2(0, -46), Vector2(0, 11), Color("f1c66d"), 2.0)
+	draw_circle(Vector2(0, 13), 6.0, Color("ef6f73") if pirate_ship else Color("f1c66d"))
+	if selected:
+		draw_arc(Vector2(0, 5), 54.0, 0.0, TAU, 40, Color("f6d778"), 4.0)
+	draw_set_transform(Vector2.ZERO)
+
+func draw_ellipse_shadow(center, radii, color):
+	draw_set_transform(center, 0.0, Vector2(1.0, float(radii.y) / float(radii.x)))
+	draw_circle(Vector2.ZERO, float(radii.x), color)
 	draw_set_transform(Vector2.ZERO)
 
 func _draw_travel_marker():

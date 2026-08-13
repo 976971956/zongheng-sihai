@@ -9,6 +9,7 @@ const MUSIC = {
 	"black_sail": preload("res://assets/audio/music/corsair.ogg"),
 	"white_whale": preload("res://assets/audio/music/dungeon.ogg"),
 	"legacy": preload("res://assets/audio/music/corsair.ogg"),
+	"sea": preload("res://assets/audio/music/harbor.ogg"),
 	"battle": preload("res://assets/audio/music/battle.ogg")
 }
 const SFX = {

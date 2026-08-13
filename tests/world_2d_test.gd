@@ -364,21 +364,25 @@ func _run():
 			_check(_actor_has_art(scene, str(modeled_npc_id)), "%s的%s必须拥有可见2D人物精灵" % [GameData.TRADE_PORTS[str(modeled_port_id)].name, GameData.NPCS[str(modeled_npc_id)].name])
 	scene._switch_region("city", "alexandria_dock")
 
-	# 航海必须使用可视化九港海图，并在航行动画完成后落到真实目的港。
+	# 航海必须把原作的“出航”和“传送”分开；正常出航进入可驾驶海域，靠港后才改写位置。
 	scene.state.player.silver = 1000
 	scene._open_sailing_map()
 	_check(is_instance_valid(scene.sailing_map) and scene.sailing_map.port_buttons.size() == GameData.TRADE_PORTS.size(), "航海图必须显示全部九座港口节点")
 	_check(not scene.sailing_map.port_buttons["amsterdam_dock"].disabled, "主线完成后九座港口必须全部在海图上解锁")
 	scene.sailing_map.select_port("venice_dock")
-	_check("亚历山大" in scene.sailing_route_label.text and "威尼斯" in scene.sailing_route_label.text and not scene.sailing_confirm_button.disabled, "选择港口后必须显示起终点、航期、航费和风险")
-	scene._start_sailing_voyage(0.05)
-	_check(scene.sailing_map.traveling, "确认启航后海图必须播放船只移动过程")
-	for _voyage_frame in range(20):
-		if not is_instance_valid(scene.sailing_map) or not scene.sailing_map.traveling:
-			break
-		await create_timer(0.03).timeout
-	_check(str(scene.state.player.location) == "venice_dock" and _has_actor(scene, "ship_owner"), "航行动画完成后必须抵达目的港并重建当地NPC")
-	_check(_has_label_text(scene.overlay, "航行抵达"), "抵港后必须显示航费、天数与随机航行事件结算")
+	_check("亚历山大" in scene.sailing_route_label.text and "威尼斯" in scene.sailing_route_label.text and "正常出航：免费" in scene.sailing_route_label.text and "付费传送" in scene.sailing_route_label.text and not scene.sailing_confirm_button.disabled, "选择港口后必须同时显示免费出航与付费传送")
+	var origin_before_departure = str(scene.state.player.location)
+	var silver_before_departure = int(scene.state.player.silver)
+	scene._start_sailing_voyage()
+	_check(scene.current_region == "sea" and not scene.state.active_voyage.is_empty(), "确认正常出航后必须进入可驾驶2D海域")
+	_check(str(scene.state.player.location) == origin_before_departure and int(scene.state.player.silver) == silver_before_departure, "海上航行未靠港前不能提前改写位置或扣传送费")
+	_check(scene.player_actor.display_id == "player_ship" and _has_actor(scene, scene.state.sea_enemy_id()) and _has_actor(scene, "drifting_cargo"), "海域必须生成可驾驶船只、航路海盗和漂流货箱")
+	scene.state.active_voyage.pirate_defeated = true
+	scene._spawn_world_actors()
+	scene.player_actor.position = Vector2(540, 365)
+	scene._update_sea_voyage(0.1)
+	_check(str(scene.state.player.location) == "venice_dock" and scene.current_region == "city" and _has_actor(scene, "ship_owner"), "船只驶入目的港后才可结算抵港并重建当地NPC")
+	_check(_has_label_text(scene.overlay, "航行抵达") and _has_label_text(scene.overlay, "正常出航免费"), "抵港后必须显示航期和免费出航结算")
 	scene._close_overlay()
 
 	var boss_state = TestState.new()

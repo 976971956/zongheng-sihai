@@ -696,6 +696,11 @@ func _audio_region_for_location(location_id):
 
 func _refresh_actions(location):
 	_clear_children(action_list)
+	if not state.active_voyage.is_empty():
+		var voyage = state.active_voyage
+		action_list.add_child(_small_caption("海燕号正在%s航行" % GameData.SEA_REGIONS[str(voyage.region)].name))
+		action_list.add_child(_wide_action("返回2D海域继续驾驶", "%s → %s · 船位与海上事件均已保存" % [GameData.TRADE_PORTS[str(voyage.origin)].name, GameData.TRADE_PORTS[str(voyage.destination)].name], "sea"))
+		return
 
 	if not location.npcs.is_empty():
 		action_list.add_child(_small_caption("附近人物"))
@@ -838,6 +843,8 @@ func _wide_action(title, hint, kind, value = "", required_level = 1, locked = fa
 		button.pressed.connect(_open_city_map)
 	elif kind == "harbor":
 		button.pressed.connect(_open_harbor)
+	elif kind == "sea":
+		button.pressed.connect(_open_2d_world)
 	return button
 
 func _refresh_quest():
@@ -1760,6 +1767,17 @@ func _open_city_map():
 func _open_harbor():
 	var content = VBoxContainer.new()
 	content.add_theme_constant_override("separation", 10)
+	if not state.active_voyage.is_empty():
+		var voyage = state.active_voyage
+		content.add_child(_label("海燕号正在航行", 20, GOLD))
+		var sailing_copy = _label("当前位于%s：%s → %s。航行中不能在启航港买卖货物，请返回2D海域继续驾驶。" % [GameData.SEA_REGIONS[str(voyage.region)].name, GameData.TRADE_PORTS[str(voyage.origin)].name, GameData.TRADE_PORTS[str(voyage.destination)].name], 13, Color("b7cfd5"))
+		sailing_copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		content.add_child(sailing_copy)
+		var resume = _button("返回海域继续航行", "primary")
+		resume.pressed.connect(_open_2d_world)
+		content.add_child(resume)
+		_open_modal("航行进行中", content, Vector2(650, 380))
+		return
 	if not state.is_trade_unlocked():
 		content.add_child(_label("港口贸易尚未解锁", 20, GOLD))
 		var locked = _label("完成主线「四层试炼」并领取奖励后，船老板会赠送贸易船「海燕号」。之后会随剧情逐步发现九座各具特产的港口。", 13, Color("b7cfd5"))
@@ -1842,7 +1860,7 @@ func _open_harbor():
 		cook.pressed.connect(_cook_recipe.bind(str(recipe.id)))
 		recipe_row.add_child(cook)
 		market.add_child(recipe_row)
-	var protection = _button("护航物资已装船" if state.voyage_protection > 0 else "购买护航物资 45银 · 下次航行免损", "ghost")
+	var protection = _button("护航物资已装船" if state.voyage_protection > 0 else "购买护航物资 45银 · 下次穿越风暴免损", "ghost")
 	protection.disabled = state.voyage_protection > 0 or int(state.player.silver) < 45
 	protection.pressed.connect(_buy_voyage_protection_from_journal)
 	market.add_child(protection)
@@ -1870,7 +1888,7 @@ func _open_harbor():
 		for good_id in foreign_cargo:
 			_add_journal_trade_good_card(market, str(good_id), false)
 
-	market.add_child(_small_caption("可用航线"))
+	market.add_child(_small_caption("可用航线 · 原作出航与传送分开"))
 	for destination in GameData.TRADE_PORTS:
 		if destination == port_id:
 			continue
@@ -1879,10 +1897,17 @@ func _open_harbor():
 			continue
 		var days = max(1, int(route.days) - (int(state.ship.speed) - 1))
 		var risk = state.voyage_risk(destination)
-		var sail = _button("前往%s · %d日 · 航费%d · 风险%d%%" % [GameData.TRADE_PORTS[destination].name, days, int(route.fee), risk], "primary")
-		sail.disabled = int(state.player.silver) < int(route.fee)
-		sail.pressed.connect(_trade_sail.bind(destination))
-		market.add_child(sail)
+		var route_row = HBoxContainer.new()
+		route_row.add_theme_constant_override("separation", 8)
+		var sail = _button("出航%s · 免费 · %d日 · 风险%d%%" % [GameData.TRADE_PORTS[destination].name, days, risk], "primary")
+		sail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		sail.pressed.connect(_trade_depart.bind(destination))
+		route_row.add_child(sail)
+		var transfer = _button("传送 · %d银" % int(route.fee), "ghost")
+		transfer.disabled = int(state.player.silver) < int(route.fee)
+		transfer.pressed.connect(_trade_transfer.bind(destination))
+		route_row.add_child(transfer)
+		market.add_child(route_row)
 
 	market.add_child(_small_caption("船只改造"))
 	var upgrades = HBoxContainer.new()
@@ -1977,13 +2002,38 @@ func _cook_recipe(recipe_id):
 		call_deferred("_open_harbor")
 
 func _trade_sail(destination):
-	var result = state.sail_to(destination)
+	var result = state.transfer_to(destination)
 	if bool(result.ok):
 		AudioDirector.play_sfx("sail")
 	_close_modal()
 	refresh_ui()
 	_show_toast(result.message, result.ok)
 	call_deferred("_open_harbor")
+
+func _trade_depart(destination):
+	var result = state.begin_voyage(destination)
+	if not bool(result.get("ok", false)):
+		_close_modal()
+		refresh_ui()
+		_show_toast(str(result.get("message", "无法出航。")), false)
+		call_deferred("_open_harbor")
+		return
+	AudioDirector.play_sfx("sail")
+	_close_modal()
+	state.save_game()
+	get_tree().change_scene_to_file("res://scenes/world_2d.tscn")
+
+func _trade_transfer(destination):
+	var result = state.transfer_to(destination)
+	if bool(result.get("ok", false)):
+		AudioDirector.play_sfx("sail")
+	_close_modal()
+	refresh_ui()
+	_show_toast(str(result.get("message", "无法传送。")), bool(result.get("ok", false)))
+	if bool(result.get("quest_completed", false)):
+		call_deferred("_show_quest_completion_prompt")
+	else:
+		call_deferred("_open_harbor")
 
 func _trade_upgrade(kind):
 	var result = state.upgrade_ship(kind)
