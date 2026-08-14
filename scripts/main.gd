@@ -1895,11 +1895,10 @@ func _open_harbor():
 		var route = GameData.trade_route(port_id, destination)
 		if route.is_empty():
 			continue
-		var days = max(1, int(route.days) - (int(state.ship.speed) - 1))
-		var risk = state.voyage_risk(destination)
+		var plan = state.voyage_plan(destination)
 		var route_row = HBoxContainer.new()
 		route_row.add_theme_constant_override("separation", 8)
-		var sail = _button("出航%s · 免费 · %d日 · 风险%d%%" % [GameData.TRADE_PORTS[destination].name, days, risk], "primary")
+		var sail = _button("出航%s · %s · %d海里 · %d日 · 威胁%d处" % [GameData.TRADE_PORTS[destination].name, str(plan.tier_name), int(plan.distance_nm), int(plan.days), int(plan.threat_count)], "primary")
 		sail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		sail.pressed.connect(_trade_depart.bind(destination))
 		route_row.add_child(sail)

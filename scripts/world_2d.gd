@@ -54,7 +54,9 @@ const ENEMY_SPAWNS = {
 	,"clockwork_tailor": {"region": "legacy", "name": "傀儡天工师", "position": Vector2(360, 500), "color": Color("5f594b"), "accent": Color("f0c66d"), "location": "legacy_shears"}
 	,"tide_void_emperor": {"region": "legacy", "name": "潮虚帝", "position": Vector2(360, 500), "color": Color("192c52"), "accent": Color("55f0df"), "location": "legacy_seal"}
 	,"coastal_pirate": {"region": "sea", "name": "近海海盗", "position": Vector2(360, 687), "color": Color("5b3540"), "accent": RED, "location": ""}
+	,"reef_serpent": {"region": "sea", "name": "礁海长蛇", "position": Vector2(360, 687), "color": Color("326f72"), "accent": Color("72e0c7"), "location": ""}
 	,"ocean_raider": {"region": "sea", "name": "远洋掠夺者", "position": Vector2(360, 687), "color": Color("443547"), "accent": GOLD, "location": ""}
+	,"abyss_kraken": {"region": "sea", "name": "深海巨章", "position": Vector2(360, 687), "color": Color("493567"), "accent": Color("d18cf0"), "location": ""}
 	,"black_flag_privateer": {"region": "sea", "name": "黑旗私掠舰", "position": Vector2(360, 687), "color": Color("252a3d"), "accent": RED, "location": ""}
 }
 
@@ -287,9 +289,14 @@ func _spawn_world_actors():
 		var origin_id = str(state.active_voyage.origin)
 		_add_actor("sea_port", destination_id, "抵达 · %s" % GameData.TRADE_PORTS[destination_id].name, SeaWorldMapScript.DESTINATION_POSITION / WORLD_SCALE, Color("4b806d"), GOLD, destination_id)
 		_add_actor("sea_return", origin_id, "返航航标 · %s" % GameData.TRADE_PORTS[origin_id].name, Vector2(300, 1450) / WORLD_SCALE, Color("4c6871"), TEAL, origin_id)
-		if not bool(state.active_voyage.get("pirate_defeated", false)):
-			var pirate_id = state.sea_enemy_id()
-			_add_actor("enemy", pirate_id, str(GameData.ENEMIES[pirate_id].name), SeaWorldMapScript.PIRATE_POSITION / WORLD_SCALE, Color("4e3440"), RED, "")
+		for encounter in Array(state.active_voyage.get("encounters", [])):
+			if bool(encounter.get("defeated", false)):
+				continue
+			var enemy_id = str(encounter.get("enemy_id", "coastal_pirate"))
+			var spawn = ENEMY_SPAWNS.get(enemy_id, ENEMY_SPAWNS.coastal_pirate)
+			var sea_position = Vector2(float(encounter.get("x", SeaWorldMapScript.PIRATE_POSITION.x)), float(encounter.get("y", SeaWorldMapScript.PIRATE_POSITION.y)))
+			var enemy_label = "%s · Lv.%d" % [str(GameData.ENEMIES[enemy_id].name), int(GameData.ENEMIES[enemy_id].level)]
+			_add_actor("enemy", enemy_id, enemy_label, sea_position / WORLD_SCALE, spawn.color, spawn.accent, "", {"encounter_id": str(encounter.get("id", "")), "encounter_kind": str(encounter.get("kind", "pirate"))})
 		if not bool(state.active_voyage.get("treasure_claimed", false)):
 			_add_actor("sea_treasure", "drifting_cargo", "漂流货箱", SeaWorldMapScript.TREASURE_POSITION / WORLD_SCALE, Color("735a2f"), GOLD, "")
 	elif current_region == "city":
@@ -480,8 +487,8 @@ func _despawn_defeated_enemy():
 		action_button.text = "敌人已击败"
 		action_button.disabled = true
 	if current_region == "sea":
-		state.mark_sea_pirate_defeated()
-		hint_label.text = "%s已被击退，航道重新畅通。" % defeated.name
+		var remaining = state.sea_encounters_remaining()
+		hint_label.text = "%s已被击退，航程还剩%d处海上威胁。" % [defeated.name, remaining] if remaining > 0 else "%s已被击退，本段航路已经安全。" % defeated.name
 		_refresh_waypoint()
 		return
 	if current_region in ["dungeon", "black_sail", "white_whale", "legacy"]:
@@ -497,7 +504,7 @@ func _despawn_defeated_enemy():
 	_schedule_enemy_respawn(enemy_id, MONSTER_RESPAWN_SECONDS)
 	hint_label.text = "%s已被击败并消失，%d秒后在原地刷新。" % [defeated.name, int(MONSTER_RESPAWN_SECONDS)]
 
-func _add_actor(kind, id, display_name, position, color, accent, location_id = ""):
+func _add_actor(kind, id, display_name, position, color, accent, location_id = "", metadata = {}):
 	var actor = ActorScript.new()
 	actor.position = _world_point(position)
 	actor.z_index = 10
@@ -514,7 +521,9 @@ func _add_actor(kind, id, display_name, position, color, accent, location_id = "
 	nameplate.add_theme_color_override("font_color", Color("fff4d1"))
 	nameplate.add_theme_stylebox_override("normal", _style(Color(0.025, 0.055, 0.065, 0.88), 9, Color(GOLD, 0.48), 1, 5))
 	actor.add_child(nameplate)
-	actors.append({"kind": kind, "id": id, "name": display_name, "node": actor, "location": location_id})
+	var entry = {"kind": kind, "id": id, "name": display_name, "node": actor, "location": location_id}
+	entry.merge(Dictionary(metadata), true)
+	actors.append(entry)
 
 func _spawn_for_location(location_id):
 	if current_region == "sea" and not state.active_voyage.is_empty():
@@ -806,14 +815,12 @@ func _update_sea_voyage(delta):
 		_refresh_hud()
 		_show_message("遭遇风暴", str(storm_result.get("message", "海燕号穿过了风暴。")))
 		return
-	if bool(state.active_voyage.get("pirate_defeated", false)):
-		return
 	for entry in actors:
 		if str(entry.kind) == "enemy" and player_actor.position.distance_to(entry.node.position) <= 82.0:
 			has_move_target = false
 			player_actor.set_motion(Vector2.ZERO)
 			active_enemy_actor = entry
-			var battle = state.start_battle(str(entry.id))
+			var battle = state.start_sea_encounter(str(entry.get("encounter_id", "")))
 			if bool(battle.get("ok", false)):
 				_open_battle(battle)
 			else:
@@ -967,9 +974,9 @@ func _refresh_hud():
 	if current_region == "sea" and not state.active_voyage.is_empty():
 		var voyage = state.active_voyage
 		location_label.text = "◆ %s" % GameData.SEA_REGIONS[str(voyage.region)].name
-		stats_label.text = "%s  船帆Lv.%d" % [str(state.ship.name), int(state.ship.speed)]
+		stats_label.text = "%s  航程%d%% · 剩余%d海里" % [str(state.ship.name), int(round(state.voyage_progress() * 100.0)), state.voyage_remaining_distance()]
 		currency_label.text = "银币 %d" % int(state.player.silver)
-		quest_label.text = "%s → %s｜预计%d日｜货舱%d/%d" % [GameData.TRADE_PORTS[str(voyage.origin)].name, GameData.TRADE_PORTS[str(voyage.destination)].name, int(voyage.days), state.cargo_used(), state.cargo_capacity()]
+		quest_label.text = "%s → %s｜%s · %d日｜威胁%d/%d｜货舱%d/%d" % [GameData.TRADE_PORTS[str(voyage.origin)].name, GameData.TRADE_PORTS[str(voyage.destination)].name, str(voyage.get("tier_name", "航行")), int(voyage.days), state.sea_encounters_remaining(), Array(voyage.get("encounters", [])).size(), state.cargo_used(), state.cargo_capacity()]
 		if is_instance_valid(waypoint_label):
 			_refresh_waypoint()
 		return
@@ -2132,11 +2139,15 @@ func _select_sailing_destination(port_id):
 		sailing_confirm_button.disabled = true
 		sailing_transfer_button.disabled = true
 		return
-	var days = max(1, int(route.days) - (int(state.ship.speed) - 1))
-	var risk = state.voyage_risk(sailing_destination)
+	var plan = state.voyage_plan(sailing_destination)
+	var days = int(plan.days)
+	var risk = int(plan.risk)
 	var destination = GameData.TRADE_PORTS[sailing_destination]
 	var region_id = GameData.sea_region_for_route(str(state.player.location), sailing_destination)
-	sailing_route_label.text = "%s → %s｜%s｜预计%d日｜海上风险%d%%\n正常出航：免费、可战斗与打捞｜付费传送：%d银币、直接抵港\n港口特产：%s" % [GameData.TRADE_PORTS[str(state.player.location)].name, destination.name, GameData.SEA_REGIONS[region_id].name, days, risk, int(route.fee), destination.specialty]
+	var threats = []
+	for enemy_id in Array(plan.enemy_ids):
+		threats.append("%sLv.%d" % [GameData.ENEMIES[str(enemy_id)].name, int(GameData.ENEMIES[str(enemy_id)].level)])
+	sailing_route_label.text = "%s → %s｜%s · %s｜%d海里 · 预计%d日｜风险%d%%\n威胁情报：%s｜建议角色Lv.%d；敌人均可绕行\n正常出航免费｜付费传送%d银币｜特产：%s" % [GameData.TRADE_PORTS[str(state.player.location)].name, destination.name, GameData.SEA_REGIONS[region_id].name, str(plan.tier_name), int(plan.distance_nm), days, risk, "、".join(threats), int(plan.recommended_level), int(route.fee), destination.specialty]
 	sailing_confirm_button.text = "正常出航 · 驾驶海燕号前往%s" % destination.name
 	sailing_confirm_button.disabled = false
 	sailing_transfer_button.text = "付费传送至%s · %d银币" % [destination.name, int(route.fee)]
@@ -2384,9 +2395,8 @@ func _open_trade_2d():
 		var route = GameData.trade_route(port_id, destination)
 		if route.is_empty():
 			continue
-		var days = max(1, int(route.days) - (int(state.ship.speed) - 1))
-		var risk = state.voyage_risk(destination)
-		var sail = _button("选择%s｜出航免费 · 传送%d银 · %d日 · 风险%d%%" % [GameData.TRADE_PORTS[destination].name, int(route.fee), days, risk], "gold")
+		var plan = state.voyage_plan(destination)
+		var sail = _button("选择%s｜%s · %d海里 · %d日 · 威胁%d处" % [GameData.TRADE_PORTS[destination].name, str(plan.tier_name), int(plan.distance_nm), int(plan.days), int(plan.threat_count)], "gold")
 		sail.disabled = false
 		sail.pressed.connect(_trade_sail_2d.bind(destination))
 		list.add_child(sail)

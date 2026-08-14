@@ -61,6 +61,8 @@ const LEGACY_BOSS_IDS = [
 	"celestial_demon_general", "jade_dream_queen", "black_furnace_lord",
 	"returned_demon_king", "clockwork_tailor", "tide_void_emperor"
 ]
+const SEA_PIRATE_IDS = ["coastal_pirate", "ocean_raider", "black_flag_privateer"]
+const SEA_MONSTER_IDS = ["reef_serpent", "abyss_kraken"]
 
 var body_color = Color("2e9c99")
 var accent_color = Color("f2c66d")
@@ -100,7 +102,7 @@ func _process(delta):
 
 func set_motion(direction):
 	motion_direction = Vector2(direction)
-	if display_id == "player_ship" or display_id in ["coastal_pirate", "ocean_raider", "black_flag_privateer"]:
+	if display_id == "player_ship" or display_id in SEA_PIRATE_IDS:
 		if motion_direction.length() > 0.05:
 			rotation = motion_direction.angle() + PI * 0.5
 		return
@@ -180,11 +182,11 @@ func _art_scale():
 		_: return 0.27
 
 func _draw():
-	if display_id == "player_ship" or display_id in ["coastal_pirate", "ocean_raider", "black_flag_privateer"]:
+	if display_id == "player_ship" or display_id in SEA_PIRATE_IDS:
 		_draw_ship()
 		return
 	var bob = sin(bob_time * 2.7) * 1.35
-	var large = display_id in ["giant_bear", "stone_puppet", "tide_beast", "vermilion_phantom"] or display_id in LEGACY_BOSS_IDS
+	var large = display_id in ["giant_bear", "stone_puppet", "tide_beast", "vermilion_phantom"] or display_id in LEGACY_BOSS_IDS or display_id in SEA_MONSTER_IDS
 	_draw_oval(Vector2(0, 34 if large else 31), Vector2(31, 9) if large else Vector2(25, 7), Color(0.005, 0.02, 0.025, 0.38))
 	if selected:
 		var ring_radius = 39.0 if large else 34.0
@@ -198,7 +200,7 @@ func _draw():
 			_draw_travel_marker()
 		elif actor_kind in ["discovery", "sea_treasure"]:
 			_draw_discovery_marker()
-		elif display_id in ["sewer_rat", "giant_bear", "wildwood_ghost", "stone_puppet", "tide_beast", "vermilion_phantom"] or display_id in LEGACY_BOSS_IDS:
+		elif display_id in ["sewer_rat", "giant_bear", "wildwood_ghost", "stone_puppet", "tide_beast", "vermilion_phantom"] or display_id in LEGACY_BOSS_IDS or display_id in SEA_MONSTER_IDS:
 			_draw_monster()
 		else:
 			_draw_person()
@@ -206,7 +208,7 @@ func _draw():
 
 func _draw_ship():
 	var bob = sin(bob_time * 3.1) * 2.0
-	var pirate_ship = display_id in ["coastal_pirate", "ocean_raider", "black_flag_privateer"]
+	var pirate_ship = display_id in SEA_PIRATE_IDS
 	var hull_color = Color("3b3035") if pirate_ship else Color("8d5837")
 	var sail_color = Color("161821") if pirate_ship else Color("f0dfb5")
 	var small_sail_color = Color("7c2635") if pirate_ship else Color("39bfb1")
@@ -368,6 +370,9 @@ func _draw_person():
 		draw_line(Vector2(-5, -14), Vector2(5, -14), Color("743d36"), 2, true)
 
 func _draw_monster():
+	if display_id in SEA_MONSTER_IDS:
+		_draw_sea_monster()
+		return
 	if display_id in LEGACY_BOSS_IDS:
 		_draw_legacy_boss()
 		return
@@ -378,6 +383,31 @@ func _draw_monster():
 		"stone_puppet": _draw_golem()
 		"tide_beast": _draw_tide_beast()
 		"vermilion_phantom": _draw_phoenix()
+
+func _draw_sea_monster():
+	var outline = Color("102533")
+	var foam = Color(0.55, 0.95, 0.92, 0.45)
+	draw_arc(Vector2(0, 24), 48, PI, TAU, 24, foam, 7)
+	if display_id == "reef_serpent":
+		var body = Color("358b83")
+		draw_arc(Vector2(-8, 5), 31, -1.7, 1.55, 26, outline, 16)
+		draw_arc(Vector2(-8, 5), 31, -1.7, 1.55, 26, body, 10)
+		draw_circle(Vector2(18, -25), 17, body.lightened(0.08))
+		draw_arc(Vector2(18, -25), 17, 0, TAU, 24, outline, 3)
+		draw_circle(Vector2(24, -29), 3, accent_color)
+		for fin in [-1, 1]:
+			var side = float(fin)
+			draw_colored_polygon(PackedVector2Array([Vector2(side * 11, -10), Vector2(side * 31, -18), Vector2(side * 18, 4)]), body.darkened(0.18))
+	else:
+		var flesh = Color("68508a")
+		draw_circle(Vector2(0, -13), 31, flesh)
+		draw_arc(Vector2(0, -13), 31, 0, TAU, 28, outline, 4)
+		draw_circle(Vector2(-10, -18), 5, Color("f3cf76"))
+		draw_circle(Vector2(10, -18), 5, Color("f3cf76"))
+		for tentacle in range(6):
+			var x = -30.0 + tentacle * 12.0
+			var bend = -12.0 if tentacle % 2 == 0 else 12.0
+			draw_polyline(PackedVector2Array([Vector2(x, 6), Vector2(x + bend, 25), Vector2(x - bend * 0.4, 42)]), flesh, 8, true)
 
 func _draw_legacy_boss():
 	var outline = Color("101b27")

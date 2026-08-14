@@ -4,6 +4,13 @@ extends RefCounted
 const SAVE_VERSION = 2
 const SAVE_PATH = "user://tides_save.json"
 const ENEMY_RESPAWN_SECONDS = 20.0
+const VOYAGE_ORIGIN_Y = 1580.0
+const VOYAGE_DESTINATION_Y = 365.0
+const SEA_ENCOUNTER_POSITIONS = {
+	1: [Vector2(540, 1030)],
+	2: [Vector2(680, 1160), Vector2(390, 690)],
+	3: [Vector2(620, 1280), Vector2(350, 980), Vector2(560, 560)]
+}
 
 var rng = RandomNumberGenerator.new()
 var player = {}
@@ -774,7 +781,7 @@ func _finish_battle_win(enemy_id, round_logs):
 		dungeon_cleared[enemy_id] = true
 	var sea_victory = not active_voyage.is_empty() and bool(enemy.get("sea_enemy", false))
 	if sea_victory:
-		active_voyage.pirate_defeated = true
+		mark_sea_encounter_defeated(str(active_voyage.get("current_encounter_id", "")))
 	elif not _is_dungeon_location(str(player.location)):
 		enemy_respawns[str(enemy_id)] = float(Time.get_unix_time_from_system()) + ENEMY_RESPAWN_SECONDS
 	var quest_completed = _advance_quest("kill", enemy_id)
@@ -1272,9 +1279,60 @@ func voyage_risk(port_id):
 	var route = GameData.trade_route(str(player.location), str(port_id))
 	if route.is_empty():
 		return 0
+	return _voyage_risk_for_route(route)
+
+func _voyage_risk_for_route(route):
 	var card_risk_bonus = 4 if active_card == "corsair_card" else 0
 	var protection_bonus = 8 if voyage_protection > 0 else 0
 	return max(4, int(route.get("risk", 15)) - int(ship.get("armor", 0)) * 6 - card_risk_bonus - protection_bonus)
+
+func voyage_plan(port_id, origin_override = ""):
+	var origin = str(origin_override) if str(origin_override) != "" else str(player.location)
+	var destination = str(port_id)
+	var route = GameData.trade_route(origin, destination)
+	if route.is_empty():
+		return {}
+	var distance_nm = max(1, int(route.get("distance_nm", int(route.get("days", 1)) * 420)))
+	var tier_id = GameData.sea_voyage_tier(distance_nm)
+	var tier = GameData.SEA_VOYAGE_TIERS[tier_id]
+	var risk = _voyage_risk_for_route(route)
+	var threat_count = int(tier.minimum_threats)
+	if risk >= 22:
+		threat_count += 1
+	if risk >= 36:
+		threat_count += 1
+	threat_count = clamp(threat_count, 1, 3)
+	var roster = ["coastal_pirate"]
+	if tier_id == "regional":
+		roster = ["coastal_pirate", "reef_serpent"]
+	elif tier_id == "oceanic":
+		roster = ["ocean_raider", "abyss_kraken", "black_flag_privateer"]
+	var enemy_ids = roster.slice(0, min(threat_count, roster.size()))
+	var recommended_level = 1
+	for enemy_id in enemy_ids:
+		recommended_level = max(recommended_level, int(GameData.ENEMIES[str(enemy_id)].level))
+	return {
+		"origin": origin, "destination": destination,
+		"distance_nm": distance_nm, "tier": tier_id, "tier_name": str(tier.name),
+		"days": max(1, int(route.days) - (int(ship.get("speed", 1)) - 1)),
+		"risk": risk, "threat_count": enemy_ids.size(), "enemy_ids": enemy_ids,
+		"recommended_level": recommended_level, "description": str(tier.description)
+	}
+
+func _build_sea_encounters(plan):
+	var encounters = []
+	var enemy_ids = Array(plan.get("enemy_ids", []))
+	var count = clamp(enemy_ids.size(), 1, 3)
+	var positions = Array(SEA_ENCOUNTER_POSITIONS[count])
+	for index in range(enemy_ids.size()):
+		var enemy_id = str(enemy_ids[index])
+		var position = Vector2(positions[index])
+		encounters.append({
+			"id": "sea_%d" % (index + 1), "enemy_id": enemy_id,
+			"kind": "monster" if enemy_id in ["reef_serpent", "abyss_kraken"] else "pirate",
+			"x": position.x, "y": position.y, "defeated": false
+		})
+	return encounters
 
 func begin_voyage(port_id):
 	var destination = str(port_id)
@@ -1288,21 +1346,23 @@ func begin_voyage(port_id):
 		return {"ok": false, "message": "海燕号已经停泊在这里。"}
 	if not is_port_unlocked(destination):
 		return {"ok": false, "message": "该港口尚未从主线海图中解锁。"}
-	var route = GameData.trade_route(str(player.location), destination)
-	if route.is_empty():
+	var plan = voyage_plan(destination)
+	if plan.is_empty():
 		return {"ok": false, "message": "两座港口之间没有直达航线，需要中转。"}
-	var days = max(1, int(route.days) - (int(ship.get("speed", 1)) - 1))
 	active_voyage = {
 		"origin": str(player.location), "destination": destination,
 		"region": GameData.sea_region_for_route(str(player.location), destination),
-		"days": days, "risk": voyage_risk(destination),
+		"days": int(plan.days), "risk": int(plan.risk),
+		"distance_nm": int(plan.distance_nm), "tier": str(plan.tier), "tier_name": str(plan.tier_name),
+		"recommended_level": int(plan.recommended_level),
 		"x": 540.0, "y": 1580.0, "pirate_defeated": false,
-		"treasure_claimed": false, "storm_resolved": false
+		"treasure_claimed": false, "storm_resolved": false,
+		"encounters": _build_sea_encounters(plan), "current_encounter_id": ""
 	}
-	message_history.push_front("海燕号从%s正常出航，驶入%s。" % [GameData.TRADE_PORTS[str(player.location)].name, GameData.SEA_REGIONS[str(active_voyage.region)].name])
+	message_history.push_front("海燕号从%s正常出航，驶入%s：%d海里，预计%d日。" % [GameData.TRADE_PORTS[str(player.location)].name, GameData.SEA_REGIONS[str(active_voyage.region)].name, int(active_voyage.distance_nm), int(active_voyage.days)])
 	_trim_history()
 	save_game()
-	return {"ok": true, "message": "已驶入%s。驾驶海燕号抵达%s；正常出航不收传送费。" % [GameData.SEA_REGIONS[str(active_voyage.region)].name, GameData.TRADE_PORTS[destination].name], "voyage": active_voyage.duplicate(true)}
+	return {"ok": true, "message": "已驶入%s：%s，共%d海里，侦测到%d处威胁。驾驶海燕号抵达%s。" % [GameData.SEA_REGIONS[str(active_voyage.region)].name, str(plan.tier_name), int(plan.distance_nm), int(plan.threat_count), GameData.TRADE_PORTS[destination].name], "voyage": active_voyage.duplicate(true)}
 
 func update_voyage_position(position, persist = false):
 	if active_voyage.is_empty():
@@ -1318,28 +1378,73 @@ func voyage_position():
 		return Vector2.ZERO
 	return Vector2(float(active_voyage.get("x", 540.0)), float(active_voyage.get("y", 1580.0)))
 
+func voyage_progress():
+	if active_voyage.is_empty():
+		return 0.0
+	return clamp((VOYAGE_ORIGIN_Y - float(active_voyage.get("y", VOYAGE_ORIGIN_Y))) / (VOYAGE_ORIGIN_Y - VOYAGE_DESTINATION_Y), 0.0, 1.0)
+
+func voyage_remaining_distance():
+	if active_voyage.is_empty():
+		return 0
+	return int(round(float(active_voyage.get("distance_nm", 0)) * (1.0 - voyage_progress())))
+
+func sea_encounters_remaining():
+	if active_voyage.is_empty():
+		return 0
+	var remaining = 0
+	for encounter in Array(active_voyage.get("encounters", [])):
+		if not bool(encounter.get("defeated", false)):
+			remaining += 1
+	return remaining
+
+func sea_encounter(encounter_id):
+	for encounter in Array(active_voyage.get("encounters", [])):
+		if str(encounter.get("id", "")) == str(encounter_id):
+			return Dictionary(encounter)
+	return {}
+
 func sea_enemy_id():
 	if active_voyage.is_empty():
 		return ""
-	var risk = int(active_voyage.get("risk", 15))
-	if risk >= 34 or int(player.level) >= 45:
-		return "black_flag_privateer"
-	if risk >= 25 or int(player.level) >= 18:
-		return "ocean_raider"
-	return "coastal_pirate"
+	for encounter in Array(active_voyage.get("encounters", [])):
+		if not bool(encounter.get("defeated", false)):
+			return str(encounter.get("enemy_id", "coastal_pirate"))
+	return ""
 
-func mark_sea_pirate_defeated():
+func start_sea_encounter(encounter_id):
+	if active_voyage.is_empty():
+		return {"ok": false, "message": "当前不在航行中。"}
+	var encounter = sea_encounter(encounter_id)
+	if encounter.is_empty() or bool(encounter.get("defeated", false)):
+		return {"ok": false, "message": "这处海上威胁已经消失。"}
+	active_voyage.current_encounter_id = str(encounter_id)
+	return start_battle(str(encounter.enemy_id))
+
+func mark_sea_encounter_defeated(encounter_id = ""):
 	if active_voyage.is_empty():
 		return
-	active_voyage.pirate_defeated = true
+	var resolved_id = str(encounter_id) if str(encounter_id) != "" else str(active_voyage.get("current_encounter_id", ""))
+	var encounters = Array(active_voyage.get("encounters", []))
+	for index in range(encounters.size()):
+		var encounter = Dictionary(encounters[index])
+		if str(encounter.get("id", "")) == resolved_id or (resolved_id == "" and not bool(encounter.get("defeated", false))):
+			encounter.defeated = true
+			encounters[index] = encounter
+			break
+	active_voyage.encounters = encounters
+	active_voyage.current_encounter_id = ""
+	active_voyage.pirate_defeated = sea_encounters_remaining() == 0
 	save_game()
+
+func mark_sea_pirate_defeated():
+	mark_sea_encounter_defeated()
 
 func claim_sea_treasure():
 	if active_voyage.is_empty():
 		return {"ok": false, "message": "这里没有正在进行的航程。"}
 	if bool(active_voyage.get("treasure_claimed", false)):
 		return {"ok": false, "message": "漂流货箱已经打捞过了。"}
-	var silver = 18 + int(active_voyage.get("days", 1)) * 5
+	var silver = 18 + int(active_voyage.get("days", 1)) * 5 + int(active_voyage.get("distance_nm", 0)) / 240
 	active_voyage.treasure_claimed = true
 	player.silver += silver
 	message_history.push_front("航途中打捞漂流货箱，获得%d银币。" % silver)
@@ -1361,9 +1466,11 @@ func resolve_sea_storm():
 	cargo_ids.sort()
 	if not cargo_ids.is_empty():
 		var lost_id = str(cargo_ids[0])
-		_remove_item_from_cargo(lost_id, 1)
+		var lost_count = 2 if str(active_voyage.get("tier", "coastal")) == "oceanic" else 1
+		lost_count = min(lost_count, int(cargo.get(lost_id, 0)))
+		_remove_item_from_cargo(lost_id, lost_count)
 		save_game()
-		return {"ok": true, "message": "巨浪打进货舱，损失1%s%s。" % [GameData.TRADE_GOODS[lost_id].unit, GameData.TRADE_GOODS[lost_id].name], "protected": false}
+		return {"ok": true, "message": "巨浪打进货舱，损失%d%s%s。" % [lost_count, GameData.TRADE_GOODS[lost_id].unit, GameData.TRADE_GOODS[lost_id].name], "protected": false, "lost_count": lost_count}
 	var repair_cost = min(int(player.silver), 12 + int(active_voyage.get("risk", 15)))
 	player.silver -= repair_cost
 	trade_profit -= repair_cost
@@ -1383,7 +1490,7 @@ func complete_voyage():
 	message_history.push_front("海燕号从%s航行%d日，抵达%s。" % [GameData.TRADE_PORTS[origin].name, int(voyage.days), GameData.TRADE_PORTS[destination].name])
 	_trim_history()
 	save_game()
-	return {"ok": true, "message": "抵达%s · 正常出航免费 · 用时%d日\n海盗、风暴和打捞均已在海域中即时结算。" % [GameData.TRADE_PORTS[destination].name, int(voyage.days)], "days": int(voyage.days), "from": origin, "destination": destination, "quest_completed": quest_completed}
+	return {"ok": true, "message": "抵达%s · 完成%d海里航程 · 用时%d日\n海盗、海怪、风暴和打捞均已在海域中即时结算。" % [GameData.TRADE_PORTS[destination].name, int(voyage.get("distance_nm", 0)), int(voyage.days)], "days": int(voyage.days), "distance_nm": int(voyage.get("distance_nm", 0)), "from": origin, "destination": destination, "quest_completed": quest_completed}
 
 func abort_voyage():
 	if active_voyage.is_empty():
@@ -1541,6 +1648,36 @@ func _trim_history():
 	if message_history.size() > 8:
 		message_history.resize(8)
 
+func _normalize_active_voyage():
+	if active_voyage.is_empty():
+		return
+	var origin = str(active_voyage.get("origin", ""))
+	var destination = str(active_voyage.get("destination", ""))
+	var plan = voyage_plan(destination, origin)
+	if plan.is_empty():
+		active_voyage = {}
+		return
+	if not active_voyage.has("distance_nm"):
+		active_voyage.distance_nm = int(plan.distance_nm)
+	if not active_voyage.has("tier"):
+		active_voyage.tier = str(plan.tier)
+	if not active_voyage.has("tier_name"):
+		active_voyage.tier_name = str(plan.tier_name)
+	if not active_voyage.has("recommended_level"):
+		active_voyage.recommended_level = int(plan.recommended_level)
+	var saved_encounters = active_voyage.get("encounters", [])
+	if typeof(saved_encounters) != TYPE_ARRAY or Array(saved_encounters).is_empty():
+		active_voyage.encounters = _build_sea_encounters(plan)
+		if bool(active_voyage.get("pirate_defeated", false)):
+			var cleared = []
+			for encounter in Array(active_voyage.encounters):
+				var migrated = Dictionary(encounter)
+				migrated.defeated = true
+				cleared.append(migrated)
+			active_voyage.encounters = cleared
+	if not active_voyage.has("current_encounter_id"):
+		active_voyage.current_encounter_id = ""
+
 func save_game():
 	var payload = {
 		"save_version": SAVE_VERSION, "player": player, "inventory": inventory, "equipment": equipment,
@@ -1632,6 +1769,7 @@ func load_game():
 			active_voyage = {}
 		else:
 			player.location = saved_origin
+			_normalize_active_voyage()
 	meal_buff_battles = clamp(int(parsed.get("meal_buff_battles", 0)), 0, 3)
 	for trade_port_id in GameData.TRADE_PORTS:
 		port_reputation[str(trade_port_id)] = clamp(int(port_reputation.get(str(trade_port_id), 0)), 0, 30)

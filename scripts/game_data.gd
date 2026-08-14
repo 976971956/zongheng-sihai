@@ -326,25 +326,39 @@ const TRADE_GOODS = {
 }
 
 const TRADE_ROUTES = {
-	"ragusa_dock|venice_dock": {"days": 2, "fee": 14, "risk": 14},
-	"alexandria_dock|venice_dock": {"days": 5, "fee": 30, "risk": 30},
-	"alexandria_dock|ragusa_dock": {"days": 4, "fee": 24, "risk": 24},
-	"malta_dock|venice_dock": {"days": 4, "fee": 26, "risk": 24},
-	"malta_dock|ragusa_dock": {"days": 3, "fee": 20, "risk": 20},
-	"alexandria_dock|malta_dock": {"days": 3, "fee": 22, "risk": 22}
-	,"cape_town_dock|malta_dock": {"days": 8, "fee": 52, "risk": 38}
-	,"cape_town_dock|quanzhou_dock": {"days": 10, "fee": 66, "risk": 42}
-	,"athens_dock|quanzhou_dock": {"days": 7, "fee": 44, "risk": 32}
-	,"athens_dock|venice_dock": {"days": 3, "fee": 20, "risk": 18}
-	,"venice_dock|yangzhou_dock": {"days": 9, "fee": 58, "risk": 38}
-	,"amsterdam_dock|yangzhou_dock": {"days": 8, "fee": 50, "risk": 34}
-	,"amsterdam_dock|venice_dock": {"days": 4, "fee": 28, "risk": 22}
-	,"quanzhou_dock|venice_dock": {"days": 8, "fee": 50, "risk": 36}
-	,"athens_dock|yangzhou_dock": {"days": 7, "fee": 46, "risk": 32}
-	,"cape_town_dock|venice_dock": {"days": 9, "fee": 60, "risk": 40}
-	,"amsterdam_dock|quanzhou_dock": {"days": 9, "fee": 58, "risk": 38}
-	,"quanzhou_dock|yangzhou_dock": {"days": 3, "fee": 18, "risk": 16}
+	"ragusa_dock|venice_dock": {"days": 2, "distance_nm": 420, "fee": 14, "risk": 14},
+	"alexandria_dock|venice_dock": {"days": 5, "distance_nm": 1680, "fee": 30, "risk": 30},
+	"alexandria_dock|ragusa_dock": {"days": 4, "distance_nm": 1380, "fee": 24, "risk": 24},
+	"malta_dock|venice_dock": {"days": 4, "distance_nm": 1120, "fee": 26, "risk": 24},
+	"malta_dock|ragusa_dock": {"days": 3, "distance_nm": 760, "fee": 20, "risk": 20},
+	"alexandria_dock|malta_dock": {"days": 3, "distance_nm": 890, "fee": 22, "risk": 22}
+	,"cape_town_dock|malta_dock": {"days": 8, "distance_nm": 4850, "fee": 52, "risk": 38}
+	,"cape_town_dock|quanzhou_dock": {"days": 10, "distance_nm": 6900, "fee": 66, "risk": 42}
+	,"athens_dock|quanzhou_dock": {"days": 7, "distance_nm": 5600, "fee": 44, "risk": 32}
+	,"athens_dock|venice_dock": {"days": 3, "distance_nm": 1050, "fee": 20, "risk": 18}
+	,"venice_dock|yangzhou_dock": {"days": 9, "distance_nm": 6500, "fee": 58, "risk": 38}
+	,"amsterdam_dock|yangzhou_dock": {"days": 8, "distance_nm": 7200, "fee": 50, "risk": 34}
+	,"amsterdam_dock|venice_dock": {"days": 4, "distance_nm": 1900, "fee": 28, "risk": 22}
+	,"quanzhou_dock|venice_dock": {"days": 8, "distance_nm": 6100, "fee": 50, "risk": 36}
+	,"athens_dock|yangzhou_dock": {"days": 7, "distance_nm": 5450, "fee": 46, "risk": 32}
+	,"cape_town_dock|venice_dock": {"days": 9, "distance_nm": 5200, "fee": 60, "risk": 40}
+	,"amsterdam_dock|quanzhou_dock": {"days": 9, "distance_nm": 7600, "fee": 58, "risk": 38}
+	,"quanzhou_dock|yangzhou_dock": {"days": 3, "distance_nm": 720, "fee": 18, "risk": 16}
 }
+
+const SEA_VOYAGE_TIERS = {
+	"coastal": {"name": "近海短途", "max_distance_nm": 900, "minimum_threats": 1, "description": "沿岸航行，补给压力低，主要遭遇小型海盗快艇。"},
+	"regional": {"name": "跨海航线", "max_distance_nm": 2200, "minimum_threats": 1, "description": "需要横跨一片海域，海盗与礁海怪物会同时活动。"},
+	"oceanic": {"name": "远洋航线", "max_distance_nm": 99999, "minimum_threats": 2, "description": "连续数日看不到陆地，至少有两段高危海区。"}
+}
+
+static func sea_voyage_tier(distance_nm):
+	var distance = int(distance_nm)
+	if distance <= int(SEA_VOYAGE_TIERS.coastal.max_distance_nm):
+		return "coastal"
+	if distance <= int(SEA_VOYAGE_TIERS.regional.max_distance_nm):
+		return "regional"
+	return "oceanic"
 
 # 旧版码头把世界先分成海域，再在海域内选择城市。2D版保留九港剧情，
 # 但把每条现有航线放回对应海域，让“出航”进入可驾驶地图而非抵港动画。
@@ -460,7 +474,9 @@ const ENEMIES = {
 	,"corsair_guard": {"name": "黑帆重卫", "level": 10, "rank": "副本精英", "hp": 380, "attack": 38, "defense": 24, "speed": 12, "exp": 340, "silver": [78, 108], "drops": ["gunner_coat", "captain_hat", "stamina_tonic"], "special": {"name": "破阵冲锋", "every": 3, "damage_multiplier": 1.40}, "intro": "重卫架起盾牌，沉重脚步震落洞顶的细沙。"}
 	,"corsair_captain": {"name": "黑帆船长雷蒙", "level": 12, "rank": "副本 Boss", "hp": 620, "attack": 48, "defense": 29, "speed": 18, "exp": 620, "silver": [150, 210], "drops": ["corsair_cutlass", "gunner_coat", "captain_hat", "black_sail_charm"], "effect": {"name": "诅咒", "chance": 0.20, "rounds": 3}, "special": {"name": "黑潮连斩", "every": 3, "damage_multiplier": 1.60}, "intro": "雷蒙展开黑帆海图，拔剑宣告这里将是你的终点。"}
 	,"coastal_pirate": {"name": "近海海盗", "level": 5, "rank": "海上敌人", "sea_enemy": true, "hp": 148, "attack": 20, "defense": 8, "speed": 12, "exp": 95, "silver": [34, 52], "drops": ["unknown_equipment", "sea_salt_bread", "small_milk"], "intro": "一艘挂着旧黑旗的快艇切入航道，海盗抛钩准备登船。"}
+	,"reef_serpent": {"name": "礁海长蛇", "level": 12, "rank": "海上怪物", "sea_enemy": true, "hp": 360, "attack": 34, "defense": 18, "speed": 22, "exp": 420, "silver": [72, 104], "drops": ["unknown_equipment", "universal_medicine", "sea_salt_bread"], "effect": {"name": "中毒", "chance": 0.16, "rounds": 3}, "intro": "海面像被刀切开，盘踞礁群的长蛇昂首缠向船舷。"}
 	,"ocean_raider": {"name": "远洋掠夺者", "level": 24, "rank": "海上精英", "sea_enemy": true, "hp": 720, "attack": 54, "defense": 34, "speed": 28, "exp": 1450, "silver": [170, 240], "drops": ["unknown_equipment", "universal_medicine", "corsair_card"], "effect": {"name": "缓慢", "chance": 0.18, "rounds": 2}, "intro": "远洋掠夺船借着逆光逼近，弩手已经占据上风位。"}
+	,"abyss_kraken": {"name": "深海巨章", "level": 36, "rank": "海上首领", "sea_enemy": true, "hp": 1320, "attack": 80, "defense": 54, "speed": 38, "exp": 5600, "silver": [380, 520], "drops": ["unknown_equipment", "stamina_tonic", "siren_charm"], "effect": {"name": "缓慢", "chance": 0.22, "rounds": 2}, "special": {"name": "触腕绞船", "every": 3, "damage_multiplier": 1.42}, "intro": "墨色海水突然沸腾，巨大的触腕从船底升起，试图绞断龙骨。"}
 	,"black_flag_privateer": {"name": "黑旗私掠舰", "level": 52, "rank": "海上首领", "sea_enemy": true, "hp": 2350, "attack": 108, "defense": 80, "speed": 58, "exp": 16500, "silver": [900, 1180], "drops": ["unknown_equipment", "stamina_tonic", "black_sail_charm"], "special": {"name": "舷炮齐射", "every": 3, "damage_multiplier": 1.48}, "intro": "三层黑帆同时升起，私掠舰封死航道并亮出整排舷炮。"}
 	,"wreck_crab": {"name": "覆甲礁蟹", "level": 21, "rank": "副本", "hp": 640, "attack": 48, "defense": 32, "speed": 16, "exp": 1100, "silver": [120, 170], "drops": ["stamina_tonic", "whale_bone_sabre"], "intro": "覆满船钉的巨蟹从白鲸号龙骨下爬出，铁螯砸向礁石。"}
 	,"drowned_sailor": {"name": "溺潮水手", "level": 24, "rank": "副本精英", "hp": 760, "attack": 54, "defense": 36, "speed": 23, "exp": 1500, "silver": [150, 210], "drops": ["survivor_coat", "universal_medicine"], "effect": {"name": "缓慢", "chance": 0.20, "rounds": 2}, "intro": "水手幻影攥着腐朽缆绳，仍在执行二十年前没有完成的封舱命令。"}

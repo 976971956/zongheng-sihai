@@ -370,7 +370,7 @@ func _run():
 	_check(is_instance_valid(scene.sailing_map) and scene.sailing_map.port_buttons.size() == GameData.TRADE_PORTS.size(), "航海图必须显示全部九座港口节点")
 	_check(not scene.sailing_map.port_buttons["amsterdam_dock"].disabled, "主线完成后九座港口必须全部在海图上解锁")
 	scene.sailing_map.select_port("venice_dock")
-	_check("亚历山大" in scene.sailing_route_label.text and "威尼斯" in scene.sailing_route_label.text and "正常出航：免费" in scene.sailing_route_label.text and "付费传送" in scene.sailing_route_label.text and not scene.sailing_confirm_button.disabled, "选择港口后必须同时显示免费出航与付费传送")
+	_check("亚历山大" in scene.sailing_route_label.text and "威尼斯" in scene.sailing_route_label.text and "1680海里" in scene.sailing_route_label.text and "威胁情报" in scene.sailing_route_label.text and "正常出航免费" in scene.sailing_route_label.text and "付费传送" in scene.sailing_route_label.text and not scene.sailing_confirm_button.disabled, "选择港口后必须显示距离、威胁以及免费出航/付费传送")
 	var origin_before_departure = str(scene.state.player.location)
 	var silver_before_departure = int(scene.state.player.silver)
 	scene._start_sailing_voyage()
@@ -382,7 +382,7 @@ func _run():
 	scene.player_actor.position = Vector2(540, 365)
 	scene._update_sea_voyage(0.1)
 	_check(str(scene.state.player.location) == "venice_dock" and scene.current_region == "city" and _has_actor(scene, "ship_owner"), "船只驶入目的港后才可结算抵港并重建当地NPC")
-	_check(_has_label_text(scene.overlay, "航行抵达") and _has_label_text(scene.overlay, "正常出航免费"), "抵港后必须显示航期和免费出航结算")
+	_check(_has_label_text(scene.overlay, "航行抵达") and _has_label_text(scene.overlay, "完成1680海里航程"), "抵港后必须显示实际航程和航期结算")
 	scene._close_overlay()
 
 	var boss_state = TestState.new()
