@@ -312,10 +312,13 @@ func _spawn_world_actors():
 	if current_region == "sea":
 		if state.active_voyage.is_empty():
 			return
-		var destination_id = str(state.active_voyage.destination)
 		var origin_id = str(state.active_voyage.origin)
-		_add_actor("sea_port", destination_id, "抵达 · %s" % GameData.TRADE_PORTS[destination_id].name, _sea_destination_position() / WORLD_SCALE, Color("4b806d"), GOLD, destination_id)
-		_add_actor("sea_return", origin_id, "返航航标 · %s" % GameData.TRADE_PORTS[origin_id].name, (_sea_origin_position() + Vector2(-235, -105)) / WORLD_SCALE, Color("4c6871"), TEAL, origin_id)
+		var destination_id = str(state.active_voyage.destination)
+		for port_id in Array(state.active_voyage.get("unlocked_ports", [origin_id, destination_id])):
+			var resolved_port = str(port_id)
+			var port_position = GameData.sea_port_position(resolved_port)
+			var port_label = ("计划靠港 · " if resolved_port == destination_id else ("返航 · " if resolved_port == origin_id else "可改靠 · ")) + str(GameData.TRADE_PORTS[resolved_port].name)
+			_add_actor("sea_port", resolved_port, port_label, port_position / WORLD_SCALE, Color("4b806d") if resolved_port != origin_id else Color("4c6871"), GOLD if resolved_port == destination_id else TEAL, resolved_port)
 		for encounter in Array(state.active_voyage.get("encounters", [])):
 			if bool(encounter.get("defeated", false)):
 				continue
@@ -805,7 +808,7 @@ func _update_nearest_actor():
 		nearest_actor.node.selected = true
 		action_button.disabled = false
 		if nearest_actor.kind == "sea_port":
-			action_button.text = "靠港 · %s" % nearest_actor.name.trim_prefix("抵达 · ")
+			action_button.text = ("返航 · " if str(nearest_actor.id) == str(state.active_voyage.origin) else "靠港 · ") + str(GameData.TRADE_PORTS[str(nearest_actor.id)].name)
 		elif nearest_actor.kind == "sea_return":
 			action_button.text = "放弃航程 · 返回%s" % GameData.TRADE_PORTS[str(nearest_actor.id)].name
 		elif nearest_actor.kind == "sea_treasure":
@@ -858,10 +861,14 @@ func _update_sea_voyage(delta):
 				_show_message("无法交战", str(battle.get("message", "海盗已经离开。")))
 			return
 
-func _complete_sea_voyage():
+func _complete_sea_voyage(port_id = ""):
 	if current_region != "sea" or state.active_voyage.is_empty():
 		return
-	var result = state.complete_voyage()
+	var arrival_port = str(port_id) if str(port_id) != "" else str(state.active_voyage.destination)
+	if arrival_port == str(state.active_voyage.origin):
+		_show_sea_return_prompt()
+		return
+	var result = state.complete_voyage(arrival_port)
 	if not bool(result.get("ok", false)):
 		_show_message("无法靠港", str(result.get("message", "航程状态异常。")))
 		return
@@ -960,7 +967,7 @@ func _enter_active_voyage():
 	AudioDirector.set_region("sea")
 	_refresh_hud()
 	_refresh_waypoint()
-	hint_label.text = "摇杆或点击海面驾驶 · 绕开礁石与风暴 · 驶入金色港圈靠岸"
+	hint_label.text = "九港大地图已打通 · 可沿金色航线前进，也能中途改靠其他已发现港口"
 
 func _leave_sea_to_port(port_id):
 	current_region = "city"
@@ -1036,7 +1043,7 @@ func _refresh_hud():
 		var voyage = state.active_voyage
 		location_label.text = "◆ %s" % GameData.SEA_REGIONS[str(voyage.region)].name
 		var speed_profile = state.ship_speed_profile()
-		stats_label.text = "%s Lv.%d · %d节｜航程%d%% · 剩余%d海里" % [str(state.ship.name), int(state.ship.speed), int(speed_profile.knots), int(round(state.voyage_progress() * 100.0)), state.voyage_remaining_distance()]
+		stats_label.text = "%s · %.1f节｜航程%d%% · 剩余%d海里" % [str(state.ship.name), float(speed_profile.knots), int(round(state.voyage_progress() * 100.0)), state.voyage_remaining_distance()]
 		currency_label.text = "银币 %d" % int(state.player.silver)
 		var salvage_status = "已打捞" if bool(voyage.get("treasure_claimed", false)) else "可潜水"
 		quest_label.text = "%s → %s｜%s · %d日｜威胁%d/%d｜%s｜货舱%d/%d" % [GameData.TRADE_PORTS[str(voyage.origin)].name, GameData.TRADE_PORTS[str(voyage.destination)].name, str(voyage.get("tier_name", "航行")), int(voyage.days), state.sea_encounters_remaining(), Array(voyage.get("encounters", [])).size(), salvage_status, state.cargo_used(), state.cargo_capacity()]
@@ -1063,7 +1070,7 @@ func _interact():
 	_cancel_task_navigation()
 	AudioDirector.play_sfx("interact")
 	if nearest_actor.kind == "sea_port":
-		_complete_sea_voyage()
+		_complete_sea_voyage(str(nearest_actor.id))
 		return
 	if nearest_actor.kind == "sea_return":
 		_show_sea_return_prompt()
@@ -2436,7 +2443,7 @@ func _select_sailing_destination(port_id):
 	var stamina_cost = int(plan.stamina_cost)
 	var hp_after = int(state.player.hp) - stamina_cost
 	var storm_loss = 2 if str(plan.tier) == "oceanic" else 1
-	sailing_route_label.text = "%s → %s｜全港直航 · %s｜%d海里 · 预计%d日｜风险%d%%\n海燕号 Lv.%d · %d节 · %d海里/日｜连续大地图航道 %.1f屏\n航经：%s｜威胁情报：%s｜建议Lv.%d；敌人可绕行\n正常出航免费：消耗%d体力（%d→%d）｜潜水寻宝%d%%｜无护航遇风暴最多损失%d单位货物\n付费传送：%d银币 · 1日直达 · 无海战/打捞｜特产：%s" % [GameData.TRADE_PORTS[str(state.player.location)].name, destination.name, str(plan.tier_name), int(plan.distance_nm), days, risk, int(plan.ship_level), int(plan.speed_knots), int(plan.nm_per_day), GameData.sea_route_span(int(plan.distance_nm)) / MAP_SIZE.y, str(plan.waters_text), "、".join(threats), int(plan.recommended_level), stamina_cost, int(state.player.hp), max(0, hp_after), int(plan.dive_chance), storm_loss, int(route.fee), destination.specialty]
+	sailing_route_label.text = "%s → %s｜九港大地图 · %s｜%d海里 · 预计%d日｜风险%d%%\n%s · 帆装Lv.%d · %.1f节 · %d海里/日｜货舱%d格 · 船甲%d\n航经：%s｜威胁情报：%s｜建议Lv.%d；出航后可自由改靠其他港口\n正常出航免费：消耗%d体力（%d→%d）｜潜水寻宝%d%%｜无护航遇风暴最多损失%d单位货物\n付费传送：%d银币 · 1日直达 · 无海战/打捞｜特产：%s" % [GameData.TRADE_PORTS[str(state.player.location)].name, destination.name, str(plan.tier_name), int(plan.distance_nm), days, risk, str(state.ship.name), int(plan.ship_level), float(plan.speed_knots), int(plan.nm_per_day), state.cargo_capacity(), state.ship_armor(), str(plan.waters_text), "、".join(threats), int(plan.recommended_level), stamina_cost, int(state.player.hp), max(0, hp_after), int(plan.dive_chance), storm_loss, int(route.fee), destination.specialty]
 	if int(state.player.level) + 5 < int(plan.recommended_level):
 		sailing_route_label.text += "\n⚠ 当前等级偏低：建议手动绕开强敌、强化装备，或使用付费传送。"
 	elif state.voyage_protection > 0:
@@ -2702,13 +2709,24 @@ func _open_trade_2d():
 		sail.pressed.connect(_trade_sail_2d.bind(destination))
 		list.add_child(sail)
 	list.add_child(_label("船只改造", 16, GOLD))
+	var offered_hull_id = str(port.get("ship_offer", "sea_swallow"))
+	var offered_hull = Dictionary(GameData.SHIP_HULLS[offered_hull_id])
+	var ship_offer_copy = _label("本港船老板｜%s\n出售 Lv.%d %s｜基础%.1f节 · 货舱%d格 · 船甲%d\n%s" % [str(port.get("ship_seller", "船老板")), int(offered_hull.level), str(offered_hull.name), float(offered_hull.base_knots), int(offered_hull.capacity), int(offered_hull.armor), str(offered_hull.trait)], 14, TEAL)
+	ship_offer_copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	list.add_child(ship_offer_copy)
+	var buy_ship_button = _button("当前船只" if str(state.ship.get("hull_id", "sea_swallow")) == offered_hull_id else "购买%s · %d银币" % [str(offered_hull.name), int(offered_hull.price)], "gold")
+	buy_ship_button.disabled = str(state.ship.get("hull_id", "sea_swallow")) == offered_hull_id or int(state.player.silver) < int(offered_hull.price) or state.cargo_used() > int(offered_hull.capacity) + int(state.ship.get("hold_level", 0)) * 6
+	buy_ship_button.pressed.connect(_buy_ship_2d.bind(offered_hull_id))
+	list.add_child(buy_ship_button)
+	var profile = state.ship_speed_profile()
+	list.add_child(_label("当前｜%s · %.1f节 · %d海里/日｜货舱%d格｜船甲%d\n船装可跨船型转装：帆装Lv.%d · 舱板Lv.%d · 装甲Lv.%d" % [str(state.ship.name), float(profile.knots), int(profile.nm_per_day), state.cargo_capacity(), state.ship_armor(), int(state.ship.speed), int(state.ship.get("hold_level", 0)), int(state.ship.get("armor", 0))], 13, GOLD))
 	for upgrade_entry in [
-		{"id": "hold", "text": "扩建货舱 +6"},
-		{"id": "speed", "text": "升级船帆 · 提升节速"},
-		{"id": "armor", "text": "加固船体 -6%风险"}
+		{"id": "hold", "text": "强化舱板 +6格"},
+		{"id": "speed", "text": "强化帆装 +1.5节"},
+		{"id": "armor", "text": "强化装甲 -6%风险"}
 	]:
 		var upgrade_button = _button(upgrade_entry.text, "ghost")
-		upgrade_button.disabled = (upgrade_entry.id == "hold" and state.cargo_capacity() >= 30) or (upgrade_entry.id == "speed" and int(state.ship.speed) >= 4) or (upgrade_entry.id == "armor" and int(state.ship.get("armor", 0)) >= 3)
+		upgrade_button.disabled = (upgrade_entry.id == "hold" and int(state.ship.get("hold_level", 0)) >= 3) or (upgrade_entry.id == "speed" and int(state.ship.speed) >= 4) or (upgrade_entry.id == "armor" and int(state.ship.get("armor", 0)) >= 3)
 		upgrade_button.pressed.connect(_trade_upgrade_2d.bind(upgrade_entry.id))
 		list.add_child(upgrade_button)
 	list.add_child(_label("本轮商会净收支：%+d｜生涯已实现货差：%+d｜累计成交%d件" % [state.trade_profit, state.trade_lifetime_profit, state.trade_volume], 13, MUTED))
@@ -2814,6 +2832,8 @@ func _trade_dashboard_2d(port_id):
 	cargo_bar.add_theme_stylebox_override("fill", _style(Color(TEAL, 0.78), 9))
 	stack.add_child(cargo_bar)
 	stack.add_child(_label("货舱装载 %d/%d格  ·  空余%d格｜本港声望%d · 总声望%d" % [state.cargo_used(), state.cargo_capacity(), max(0, state.cargo_capacity() - state.cargo_used()), state.port_reputation_value(port_id), state.total_trade_reputation()], 13, MUTED))
+	var ship_profile = state.ship_speed_profile()
+	stack.add_child(_label("船只｜%s · %.1f节 · 日航%d海里｜船甲%d" % [str(state.ship.name), float(ship_profile.knots), int(ship_profile.nm_per_day), state.ship_armor()], 13, TEAL))
 	return panel
 
 func _trade_trend_2d(port_id, good_id):
@@ -2885,6 +2905,16 @@ func _trade_upgrade_2d(kind):
 		call_deferred("_open_trade_2d")
 	else:
 		_show_message("改造失败", str(result.get("message", "无法改造船只")))
+
+func _buy_ship_2d(hull_id):
+	var result = state.buy_ship(str(hull_id))
+	inventory_notice = ("✓ " if bool(result.get("ok", false)) else "！") + str(result.get("message", "无法购买船只"))
+	_refresh_hud()
+	_close_overlay()
+	if bool(result.get("ok", false)):
+		call_deferred("_open_trade_2d")
+	else:
+		_show_message("购船失败", str(result.get("message", "无法购买船只")))
 
 func _claim_trade_contract_2d():
 	var result = state.claim_trade_contract()

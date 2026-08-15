@@ -1900,7 +1900,7 @@ func _open_harbor():
 		var plan = state.voyage_plan(destination)
 		var route_row = HBoxContainer.new()
 		route_row.add_theme_constant_override("separation", 8)
-		var sail = _button("出航%s · %d海里/%d日 · %d节 · 体力%d · 风险%d%%" % [GameData.TRADE_PORTS[destination].name, int(plan.distance_nm), int(plan.days), int(plan.speed_knots), int(plan.stamina_cost), int(plan.risk)], "primary")
+		var sail = _button("出航%s · %d海里/%d日 · %.1f节 · 体力%d · 风险%d%%" % [GameData.TRADE_PORTS[destination].name, int(plan.distance_nm), int(plan.days), float(plan.speed_knots), int(plan.stamina_cost), int(plan.risk)], "primary")
 		sail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		sail.disabled = int(state.player.hp) <= int(plan.stamina_cost)
 		sail.tooltip_text = "潜水寻宝%d%%｜侦测到%d处威胁" % [int(plan.dive_chance), int(plan.threat_count)]
@@ -1913,6 +1913,13 @@ func _open_harbor():
 		market.add_child(route_row)
 
 	market.add_child(_small_caption("船只改造"))
+	var offered_hull_id = str(port.get("ship_offer", "sea_swallow"))
+	var offered_hull = Dictionary(GameData.SHIP_HULLS[offered_hull_id])
+	market.add_child(_label("%s船行｜Lv.%d %s · %.1f节 · %d格货舱 · 船甲%d" % [str(port.get("ship_seller", "本港")), int(offered_hull.level), str(offered_hull.name), float(offered_hull.base_knots), int(offered_hull.capacity), int(offered_hull.armor)], 11, TEAL))
+	var purchase_ship = _button("当前船只" if str(state.ship.get("hull_id", "sea_swallow")) == offered_hull_id else "购买%s · %d银" % [str(offered_hull.name), int(offered_hull.price)], "gold")
+	purchase_ship.disabled = str(state.ship.get("hull_id", "sea_swallow")) == offered_hull_id or int(state.player.silver) < int(offered_hull.price) or state.cargo_used() > int(offered_hull.capacity) + int(state.ship.get("hold_level", 0)) * 6
+	purchase_ship.pressed.connect(_buy_ship_from_journal.bind(offered_hull_id))
+	market.add_child(purchase_ship)
 	var upgrades = HBoxContainer.new()
 	upgrades.add_theme_constant_override("separation", 8)
 	var hold = _button("扩建货舱 +6", "ghost")
@@ -1921,7 +1928,7 @@ func _open_harbor():
 	hold.pressed.connect(_trade_upgrade.bind("hold"))
 	upgrades.add_child(hold)
 	var speed_profile = state.ship_speed_profile()
-	var speed = _button("船帆Lv.%d · %d节｜升级节速" % [int(state.ship.speed), int(speed_profile.knots)], "ghost")
+	var speed = _button("帆装Lv.%d · %.1f节｜强化帆装" % [int(state.ship.speed), float(speed_profile.knots)], "ghost")
 	speed.disabled = int(state.ship.speed) >= 4
 	speed.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	speed.pressed.connect(_trade_upgrade.bind("speed"))
@@ -1979,7 +1986,7 @@ func _add_journal_trade_good_card(market, good_id, can_buy):
 	market.add_child(card)
 
 func _hold_upgrade_state(button):
-	button.disabled = state.cargo_capacity() >= 30
+	button.disabled = int(state.ship.get("hold_level", 0)) >= 3
 
 func _trade_buy(good_id, buy_max = false):
 	var result = state.buy_max_cargo(good_id) if buy_max else state.buy_cargo(good_id)
@@ -2044,6 +2051,13 @@ func _trade_upgrade(kind):
 	_close_modal()
 	refresh_ui()
 	_show_toast(result.message, result.ok)
+	call_deferred("_open_harbor")
+
+func _buy_ship_from_journal(hull_id):
+	var result = state.buy_ship(str(hull_id))
+	_close_modal()
+	refresh_ui()
+	_show_toast(str(result.get("message", "无法购买船只")), bool(result.get("ok", false)))
 	call_deferred("_open_harbor")
 
 func _claim_trade_contract_from_journal():

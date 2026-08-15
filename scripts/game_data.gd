@@ -295,15 +295,27 @@ const NPCS = {
 }
 
 const TRADE_PORTS = {
-	"venice_dock": {"name": "威尼斯", "specialty": "威尼斯玻璃", "specialty_good": "venetian_glass", "stock": ["venetian_glass"], "merchant_npc": "venice_quartermaster", "note": "蕾娜只出售本地玻璃；香料和东方货在此溢价", "order_npc": "ship_owner"},
-	"ragusa_dock": {"name": "拉古萨", "specialty": "石墙羊毛布与亚得里亚橄榄油", "specialty_good": "wool_cloth", "stock": ["wool_cloth", "olive_oil"], "merchant_npc": "ragusa_broker", "note": "羊毛布和橄榄油只在拉古萨出产；把它们运往缺货港口才能赚取货差", "order_npc": "ragusa_harbormaster"},
-	"alexandria_dock": {"name": "亚历山大", "specialty": "亚历山大香料", "specialty_good": "spices", "stock": ["spices"], "merchant_npc": "alexandria_merchant", "note": "萨米尔只出售本地香料；玻璃和北海货在这里仅收购、不出售", "order_npc": "alex_lighthouse_keeper"},
-	"malta_dock": {"name": "马耳他", "specialty": "金岛柑橘", "specialty_good": "citrus", "stock": ["citrus"], "merchant_npc": "malta_keeper", "note": "这里只出售金岛柑橘；烹饪所需的油和香料必须从产地装船运来", "order_npc": "malta_keeper"},
-	"cape_town_dock": {"name": "开普敦", "specialty": "风暴角金砂", "specialty_good": "cape_gold_dust", "stock": ["cape_gold_dust"], "merchant_npc": "cape_quartermaster", "note": "北河金砂便宜，运往地中海与东方能卖出高价", "npc": "cape_keeper", "order_npc": "cape_quartermaster"},
-	"quanzhou_dock": {"name": "泉州", "specialty": "刺桐青瓷", "specialty_good": "quanzhou_porcelain", "stock": ["quanzhou_porcelain"], "merchant_npc": "quanzhou_merchant", "note": "海商林香专营青瓷，西方港口愿为完整瓷器支付高价", "npc": "quanzhou_scholar", "order_npc": "quanzhou_merchant"},
-	"athens_dock": {"name": "雅典", "specialty": "银帆葡萄酒", "specialty_good": "athens_wine", "stock": ["athens_wine"], "merchant_npc": "athens_oracle", "note": "银帆葡萄酒只在雅典装桶，西方庆典和东方宴席都有高价需求", "npc": "athens_oracle", "order_npc": "athens_smith"},
-	"yangzhou_dock": {"name": "扬州", "specialty": "运河玉纱", "specialty_good": "yangzhou_silk", "stock": ["yangzhou_silk"], "merchant_npc": "yangzhou_merchant", "note": "玉纱轻且昂贵，适合装满快船远销北海", "npc": "yangzhou_weaver", "order_npc": "yangzhou_merchant"},
-	"amsterdam_dock": {"name": "阿姆斯特丹", "specialty": "风车港航海仪", "specialty_good": "amsterdam_instruments", "stock": ["amsterdam_instruments"], "merchant_npc": "amsterdam_auctioneer", "note": "精密航海仪在东方稀缺，拍卖行也高价收购丝绸", "npc": "amsterdam_cartographer", "order_npc": "amsterdam_auctioneer"}
+	"venice_dock": {"name": "威尼斯", "specialty": "威尼斯玻璃", "specialty_good": "venetian_glass", "stock": ["venetian_glass"], "merchant_npc": "venice_quartermaster", "note": "蕾娜只出售本地玻璃；香料和东方货在此溢价", "order_npc": "ship_owner", "ship_offer": "sea_swallow", "ship_seller": "洛伦佐"},
+	"ragusa_dock": {"name": "拉古萨", "specialty": "石墙羊毛布与亚得里亚橄榄油", "specialty_good": "wool_cloth", "stock": ["wool_cloth", "olive_oil"], "merchant_npc": "ragusa_broker", "note": "羊毛布和橄榄油只在拉古萨出产；把它们运往缺货港口才能赚取货差", "order_npc": "ragusa_harbormaster", "ship_offer": "adriatic_cog", "ship_seller": "娜迪娅"},
+	"alexandria_dock": {"name": "亚历山大", "specialty": "亚历山大香料", "specialty_good": "spices", "stock": ["spices"], "merchant_npc": "alexandria_merchant", "note": "萨米尔只出售本地香料；玻璃和北海货在这里仅收购、不出售", "order_npc": "alex_lighthouse_keeper", "ship_offer": "alex_caravel", "ship_seller": "哈伦"},
+	"malta_dock": {"name": "马耳他", "specialty": "金岛柑橘", "specialty_good": "citrus", "stock": ["citrus"], "merchant_npc": "malta_keeper", "note": "这里只出售金岛柑橘；烹饪所需的油和香料必须从产地装船运来", "order_npc": "malta_keeper", "ship_offer": "malta_galley", "ship_seller": "伊莎贝拉"},
+	"cape_town_dock": {"name": "开普敦", "specialty": "风暴角金砂", "specialty_good": "cape_gold_dust", "stock": ["cape_gold_dust"], "merchant_npc": "cape_quartermaster", "note": "北河金砂便宜，运往地中海与东方能卖出高价", "npc": "cape_keeper", "order_npc": "cape_quartermaster", "ship_offer": "cape_carrack", "ship_seller": "姆贝基"},
+	"quanzhou_dock": {"name": "泉州", "specialty": "刺桐青瓷", "specialty_good": "quanzhou_porcelain", "stock": ["quanzhou_porcelain"], "merchant_npc": "quanzhou_merchant", "note": "海商林香专营青瓷，西方港口愿为完整瓷器支付高价", "npc": "quanzhou_scholar", "order_npc": "quanzhou_merchant", "ship_offer": "quanzhou_junk", "ship_seller": "林海"},
+	"athens_dock": {"name": "雅典", "specialty": "银帆葡萄酒", "specialty_good": "athens_wine", "stock": ["athens_wine"], "merchant_npc": "athens_oracle", "note": "银帆葡萄酒只在雅典装桶，西方庆典和东方宴席都有高价需求", "npc": "athens_oracle", "order_npc": "athens_smith", "ship_offer": "athens_trireme", "ship_seller": "尼科斯"},
+	"yangzhou_dock": {"name": "扬州", "specialty": "运河玉纱", "specialty_good": "yangzhou_silk", "stock": ["yangzhou_silk"], "merchant_npc": "yangzhou_merchant", "note": "玉纱轻且昂贵，适合装满快船远销北海", "npc": "yangzhou_weaver", "order_npc": "yangzhou_merchant", "ship_offer": "yangzhou_treasure", "ship_seller": "阿渔"},
+	"amsterdam_dock": {"name": "阿姆斯特丹", "specialty": "风车港航海仪", "specialty_good": "amsterdam_instruments", "stock": ["amsterdam_instruments"], "merchant_npc": "amsterdam_auctioneer", "note": "精密航海仪在东方稀缺，拍卖行也高价收购丝绸", "npc": "amsterdam_cartographer", "order_npc": "amsterdam_auctioneer", "ship_offer": "amsterdam_clipper", "ship_seller": "威廉"}
+}
+
+const SHIP_HULLS = {
+	"sea_swallow": {"name": "海燕号", "level": 1, "price": 0, "base_knots": 8.0, "capacity": 12, "armor": 0, "trait": "轻巧可靠的沿岸帆船"},
+	"adriatic_cog": {"name": "石墙柯克船", "level": 2, "price": 260, "base_knots": 9.0, "capacity": 18, "armor": 1, "trait": "低速但有宽阔方形货舱"},
+	"alex_caravel": {"name": "灯塔卡拉维尔", "level": 3, "price": 480, "base_knots": 11.0, "capacity": 20, "armor": 1, "trait": "三角帆擅长逆风航线"},
+	"malta_galley": {"name": "金岛桨帆船", "level": 4, "price": 680, "base_knots": 12.0, "capacity": 18, "armor": 2, "trait": "无风海域仍能保持速度"},
+	"cape_carrack": {"name": "风暴角大帆船", "level": 5, "price": 980, "base_knots": 10.5, "capacity": 32, "armor": 3, "trait": "为远洋重货与风暴打造"},
+	"quanzhou_junk": {"name": "刺桐福船", "level": 6, "price": 1280, "base_knots": 13.0, "capacity": 30, "armor": 2, "trait": "水密隔舱兼顾速度和货量"},
+	"athens_trireme": {"name": "银帆战船", "level": 7, "price": 1420, "base_knots": 14.5, "capacity": 22, "armor": 3, "trait": "追击海盗的高速装甲船"},
+	"yangzhou_treasure": {"name": "月港宝船", "level": 8, "price": 1850, "base_knots": 12.0, "capacity": 44, "armor": 3, "trait": "九港最大的贸易货舱"},
+	"amsterdam_clipper": {"name": "北海飞剪船", "level": 9, "price": 2400, "base_knots": 17.0, "capacity": 28, "armor": 2, "trait": "七海最快的远洋商船"}
 }
 
 const PORT_UNLOCK_QUEST = {
@@ -346,26 +358,36 @@ const SEA_VOYAGE_TIERS = {
 	"oceanic": {"name": "远洋航线", "max_distance_nm": 99999, "minimum_threats": 2, "description": "连续数日看不到陆地，至少有两段高危海区。"}
 }
 
-# 船帆等级同时决定贸易日历与2D驾驶速度。按每天24小时连续航行换算，
-# 15节约为360海里/日；高等级船帆提升的是节速，而不是简单固定减一天。
+# 船帆等级同时决定贸易日历与2D驾驶速度。实际节速由船体基础速度与帆装加成组成，
+# 日航程按24小时连续航行换算；强化帆装提升的是节速，而不是简单固定减一天。
 const SHIP_SPEED_LEVELS = {
-	1: {"name": "沿岸帆装", "knots": 15, "nm_per_day": 360, "world_speed": 300.0},
-	2: {"name": "双桅帆装", "knots": 18, "nm_per_day": 432, "world_speed": 350.0},
-	3: {"name": "远洋帆装", "knots": 22, "nm_per_day": 528, "world_speed": 415.0},
-	4: {"name": "飞剪帆装", "knots": 27, "nm_per_day": 648, "world_speed": 490.0}
+	1: {"name": "旧麻帆", "knots_bonus": 0.0},
+	2: {"name": "加固横帆", "knots_bonus": 1.5},
+	3: {"name": "远洋复帆", "knots_bonus": 3.0},
+	4: {"name": "飞剪帆组", "knots_bonus": 4.5}
 }
 
 # 真实海里决定连续航海地图的纵向长度。为保证手机操作节奏，洲际航线
 # 采用统一比例压缩并封顶，但港口之间仍保持明确、单调的距离差异。
 const SEA_WORLD_WIDTH = 1080.0
 const SEA_WORLD_MARGIN = 260.0
+const SEA_GLOBAL_WORLD_SIZE = Vector2(3200, 2900)
 
-static func ship_speed_profile(level):
-	return Dictionary(SHIP_SPEED_LEVELS.get(clamp(int(level), 1, 4), SHIP_SPEED_LEVELS[1])).duplicate(true)
+static func ship_speed_profile(level, hull_id = "sea_swallow"):
+	var sail = Dictionary(SHIP_SPEED_LEVELS.get(clamp(int(level), 1, 4), SHIP_SPEED_LEVELS[1]))
+	var hull = Dictionary(SHIP_HULLS.get(str(hull_id), SHIP_HULLS.sea_swallow))
+	var knots = float(hull.base_knots) + float(sail.knots_bonus)
+	return {"name": str(sail.name), "knots": knots, "nm_per_day": int(round(knots * 24.0)), "world_speed": knots * 10.0}
 
-static func voyage_days(distance_nm, ship_level):
-	var profile = ship_speed_profile(ship_level)
+static func voyage_days(distance_nm, ship_level, hull_id = "sea_swallow"):
+	var profile = ship_speed_profile(ship_level, hull_id)
 	return max(1, int(ceil(float(max(1, int(distance_nm))) / float(profile.nm_per_day))))
+
+static func sea_port_position(port_id):
+	var navigation = PORT_NAVIGATION.get(str(port_id), PORT_NAVIGATION.venice_dock)
+	var x = 220.0 + (float(navigation.longitude) + 20.0) * 20.0
+	var y = 220.0 + (60.0 - float(navigation.latitude)) * 25.0
+	return Vector2(clamp(x, 180.0, SEA_GLOBAL_WORLD_SIZE.x - 180.0), clamp(y, 180.0, SEA_GLOBAL_WORLD_SIZE.y - 180.0))
 
 static func sea_route_span(distance_nm):
 	return clamp(760.0 + float(max(1, int(distance_nm))) * 0.52, 900.0, 6500.0)

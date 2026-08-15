@@ -34,15 +34,15 @@ func _run():
 	var coastal_plan = state.voyage_plan("ragusa_dock")
 	var regional_plan = state.voyage_plan("alexandria_dock")
 	var oceanic_plan = state.voyage_plan("cape_town_dock")
-	_check(int(coastal_plan.distance_nm) == 420 and str(coastal_plan.tier) == "coastal" and int(coastal_plan.threat_count) == 1 and coastal_plan.enemy_ids == ["coastal_pirate"], "威尼斯至拉古萨必须是420海里的单海盗近海航程")
-	_check(str(regional_plan.tier) == "regional" and int(regional_plan.threat_count) == 2 and "reef_serpent" in regional_plan.enemy_ids, "跨海航线必须同时规划海盗与礁海怪物")
-	_check(str(oceanic_plan.tier) == "oceanic" and int(oceanic_plan.threat_count) == 2 and not ("black_flag_privateer" in oceanic_plan.enemy_ids), "中低等级玩家的远洋航线不能过早出现Lv.52黑旗私掠舰")
+	_check(int(coastal_plan.distance_nm) == 420 and str(coastal_plan.tier) == "coastal" and int(coastal_plan.threat_count) == 2 and "coastal_pirate" in coastal_plan.enemy_ids, "威尼斯至拉古萨必须是420海里并生成两处含海盗的近海威胁")
+	_check(str(regional_plan.tier) == "regional" and int(regional_plan.threat_count) == 4 and "reef_serpent" in regional_plan.enemy_ids, "跨海航线必须提高怪物密度并同时规划海盗与礁海怪物")
+	_check(str(oceanic_plan.tier) == "oceanic" and int(oceanic_plan.threat_count) == 6 and not ("black_flag_privateer" in oceanic_plan.enemy_ids), "中低等级玩家的长途远洋航线必须有六处威胁且不能过早出现Lv.52私掠舰")
 	_check(int(coastal_plan.distance_nm) < int(regional_plan.distance_nm) and int(regional_plan.distance_nm) < int(oceanic_plan.distance_nm), "近海、跨海与远洋距离必须按真实港口跨度递增")
-	_check(GameData.sea_route_span(int(coastal_plan.distance_nm)) < GameData.sea_route_span(int(regional_plan.distance_nm)) and GameData.sea_route_span(int(regional_plan.distance_nm)) < GameData.sea_route_span(int(oceanic_plan.distance_nm)), "可驾驶航海大地图长度必须随真实海里单调增长")
+	_check(GameData.sea_port_position("venice_dock").distance_to(GameData.sea_port_position("ragusa_dock")) < GameData.sea_port_position("venice_dock").distance_to(GameData.sea_port_position("alexandria_dock")) and GameData.SEA_GLOBAL_WORLD_SIZE == Vector2(3200, 2900), "九港必须投影在同一张大地图中，近港的物理距离应更短")
 	var level_one_days = int(oceanic_plan.days)
 	state.ship.speed = 4
 	var fast_oceanic_plan = state.voyage_plan("cape_town_dock")
-	_check(int(fast_oceanic_plan.speed_knots) == 27 and int(fast_oceanic_plan.nm_per_day) == 648 and float(fast_oceanic_plan.world_speed) > float(oceanic_plan.world_speed) and int(fast_oceanic_plan.days) < level_one_days, "船帆等级必须通过节速同时缩短贸易日历并提高2D驾驶速度")
+	_check(is_equal_approx(float(fast_oceanic_plan.speed_knots), 12.5) and int(fast_oceanic_plan.nm_per_day) == 300 and float(fast_oceanic_plan.world_speed) > float(oceanic_plan.world_speed) and int(fast_oceanic_plan.days) < level_one_days, "船型基础速度与帆装等级必须共同缩短贸易日历并提高2D驾驶速度")
 	state.ship.speed = 1
 	_check(int(coastal_plan.stamina_cost) < int(oceanic_plan.stamina_cost) and int(coastal_plan.dive_chance) < int(oceanic_plan.dive_chance), "远洋必须消耗更多出航体力，同时提供更高的潜水寻宝概率")
 	var tired_state = TestState.new()
@@ -52,17 +52,17 @@ func _run():
 	_check(not bool(tired_state.begin_voyage("ragusa_dock").get("ok", true)) and tired_state.active_voyage.is_empty(), "体力不足时不能以0体力离港，必须先休息或使用补给")
 	state.player.level = 55
 	var veteran_oceanic_plan = state.voyage_plan("cape_town_dock")
-	_check(int(veteran_oceanic_plan.threat_count) == 3 and "black_flag_privateer" in veteran_oceanic_plan.enemy_ids, "高等级玩家进入高风险远洋时必须出现第三段私掠舰威胁")
+	_check(int(veteran_oceanic_plan.threat_count) == 6 and "black_flag_privateer" in veteran_oceanic_plan.enemy_ids, "高等级玩家进入高风险远洋时必须出现六处巡游威胁并包含私掠舰")
 	var north_sea_plan = state.voyage_plan("venice_dock", "amsterdam_dock")
 	var east_asia_plan = state.voyage_plan("yangzhou_dock", "quanzhou_dock")
 	var intercontinental_plan = state.voyage_plan("quanzhou_dock", "venice_dock")
 	_check("fog_siren" in north_sea_plan.enemy_ids or "drowned_sailor" in north_sea_plan.enemy_ids, "北海航程必须出现雾歌海妖或溺潮水手，不能复用地中海固定敌群：%s" % north_sea_plan)
-	_check(east_asia_plan.enemy_ids == ["reef_serpent"], "泉州至扬州近海必须生成东亚礁海怪物")
+	_check(Array(east_asia_plan.enemy_ids).size() == 2 and "reef_serpent" in east_asia_plan.enemy_ids, "泉州至扬州近海必须生成两处含礁海长蛇的东亚威胁")
 	_check(intercontinental_plan.zone_ids == ["mediterranean", "indian_ocean", "east_asia"] and "印度洋" in str(intercontinental_plan.waters_text), "威尼斯至泉州必须记录完整跨海域航迹")
 	state.ship.armor = 3
 	state.voyage_protection = 1
 	var protected_oceanic_plan = state.voyage_plan("cape_town_dock")
-	_check(int(protected_oceanic_plan.threat_count) == 2 and int(protected_oceanic_plan.risk) < int(veteran_oceanic_plan.risk), "船体护甲和护航物资必须降低远洋风险与遭遇数量")
+	_check(int(protected_oceanic_plan.threat_count) == 5 and int(protected_oceanic_plan.risk) < int(veteran_oceanic_plan.risk), "船体护甲和护航物资必须降低远洋风险与遭遇数量")
 	state.ship.armor = 0
 	state.voyage_protection = 0
 	state.player.level = 8
@@ -73,11 +73,11 @@ func _run():
 	_check(bool(departure.get("ok", false)), "正常出航必须能创建进行中的航程")
 	_check(str(state.player.location) == "venice_dock" and int(state.player.silver) == initial_silver, "出航后、靠港前必须保留启航港且不收传送费")
 	_check(int(state.player.hp) == initial_hp - int(coastal_plan.stamina_cost) and int(state.active_voyage.stamina_cost) == int(coastal_plan.stamina_cost), "正常出航必须按航程消耗体力并把消耗记录进航程")
-	var coastal_origin = GameData.sea_route_position(int(coastal_plan.distance_nm), 0.0)
-	_check(str(state.active_voyage.get("region", "")) == "mediterranean" and state.voyage_position() == coastal_origin and float(state.active_voyage.world_height) == GameData.sea_world_height(int(coastal_plan.distance_nm)), "威尼斯至拉古萨必须进入按真实距离生成的地中海地图并保存船位")
+	var coastal_origin = GameData.sea_port_position("venice_dock")
+	_check(str(state.active_voyage.get("region", "")) == "mediterranean" and state.voyage_position() == coastal_origin and Vector2(float(state.active_voyage.world_width), float(state.active_voyage.world_height)) == GameData.SEA_GLOBAL_WORLD_SIZE and Array(state.active_voyage.unlocked_ports).size() == 9, "出航后必须进入九港共用大地图并在启航港保存船位")
 	state.update_voyage_position(Vector2(610, 1240))
 	_check(state.voyage_position() == Vector2(610, 1240), "进行中的船位必须可以写入存档状态")
-	state.update_voyage_position(GameData.sea_route_position(int(coastal_plan.distance_nm), 0.5))
+	state.update_voyage_position(GameData.sea_port_position("venice_dock").lerp(GameData.sea_port_position("ragusa_dock"), 0.5))
 	_check(is_equal_approx(state.voyage_progress(), 0.5) and state.voyage_remaining_distance() == 210, "船位必须换算为真实航程进度与剩余海里")
 	var treasure = state.claim_sea_treasure()
 	_check(bool(treasure.get("ok", false)) and str(treasure.get("mode", "")) == "salvage" and int(state.player.silver) > initial_silver and not bool(state.claim_sea_treasure().get("ok", true)), "每段航程可选择稳妥打捞，且漂流货箱只能领取一次")
@@ -86,7 +86,7 @@ func _run():
 	var storm = state.resolve_sea_storm()
 	_check(bool(storm.get("ok", false)) and int(state.cargo.get("venetian_glass", 0)) == 1, "未携带护航物资穿越风暴时必须在海域内即时损失货物")
 	state.mark_sea_pirate_defeated()
-	_check(bool(state.active_voyage.get("pirate_defeated", false)), "击败海盗必须记录在当前航程，防止重复拦截")
+	_check(state.sea_encounters_remaining() == 1 and not bool(state.active_voyage.get("pirate_defeated", true)), "击败一支巡游海盗后必须保留同航线上的其他威胁")
 	var arrival = state.complete_voyage()
 	_check(bool(arrival.get("ok", false)) and str(state.player.location) == "ragusa_dock" and state.active_voyage.is_empty() and int(state.trade_day) > initial_day, "抵港后才应修改港口、推进日期并清空航程")
 
@@ -152,18 +152,17 @@ func _run():
 	long_state.player.location = "venice_dock"
 	long_state.player.level = 55
 	long_state.begin_voyage("cape_town_dock")
-	_check(Array(long_state.active_voyage.encounters).size() == 3 and long_state.sea_encounters_remaining() == 3, "远洋航程必须生成并保存三处独立遭遇")
+	_check(Array(long_state.active_voyage.encounters).size() == 6 and long_state.sea_encounters_remaining() == 6, "远洋航程必须生成并保存六处独立遭遇")
 	for encounter in Array(long_state.active_voyage.encounters):
 		var encounter_data = Dictionary(encounter)
-		var zone_index = Array(long_state.active_voyage.zone_ids).find(str(encounter_data.zone_id))
-		var encounter_progress = float(encounter_data.progress)
-		_check(zone_index >= 0 and encounter_progress >= float(zone_index) / Array(long_state.active_voyage.zone_ids).size() and encounter_progress <= float(zone_index + 1) / Array(long_state.active_voyage.zone_ids).size(), "海盗与海怪必须落在各自海域生态带，而不是堆到固定坐标")
+		var encounter_position = Vector2(float(encounter_data.x), float(encounter_data.y))
+		_check(str(encounter_data.zone_id) in Array(long_state.active_voyage.zone_ids) and encounter_position.x > 100.0 and encounter_position.x < GameData.SEA_GLOBAL_WORLD_SIZE.x - 100.0 and encounter_position.y > 100.0 and encounter_position.y < GameData.SEA_GLOBAL_WORLD_SIZE.y - 100.0, "海盗与海怪必须分散在大地图航路及对应海域内")
 	var first_encounter = Dictionary(long_state.active_voyage.encounters[0])
 	long_state.mark_sea_encounter_defeated(str(first_encounter.id))
-	_check(long_state.sea_encounters_remaining() == 2 and not bool(long_state.active_voyage.pirate_defeated), "击败一处远洋威胁不能错误清空其余敌人")
+	_check(long_state.sea_encounters_remaining() == 5 and not bool(long_state.active_voyage.pirate_defeated), "击败一处远洋威胁不能错误清空其余敌人")
 	var second_enemy = long_state.sea_enemy_id()
 	var expected_second_enemy = str(Dictionary(long_state.active_voyage.encounters[1]).enemy_id)
-	_check(second_enemy == expected_second_enemy and second_enemy != str(first_encounter.enemy_id), "击败第一处海域威胁后必须继续面对航迹中下一种敌人")
+	_check(second_enemy == expected_second_enemy and second_enemy != "", "击败第一处海域威胁后必须继续面对航迹中下一处敌人")
 	long_state.cargo["venetian_glass"] = 3
 	var ocean_storm = long_state.resolve_sea_storm()
 	_check(int(ocean_storm.get("lost_count", 0)) == 2 and int(long_state.cargo.get("venetian_glass", 0)) == 1, "未防护的远洋风暴必须损失两单位货物")
@@ -174,7 +173,7 @@ func _run():
 	legacy_state.voyage_protection = 1
 	legacy_state.active_voyage = {"origin": "venice_dock", "destination": "ragusa_dock", "days": 2, "risk": 14, "x": 540.0, "y": 1200.0, "pirate_defeated": false}
 	legacy_state._normalize_active_voyage()
-	_check(int(legacy_state.active_voyage.get("distance_nm", 0)) == 420 and legacy_state.active_voyage.has("world_height") and Array(legacy_state.active_voyage.get("encounters", [])).size() == 1 and Dictionary(legacy_state.active_voyage.encounters[0]).has("progress") and bool(legacy_state.active_voyage.get("escorted", false)) and legacy_state.voyage_protection == 0, "旧版进行中航程必须迁移为连续大地图坐标、海域遭遇和已准备的护航物资")
+	_check(int(legacy_state.active_voyage.get("distance_nm", 0)) == 420 and float(legacy_state.active_voyage.world_width) == GameData.SEA_GLOBAL_WORLD_SIZE.x and Array(legacy_state.active_voyage.get("encounters", [])).size() == 2 and Dictionary(legacy_state.active_voyage.encounters[0]).has("progress") and bool(legacy_state.active_voyage.get("escorted", false)) and legacy_state.voyage_protection == 0, "旧版进行中航程必须迁移到九港共用大地图、密集遭遇和已准备的护航物资")
 
 	if failures.is_empty():
 		print("SAILING_OK: 体力出航、海域状态、风暴、打捞/潜水、靠港、返航与付费传送全部通过")
