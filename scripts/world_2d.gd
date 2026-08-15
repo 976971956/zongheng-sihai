@@ -105,6 +105,7 @@ var battle_result = {}
 var auto_battle_running = false
 var active_enemy_actor = {}
 var enemy_respawn_scheduled = {}
+var enemy_respawn_markers = {}
 var current_zone = ""
 var current_region = "city"
 var joystick
@@ -189,11 +190,6 @@ var region_obstacles = {
 	"white_whale": [Rect2(0, 285, 295, 58), Rect2(425, 285, 295, 58), Rect2(0, 540, 295, 58), Rect2(425, 540, 295, 58), Rect2(0, 795, 295, 58), Rect2(425, 795, 295, 58)]
 	,"legacy": [Rect2(0, 285, 250, 58), Rect2(470, 285, 250, 58), Rect2(0, 760, 250, 58), Rect2(470, 760, 250, 58)]
 }
-
-var port_city_obstacles = [
-	Rect2(28, 355, 205, 165), Rect2(490, 335, 200, 175),
-	Rect2(28, 650, 205, 165), Rect2(490, 645, 200, 170)
-]
 
 func _ready():
 	get_window().content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
@@ -287,9 +283,6 @@ func _scale_world_geometry():
 		for rect in region_obstacles[region_id]:
 			scaled_rects.append(_world_rect(rect))
 		region_obstacles[region_id] = scaled_rects
-	for obstacle_index in range(port_city_obstacles.size()):
-		port_city_obstacles[obstacle_index] = _world_rect(port_city_obstacles[obstacle_index])
-
 func _active_city_port_id():
 	var location_id = str(state.player.location)
 	return location_id if GameData.TRADE_PORTS.has(location_id) else "venice_dock"
@@ -324,7 +317,11 @@ func _spawn_world_actors():
 	for entry in actors:
 		if is_instance_valid(entry.node):
 			entry.node.queue_free()
+	for marker in enemy_respawn_markers.values():
+		if is_instance_valid(marker):
+			marker.queue_free()
 	actors = []
+	enemy_respawn_markers = {}
 	nearest_actor = {}
 	if current_region == "sea":
 		if state.active_voyage.is_empty():
@@ -444,10 +441,12 @@ func _spawn_enemy_if_ready(enemy_id):
 	var key = _enemy_spawn_key(enemy_id)
 	var remaining = float(state.enemy_respawns.get(key, 0.0)) - _world_time_seconds()
 	if remaining > 0.0:
+		_show_enemy_respawn_marker(enemy_id, remaining)
 		_schedule_enemy_respawn(enemy_id, remaining)
 		return
 	state.enemy_respawns.erase(key)
 	enemy_respawn_scheduled.erase(key)
+	_remove_enemy_respawn_marker(key)
 	if _has_actor_id(enemy_id):
 		return
 	_add_actor("enemy", enemy_id, data.name, data.position, data.color, data.accent, data.location)
@@ -473,10 +472,58 @@ func _schedule_enemy_respawn(enemy_id, delay):
 	var timer = get_tree().create_timer(max(0.05, float(delay)))
 	timer.timeout.connect(_try_respawn_enemy.bind(enemy_id, deadline))
 
+func _show_enemy_respawn_marker(enemy_id, remaining):
+	if not ENEMY_SPAWNS.has(enemy_id) or current_region in ["sea", "dungeon", "black_sail", "white_whale", "legacy"]:
+		return
+	var key = _enemy_spawn_key(enemy_id)
+	var marker = enemy_respawn_markers.get(key)
+	if not is_instance_valid(marker):
+		var data = ENEMY_SPAWNS[enemy_id]
+		marker = Label.new()
+		marker.name = "RespawnMarker_%s" % enemy_id
+		marker.position = _world_point(data.position) + Vector2(-105, -112)
+		marker.size = Vector2(210, 66)
+		marker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		marker.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		marker.z_index = 32
+		marker.add_theme_font_size_override("font_size", 14)
+		marker.add_theme_color_override("font_color", Color("d9f7f1"))
+		marker.add_theme_stylebox_override("normal", _style(Color(0.02, 0.09, 0.11, 0.92), 12, Color(TEAL, 0.78), 2, 7))
+		world_layer.add_child(marker)
+		enemy_respawn_markers[key] = marker
+	_update_enemy_respawn_marker(enemy_id, float(remaining))
+
+func _update_enemy_respawn_marker(enemy_id, remaining):
+	var key = _enemy_spawn_key(enemy_id)
+	var marker = enemy_respawn_markers.get(key)
+	if not is_instance_valid(marker) or not ENEMY_SPAWNS.has(enemy_id):
+		return
+	var seconds = max(0, int(ceil(float(remaining))))
+	var minutes = int(seconds / 60)
+	marker.text = "%s刷新中\n◇ %02d:%02d" % [str(ENEMY_SPAWNS[enemy_id].name), minutes, seconds % 60]
+
+func _refresh_enemy_respawn_markers():
+	var now = _world_time_seconds()
+	for key in Array(enemy_respawn_markers.keys()):
+		var marker = enemy_respawn_markers.get(key)
+		if not is_instance_valid(marker):
+			enemy_respawn_markers.erase(key)
+			continue
+		var deadline = max(float(state.enemy_respawns.get(key, 0.0)), float(enemy_respawn_scheduled.get(key, 0.0)))
+		_update_enemy_respawn_marker(str(key), max(0.0, deadline - now))
+
+func _remove_enemy_respawn_marker(key):
+	var marker = enemy_respawn_markers.get(str(key))
+	if is_instance_valid(marker):
+		marker.queue_free()
+	enemy_respawn_markers.erase(str(key))
+
 func _defer_enemy_respawn(enemy_id):
 	var key = _enemy_spawn_key(enemy_id)
 	var retry_deadline = _world_time_seconds() + MONSTER_RESPAWN_RETRY_SECONDS
 	enemy_respawn_scheduled[key] = retry_deadline
+	_show_enemy_respawn_marker(enemy_id, MONSTER_RESPAWN_RETRY_SECONDS)
 	var timer = get_tree().create_timer(MONSTER_RESPAWN_RETRY_SECONDS)
 	timer.timeout.connect(_try_respawn_enemy.bind(enemy_id, retry_deadline))
 
@@ -494,6 +541,7 @@ func _try_respawn_enemy(enemy_id, scheduled_deadline = -1.0):
 	enemy_respawn_scheduled.erase(key)
 	var remaining = float(state.enemy_respawns.get(key, 0.0)) - _world_time_seconds()
 	if remaining > 0.0:
+		_show_enemy_respawn_marker(enemy_id, remaining)
 		_schedule_enemy_respawn(enemy_id, remaining)
 		return
 	var data = ENEMY_SPAWNS.get(enemy_id, {})
@@ -501,12 +549,15 @@ func _try_respawn_enemy(enemy_id, scheduled_deadline = -1.0):
 		return
 	if str(data.region) in ["dungeon", "black_sail", "white_whale", "legacy"] and bool(state.dungeon_cleared.get(enemy_id, false)):
 		state.enemy_respawns.erase(key)
+		_remove_enemy_respawn_marker(key)
 		return
 	if str(data.region) != current_region:
 		state.enemy_respawns.erase(key)
+		_remove_enemy_respawn_marker(key)
 		return
 	if _has_actor_id(enemy_id):
 		state.enemy_respawns.erase(key)
+		_remove_enemy_respawn_marker(key)
 		return
 	if _respawn_is_blocked(data):
 		_defer_enemy_respawn(enemy_id)
@@ -514,6 +565,7 @@ func _try_respawn_enemy(enemy_id, scheduled_deadline = -1.0):
 			hint_label.text = "%s将在你离开刷新点后重新出现。" % data.name
 		return
 	state.enemy_respawns.erase(key)
+	_remove_enemy_respawn_marker(key)
 	_add_actor("enemy", enemy_id, data.name, data.position, data.color, data.accent, data.location)
 	_refresh_waypoint()
 	hint_label.text = "%s重新出现了，可以再次挑战。" % data.name
@@ -549,7 +601,9 @@ func _despawn_defeated_enemy():
 	if state.enemy_respawn_remaining(enemy_id) <= 0.0:
 		state.enemy_respawns[key] = _world_time_seconds() + MONSTER_RESPAWN_SECONDS
 		state.save_game()
-	_schedule_enemy_respawn(enemy_id, MONSTER_RESPAWN_SECONDS)
+	var respawn_remaining = state.enemy_respawn_remaining(enemy_id)
+	_show_enemy_respawn_marker(enemy_id, respawn_remaining)
+	_schedule_enemy_respawn(enemy_id, respawn_remaining)
 	hint_label.text = "%s已被击败并消失，%d秒后在原地刷新。" % [defeated.name, int(MONSTER_RESPAWN_SECONDS)]
 
 func _add_actor(kind, id, display_name, position, color, accent, location_id = "", metadata = {}):
@@ -703,6 +757,7 @@ func _toggle_audio():
 	hint_label.text = "背景音乐与音效已开启。" if is_enabled else "背景音乐与音效已关闭。"
 
 func _process(delta):
+	_refresh_enemy_respawn_markers()
 	if is_instance_valid(overlay):
 		return
 	var keyboard = Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
@@ -805,11 +860,21 @@ func _on_joystick_direction(value):
 func _is_walkable(position):
 	if current_region == "sea" and is_instance_valid(map_node) and map_node.has_method("is_navigable"):
 		return bool(map_node.is_navigable(position))
-	var active_obstacles = port_city_obstacles if current_region == "city" and _active_city_port_id() != "venice_dock" else region_obstacles.get(current_region, [])
+	var active_obstacles = _city_building_obstacles() if current_region == "city" else region_obstacles.get(current_region, [])
 	for rect in active_obstacles:
 		if rect.grow(18.0 * WORLD_SCALE).has_point(position):
 			return false
 	return true
+
+func _city_building_obstacles(port_id = ""):
+	var resolved_port = _active_city_port_id() if str(port_id).is_empty() else str(port_id)
+	var city_data = GameData.PORT_CITY_MAPS.get(resolved_port, GameData.PORT_CITY_MAPS.venice_dock)
+	var obstacles = []
+	for building in Array(city_data.get("buildings", [])):
+		var footprint = Dictionary(building).get("footprint", Rect2())
+		if typeof(footprint) == TYPE_RECT2 and footprint.size.x > 0.0 and footprint.size.y > 0.0:
+			obstacles.append(_world_rect(footprint))
+	return obstacles
 
 func _update_nearest_actor():
 	var best = {}
@@ -2440,6 +2505,13 @@ func _open_world_map():
 	var districts = _label("◆ %s" % "　◆ ".join(Array(city_data.districts)), 14, INK)
 	districts.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	list.add_child(districts)
+	list.add_child(_label("城内实体建筑", 17, TEAL))
+	var building_names = []
+	for building in Array(city_data.get("buildings", [])):
+		building_names.append(str(Dictionary(building).get("name", "建筑")))
+	var building_guide = _label("◆ %s" % "　◆ ".join(building_names), 14, INK)
+	building_guide.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	list.add_child(building_guide)
 	list.add_child(_label("城内人物与职能", 17, TEAL))
 	for npc_id in Dictionary(city_data.npc_positions):
 		if not GameData.NPCS.has(str(npc_id)):

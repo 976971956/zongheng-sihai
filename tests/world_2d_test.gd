@@ -53,9 +53,11 @@ func _run():
 	scene.state.enemy_respawns[saved_respawn_key] = scene._world_time_seconds() + 60.0
 	scene._spawn_world_actors()
 	_check(not _has_actor(scene, "drunk_sailor"), "重建地图时必须继续遵守存档中的怪物刷新倒计时")
+	_check(scene.enemy_respawn_markers.has(saved_respawn_key) and _has_label_text(scene.world_layer, "喝醉的水手刷新中") and _has_label_text(scene.world_layer, ":"), "怪物刷新期间必须在原刷新点持续显示名称和分秒倒计时")
 	scene.state.enemy_respawns.erase(saved_respawn_key)
 	scene._spawn_world_actors()
 	_check(_has_actor(scene, "drunk_sailor"), "没有刷新冷却时必须正常生成怪物")
+	_check(not scene.enemy_respawn_markers.has(saved_respawn_key), "怪物刷新完成后必须移除倒计时标记")
 	var touch = InputEventScreenTouch.new()
 	touch.pressed = true
 	touch.position = Vector2(360, 500)
@@ -271,6 +273,7 @@ func _run():
 	_check(not _has_actor(scene, "drunk_sailor"), "怪物被击败后必须立即从地图消失")
 	var respawn_key = scene._enemy_spawn_key("drunk_sailor")
 	_check(float(scene.state.enemy_respawns.get(respawn_key, 0.0)) > scene._world_time_seconds(), "怪物消失后必须把刷新倒计时写入存档状态")
+	_check(scene.enemy_respawn_markers.has(respawn_key) and _has_label_text(scene.world_layer, "喝醉的水手刷新中"), "怪物被击败消失后必须立即在原地出现可见刷新倒计时")
 	var early_retry = scene.state.start_battle("drunk_sailor")
 	_check(not bool(early_retry.get("ok", true)) and float(early_retry.get("respawn_remaining", 0.0)) > 0.0, "刷新冷却必须在核心战斗状态中阻止提前重复挑战")
 	scene.state.enemy_respawns[respawn_key] = scene._world_time_seconds() - 0.1
@@ -348,14 +351,29 @@ func _run():
 	# 九座城市必须拥有独立主题、地标与人物站位，不能继续复用同一张码头背景。
 	_check(GameData.PORT_CITY_MAPS.size() == GameData.TRADE_PORTS.size(), "每座贸易城市都必须配置完整城内地图")
 	var city_styles = {}
+	var city_building_ids = {}
+	var city_building_signatures = {}
 	for city_port_id in GameData.TRADE_PORTS:
 		var city_layout = GameData.PORT_CITY_MAPS.get(str(city_port_id), {})
 		_check(not city_layout.is_empty() and str(city_layout.get("title", "")) != "" and str(city_layout.get("landmark", "")) != "" and Array(city_layout.get("districts", [])).size() >= 4, "%s必须拥有城市主题、地标和至少四个街区" % GameData.TRADE_PORTS[str(city_port_id)].name)
 		city_styles[str(city_layout.get("style", ""))] = true
+		var building_models = Array(city_layout.get("buildings", []))
+		_check(building_models.size() >= 6, "%s必须逐栋配置至少六座独立房屋模型与碰撞轮廓" % GameData.TRADE_PORTS[str(city_port_id)].name)
+		var building_signature = []
+		for building_model in building_models:
+			var building_data = Dictionary(building_model)
+			var building_id = str(building_data.get("id", ""))
+			var footprint = building_data.get("footprint", Rect2())
+			_check(building_id != "" and str(building_data.get("name", "")) != "" and typeof(footprint) == TYPE_RECT2 and footprint.size.x > 0.0 and footprint.size.y > 0.0, "%s的每座房屋都必须拥有独立名称和有效实体轮廓" % GameData.TRADE_PORTS[str(city_port_id)].name)
+			_check(not city_building_ids.has(building_id), "房屋模型%s不能被其他城市重复使用" % building_id)
+			city_building_ids[building_id] = true
+			building_signature.append(str(footprint))
+		city_building_signatures["|".join(building_signature)] = true
 		var configured_positions = Dictionary(city_layout.get("npc_positions", {}))
 		for city_npc_id in GameData.LOCATIONS[str(city_port_id)].npcs:
 			_check(configured_positions.has(str(city_npc_id)), "%s的%s必须在城内地图配置独立站位" % [GameData.TRADE_PORTS[str(city_port_id)].name, GameData.NPCS[str(city_npc_id)].name])
 	_check(city_styles.size() == GameData.TRADE_PORTS.size(), "九座城市必须使用九种可区分的美术主题")
+	_check(city_building_signatures.size() == GameData.TRADE_PORTS.size(), "九座城市必须使用九套不同的房屋布局，不能只共用一组碰撞")
 
 	# 重新加载或走入远洋城市的视觉街区时不能篡改真实所在港口。
 	scene.state.quest_index = GameData.QUESTS.size()
@@ -468,15 +486,31 @@ func _run():
 		_check(modeled_city_art_path.ends_with("/%s_city_v%s.png" % [str(modeled_port_id).trim_suffix("_dock"), "2" if str(modeled_port_id) == "venice_dock" else "1"]), "%s必须加载与港口一一对应的独立手绘背景" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
 		_check(not modeled_city_art_paths.has(modeled_city_art_path), "%s不能复用其他城市的房屋与背景图" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
 		modeled_city_art_paths[modeled_city_art_path] = true
+		for modeled_building in Array(GameData.PORT_CITY_MAPS[str(modeled_port_id)].buildings):
+			var modeled_footprint = Rect2(Dictionary(modeled_building).footprint)
+			_check(not scene._is_walkable(scene._world_point(modeled_footprint.get_center())), "%s的%s必须拥有不可穿透的实体碰撞" % [GameData.TRADE_PORTS[str(modeled_port_id)].name, str(Dictionary(modeled_building).name)])
 		for modeled_npc_id in GameData.LOCATIONS[str(modeled_port_id)].npcs:
 			var expected_position = scene._world_point(Vector2(GameData.PORT_CITY_MAPS[str(modeled_port_id)].npc_positions[str(modeled_npc_id)]))
 			_check(_actor_has_art(scene, str(modeled_npc_id)), "%s的%s必须拥有可见人物精灵" % [GameData.TRADE_PORTS[str(modeled_port_id)].name, GameData.NPCS[str(modeled_npc_id)].name])
-			var position_is_reachable = true if str(modeled_port_id) == "venice_dock" else scene._is_walkable(expected_position)
+			var position_is_reachable = scene._is_walkable(expected_position)
 			_check(_actor_position(scene, str(modeled_npc_id)).distance_to(expected_position) < 1.0 and position_is_reachable, "%s的%s必须生成在地图配置的可行走街区" % [GameData.TRADE_PORTS[str(modeled_port_id)].name, GameData.NPCS[str(modeled_npc_id)].name])
+			var city_npc_path = scene._build_task_navigation_path(scene._spawn_for_location(str(modeled_port_id)), expected_position)
+			var path_avoids_buildings = not city_npc_path.is_empty()
+			for city_path_point in city_npc_path:
+				path_avoids_buildings = path_avoids_buildings and scene._is_walkable(Vector2(city_path_point))
+			_check(path_avoids_buildings, "%s前往%s的道路必须绕开本城全部实体房屋" % [GameData.TRADE_PORTS[str(modeled_port_id)].name, GameData.NPCS[str(modeled_npc_id)].name])
 	_check(modeled_city_art_paths.size() == GameData.TRADE_PORTS.size(), "九座港口必须拥有九张互不复用的城内背景")
+	scene._switch_region("city", "venice_dock")
+	var tavern_footprint = Rect2(GameData.PORT_CITY_MAPS.venice_dock.buildings[3].footprint)
+	var wall_test_start = scene._world_point(Vector2(tavern_footprint.end.x + 22.0, tavern_footprint.get_center().y))
+	scene.player_actor.position = wall_test_start
+	scene.joystick_direction = Vector2.LEFT
+	scene._process(0.20)
+	scene.joystick_direction = Vector2.ZERO
+	_check(scene.player_actor.position.distance_to(wall_test_start) < 0.5 and scene._is_walkable(scene.player_actor.position), "玩家用摇杆撞向房屋时必须停在墙外，不能穿透房屋")
 	scene._switch_region("city", "athens_dock")
 	scene._open_world_map()
-	_check(_has_label_text(scene.overlay, "雅典 · 城内地图") and _has_label_text(scene.overlay, "海岬神殿与银帆柱廊") and _has_button_text(scene.overlay, "卡珊德拉｜货栈 · 买卖特产") and _has_button_text(scene.overlay, "艾琳娜｜旅店 · 恢复补给"), "每座城市的城内地图必须展示本地地标、人物和职能")
+	_check(_has_label_text(scene.overlay, "雅典 · 城内地图") and _has_label_text(scene.overlay, "海岬神殿与银帆柱廊") and _has_label_text(scene.overlay, "城内实体建筑") and _has_label_text(scene.overlay, "潮汐神殿") and _has_button_text(scene.overlay, "卡珊德拉｜货栈 · 买卖特产") and _has_button_text(scene.overlay, "艾琳娜｜旅店 · 恢复补给"), "每座城市的城内地图必须展示本地地标、实体建筑、人物和职能")
 	var athens_map_start = scene.player_actor.position
 	scene._travel_to_city_npc("athens_dock", "athens_oracle")
 	_check(scene.task_navigation_active and scene.player_actor.position.distance_to(athens_map_start) < 1.0, "从城内地图选择NPC必须启动步行导航，不能直接传送")
@@ -586,6 +620,7 @@ func _run():
 func _check(condition, message):
 	if not condition:
 		failures.append(message)
+		push_error("CHECK_FAILED: %s" % message)
 
 func _has_button_text(node, fragment):
 	if not is_instance_valid(node):
