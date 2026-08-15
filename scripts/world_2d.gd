@@ -338,8 +338,8 @@ func _spawn_world_actors():
 		if active_port in GameData.TRADE_PORTS and active_port != "venice_dock":
 			# Keep the outer NPC nameplates inside a 720px phone viewport while the
 			# camera is centered on the dock spawn.
-			var port_npc_positions = [Vector2(185, 790), Vector2(350, 850), Vector2(515, 790)]
-			var port_npc_colors = [Color("49697a"), Color("7b5944"), Color("506f61")]
+			var port_npc_positions = [Vector2(105, 785), Vector2(235, 885), Vector2(365, 785), Vector2(495, 885), Vector2(615, 785)]
+			var port_npc_colors = [Color("49697a"), Color("7b5944"), Color("506f61"), Color("6f526e"), Color("6a6945")]
 			var port_npcs = GameData.LOCATIONS[active_port].npcs
 			for npc_index in range(port_npcs.size()):
 				var remote_npc_id = str(port_npcs[npc_index])
@@ -546,12 +546,13 @@ func _add_actor(kind, id, display_name, position, color, accent, location_id = "
 	actor.configure(kind, color, accent, id)
 	world_layer.add_child(actor)
 	var nameplate = Label.new()
-	nameplate.text = display_name
-	nameplate.position = Vector2(-90, 50)
-	nameplate.size = Vector2(180, 31)
+	nameplate.text = "%s\n◆ %s" % [display_name, GameData.npc_service_label(id)] if kind == "npc" and GameData.NPCS.has(str(id)) else display_name
+	nameplate.position = Vector2(-90, 48)
+	nameplate.size = Vector2(180, 45 if kind == "npc" else 31)
 	nameplate.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	nameplate.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	nameplate.add_theme_font_size_override("font_size", 15)
+	nameplate.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	nameplate.add_theme_font_size_override("font_size", 12 if kind == "npc" else 15)
 	nameplate.add_theme_color_override("font_color", Color("fff4d1"))
 	nameplate.add_theme_stylebox_override("normal", _style(Color(0.025, 0.055, 0.065, 0.88), 9, Color(GOLD, 0.48), 1, 5))
 	actor.add_child(nameplate)
@@ -821,11 +822,11 @@ func _update_nearest_actor():
 			action_button.text = "进入 · %s" % nearest_actor.name
 		elif nearest_actor.kind == "discovery":
 			action_button.text = "调查 · %s" % nearest_actor.name
-		elif nearest_actor.kind == "npc" and state.is_trade_unlocked() and not _is_current_talk_target(str(nearest_actor.id)) and _npc_service(str(nearest_actor.id)) in ["harbor", "shipyard", "cook", "trade_order"]:
-			var service_title = {"harbor": "港口贸易", "shipyard": "船坞改造", "cook": "港口厨房", "trade_order": "商会交付"}.get(_npc_service(str(nearest_actor.id)), "港口服务")
+		elif nearest_actor.kind == "npc" and state.is_trade_unlocked() and not _is_current_talk_target(str(nearest_actor.id)) and _npc_service(str(nearest_actor.id)) in ["market", "harbor", "shipyard", "cook", "trade_order"]:
+			var service_title = {"market": "货物买卖", "harbor": "航线出港", "shipyard": "买船改造", "cook": "烹制补给", "trade_order": "商会交付"}.get(_npc_service(str(nearest_actor.id)), "港口服务")
 			action_button.text = "%s · %s" % [service_title, str(nearest_actor.name)]
 		elif nearest_actor.kind == "npc" and _npc_service(str(nearest_actor.id)) == "rest" and not _is_current_talk_target(str(nearest_actor.id)):
-			action_button.text = "住宿休息 · %s" % str(nearest_actor.name)
+			action_button.text = "恢复补给 · %s" % str(nearest_actor.name)
 		elif nearest_actor.kind == "npc" and _npc_service(str(nearest_actor.id)) == "jewelry_shop" and not _is_current_talk_target(str(nearest_actor.id)):
 			action_button.text = "选购珠宝 · %s" % str(nearest_actor.name)
 		elif nearest_actor.kind == "npc" and _npc_service(str(nearest_actor.id)) == "tavern_shop" and not _is_current_talk_target(str(nearest_actor.id)):
@@ -1040,6 +1041,12 @@ func _update_zone(force):
 			hint_label.text = floor_lock
 			return
 	var state_location = str(state.player.location)
+	# 远洋港口复用威尼斯港区美术，但行走到任何视觉分区都不能把真实城市
+	# 改回威尼斯。港区内的 NPC 只负责当前远洋港口的本地业务。
+	if current_region == "city" and state_location in GameData.TRADE_PORTS and state_location != "venice_dock":
+		current_zone = "venice_dock"
+		_refresh_hud()
+		return
 	var same_effective_location = best_id == state_location or (best_id == "venice_dock" and state_location in GameData.TRADE_PORTS)
 	# 九座港口共用一张2D港区图，进入码头视觉区域时不能把远洋港口存档改回威尼斯。
 	if best_id == "venice_dock" and state_location in GameData.TRADE_PORTS:
@@ -1140,13 +1147,23 @@ func _interact():
 	if nearest_actor.kind == "npc":
 		var npc_id = str(nearest_actor.id)
 		var service = _npc_service(npc_id)
-		if service in ["harbor", "shipyard", "cook", "trade_order"] and state.is_trade_unlocked() and not _is_current_talk_target(npc_id):
-			_open_trade_2d()
+		if service == "market" and state.is_trade_unlocked() and not _is_current_talk_target(npc_id):
+			_open_trade_2d(npc_id)
+			return
+		if service == "harbor" and state.is_trade_unlocked() and not _is_current_talk_target(npc_id):
+			_open_port_harbor_2d(npc_id)
+			return
+		if service == "shipyard" and state.is_trade_unlocked() and not _is_current_talk_target(npc_id):
+			_open_port_shipyard_2d(npc_id)
+			return
+		if service == "cook" and state.is_trade_unlocked() and not _is_current_talk_target(npc_id):
+			_open_port_kitchen_2d(npc_id)
+			return
+		if service == "trade_order" and state.is_trade_unlocked() and not _is_current_talk_target(npc_id):
+			_open_port_orders_2d(npc_id)
 			return
 		if service == "rest" and not _is_current_talk_target(npc_id):
-			var rest_result = state.rest()
-			_refresh_hud()
-			_show_message("旅店休息", str(rest_result.message))
+			_open_vendor_shop_2d(npc_id)
 			return
 		if service in ["jewelry_shop", "tavern_shop"] and not _is_current_talk_target(npc_id):
 			_open_vendor_shop_2d(npc_id)
@@ -2079,9 +2096,17 @@ func _quest_navigation_target():
 	elif objective.type == "trade_buy":
 		target_location = str(GameData.TRADE_GOODS.get(str(objective.target), {"origin": "venice_dock"}).origin)
 		target_actor_id = str(GameData.TRADE_PORTS.get(target_location, {}).get("merchant_npc", ""))
-	elif objective.type in ["trade_sell", "trade_reputation", "prepare_voyage"]:
+	elif objective.type == "trade_sell":
 		target_location = str(state.player.location) if str(state.player.location) in GameData.TRADE_PORTS else "venice_dock"
 		target_actor_id = str(GameData.TRADE_PORTS.get(target_location, {}).get("merchant_npc", ""))
+	elif objective.type == "trade_reputation":
+		target_location = str(state.player.location) if str(state.player.location) in GameData.TRADE_PORTS else "venice_dock"
+		target_actor_id = GameData.port_service_npc(target_location, "trade_order")
+		if target_actor_id == "":
+			target_actor_id = GameData.port_service_npc(target_location, "market")
+	elif objective.type == "prepare_voyage":
+		target_location = str(state.player.location) if str(state.player.location) in GameData.TRADE_PORTS else "venice_dock"
+		target_actor_id = GameData.port_service_npc(target_location, "harbor")
 	elif objective.type == "upgrade_ship":
 		target_location = str(state.player.location) if str(state.player.location) in GameData.TRADE_PORTS else "venice_dock"
 		target_actor_id = _port_service_npc(target_location, "shipyard")
@@ -2175,15 +2200,19 @@ func _navigate_to_quest():
 	var needs_harbor = not quest.is_empty() and (objective_type in ["trade_buy", "trade_sell", "trade_order", "trade_reputation", "prepare_voyage", "upgrade_ship", "cook"] or (objective_type == "visit" and str(quest.objective.target) in GameData.TRADE_PORTS))
 	if needs_harbor:
 		var target_port = str(navigation_target.get("location", ""))
+		var objective_service = {"trade_buy": "market", "trade_sell": "market", "trade_order": "orders", "trade_reputation": "orders", "prepare_voyage": "harbor", "upgrade_ship": "shipyard", "cook": "kitchen"}.get(objective_type, "")
+		var target_actor_service = _npc_service(str(navigation_target.get("actor_id", "")))
+		if target_actor_service != "":
+			objective_service = {"market": "market", "harbor": "harbor", "shipyard": "shipyard", "trade_order": "orders", "cook": "kitchen"}.get(target_actor_service, objective_service)
 		if target_port in GameData.TRADE_PORTS and str(state.player.location) in GameData.TRADE_PORTS and str(state.player.location) != target_port:
 			_open_task_sailing_route(target_port)
 			return
 		if str(state.player.location) == target_port:
-			task_navigation_open_service = "trade"
+			task_navigation_open_service = str(objective_service)
 		elif target_port in GameData.TRADE_PORTS:
 			task_navigation_open_service = "sail:%s" % target_port
 		else:
-			task_navigation_open_service = "trade"
+			task_navigation_open_service = str(objective_service)
 	else:
 		task_navigation_open_service = ""
 	if is_instance_valid(overlay):
@@ -2309,8 +2338,16 @@ func _finish_task_navigation_leg():
 	task_navigation_open_service = ""
 	_update_nearest_actor()
 	hint_label.text = "已步行到达：%s｜靠近后点击互动" % target_name
-	if open_service == "trade":
+	if open_service == "market":
 		call_deferred("_open_trade_2d")
+	elif open_service == "harbor":
+		call_deferred("_open_port_harbor_2d")
+	elif open_service == "shipyard":
+		call_deferred("_open_port_shipyard_2d")
+	elif open_service == "orders":
+		call_deferred("_open_port_orders_2d")
+	elif open_service == "kitchen":
+		call_deferred("_open_port_kitchen_2d")
 	elif open_service.begins_with("sail:"):
 		call_deferred("_open_sailing_map", open_service.trim_prefix("sail:"))
 
@@ -2603,9 +2640,9 @@ func _open_vendor_shop_2d(npc_id):
 		identify.disabled = unknown_count <= 0 or int(state.player.silver) < 5
 		identify.pressed.connect(_identify_at_jeweler_2d)
 		content.add_child(identify)
-	elif vendor_id == "tavern_keeper":
+	elif _npc_service(vendor_id) in ["tavern_shop", "rest"]:
 		var rest_button = _button("在酒馆免费休息 · 恢复全部体力与状态", "primary")
-		rest_button.pressed.connect(_rest_at_vendor_2d)
+		rest_button.pressed.connect(_rest_at_vendor_2d.bind(vendor_id))
 		content.add_child(rest_button)
 	var close = _button("返回地图", "ghost")
 	close.pressed.connect(_close_overlay)
@@ -2626,15 +2663,215 @@ func _identify_at_jeweler_2d():
 	_close_overlay()
 	call_deferred("_open_vendor_shop_2d", "jeweler")
 
-func _rest_at_vendor_2d():
+func _rest_at_vendor_2d(vendor_id = "tavern_keeper"):
 	var result = state.rest()
 	if bool(result.ok):
 		AudioDirector.play_sfx("heal")
 	_refresh_hud()
 	_close_overlay()
-	call_deferred("_open_vendor_shop_2d", "tavern_keeper")
+	call_deferred("_open_vendor_shop_2d", str(vendor_id))
 
-func _open_trade_2d():
+func _port_service_ready_2d():
+	if not state.is_trade_unlocked():
+		_show_message("港口尚未开放", "完成威尼斯四层试炼后，船老板会将贸易船海燕号交给你。")
+		return false
+	if not GameData.TRADE_PORTS.has(state.player.location):
+		_show_message("这里不是港口", "港口业务必须在真实港口找对应人物办理。请通过区域地图步行前往威尼斯码头；远洋港口之间需要乘船航行。")
+		return false
+	return true
+
+func _port_service_identity_2d(service, npc_id = ""):
+	var resolved_id = str(npc_id)
+	if resolved_id == "":
+		resolved_id = GameData.port_service_npc(str(state.player.location), str(service))
+	return GameData.NPCS.get(resolved_id, {"name": "港口职员", "role": GameData.NPC_SERVICE_LABELS.get(str(service), "港口服务")})
+
+func _port_service_intro_2d(content, service, npc_id, description):
+	var npc = _port_service_identity_2d(service, npc_id)
+	var intro = _label("◆ %s｜%s\n%s" % [str(npc.name), str(npc.role), str(description)], 14, TEAL)
+	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	intro.add_theme_stylebox_override("normal", _style(Color(0.03, 0.17, 0.15, 0.92), 10, Color(TEAL, 0.5), 1, 10))
+	content.add_child(intro)
+
+func _consume_port_notice_2d(content):
+	if inventory_notice == "":
+		return
+	var notice = _label(inventory_notice, 14, GOLD)
+	notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(notice)
+	inventory_notice = ""
+
+func _port_service_scroll_2d(content, height = 560):
+	var scroll = ScrollContainer.new()
+	scroll.custom_minimum_size.y = height
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	content.add_child(scroll)
+	var list = VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 9)
+	scroll.add_child(list)
+	return list
+
+func _finish_port_service_overlay_2d(content):
+	var close = _button("返回港口地图", "primary")
+	close.pressed.connect(_close_overlay)
+	content.add_child(close)
+	_open_overlay(content, true, Vector2(666, 940))
+
+func _open_trade_2d(npc_id = ""):
+	if not _port_service_ready_2d():
+		return
+	var port_id = str(state.player.location)
+	var port = GameData.TRADE_PORTS[port_id]
+	var content = VBoxContainer.new()
+	content.add_theme_constant_override("separation", 10)
+	content.add_child(_label("%s · 本地货栈" % port.name, 25, GOLD))
+	_port_service_intro_2d(content, "market", npc_id, "只办理本港特产买卖、外来货收购和商会订单；航线与船只改造请找其他 NPC。")
+	content.add_child(_trade_dashboard_2d(port_id))
+	_consume_port_notice_2d(content)
+	var list = _port_service_scroll_2d(content)
+	var market_event = GameData.trade_event(state.trade_day)
+	list.add_child(_label("今日行情｜%s\n%s" % [market_event.name, market_event.description], 14, GOLD))
+	var opportunity = state.best_trade_opportunity()
+	if not opportunity.is_empty():
+		list.add_child(_label("商路推荐｜%s → %s · %d日后满舱约赚%d银" % [GameData.TRADE_GOODS[str(opportunity.good_id)].name, GameData.TRADE_PORTS[str(opportunity.destination)].name, int(opportunity.days), int(opportunity.total_profit)], 13, TEAL))
+	var local_stock = GameData.port_stock(port_id)
+	list.add_child(_label("本港产地货栈 · 仅出售%s" % str(port.specialty), 16, GOLD))
+	for good_id in local_stock:
+		_add_trade_good_card_2d(list, str(good_id), true)
+	var foreign_cargo = []
+	for good_id in state.cargo:
+		if int(state.cargo.get(good_id, 0)) > 0 and GameData.TRADE_GOODS.has(good_id) and str(good_id) not in local_stock:
+			foreign_cargo.append(str(good_id))
+	if not foreign_cargo.is_empty():
+		list.add_child(_label("船上外来货 · 本港只收购、不出售", 16, TEAL))
+		for good_id in foreign_cargo:
+			_add_trade_good_card_2d(list, str(good_id), false)
+	var orders = _button("打开商会订单柜台", "gold")
+	var order_npc_id = GameData.port_service_npc(port_id, "trade_order")
+	orders.pressed.connect(_open_port_orders_2d.bind(order_npc_id if order_npc_id != "" else GameData.port_service_npc(port_id, "market")))
+	list.add_child(orders)
+	_finish_port_service_overlay_2d(content)
+
+func _open_port_harbor_2d(npc_id = ""):
+	if not _port_service_ready_2d():
+		return
+	var port_id = str(state.player.location)
+	var port = GameData.TRADE_PORTS[port_id]
+	var content = VBoxContainer.new()
+	content.add_theme_constant_override("separation", 10)
+	content.add_child(_label("%s · 港务处" % port.name, 25, GOLD))
+	_port_service_intro_2d(content, "harbor", npc_id, "只办理航线规划、出航和护航补给；货物买卖请找本港货栈。")
+	_consume_port_notice_2d(content)
+	var profile = state.ship_speed_profile()
+	content.add_child(_label("当前船只｜%s · %.1f节 · %d海里/日｜货舱%d/%d｜船甲%d" % [str(state.ship.name), float(profile.knots), int(profile.nm_per_day), state.cargo_used(), state.cargo_capacity(), state.ship_armor()], 14, GOLD))
+	var list = _port_service_scroll_2d(content)
+	var chart = _button("打开九港航海大地图", "gold")
+	chart.pressed.connect(_open_sailing_map)
+	list.add_child(chart)
+	var protection_text = "护航物资已装船｜下次风暴免损" if state.voyage_protection > 0 else "购买护航物资 45银｜降低风险并免除一次风暴损失"
+	var protection = _button(protection_text, "primary" if state.voyage_protection <= 0 else "ghost")
+	protection.disabled = state.voyage_protection > 0 or int(state.player.silver) < 45
+	protection.pressed.connect(_buy_voyage_protection_2d)
+	list.add_child(protection)
+	list.add_child(_label("自由航线 · 选择任一已发现港口出航", 16, GOLD))
+	for destination in GameData.TRADE_PORTS:
+		if destination == port_id or not state.is_port_unlocked(str(destination)):
+			continue
+		var plan = state.voyage_plan(destination)
+		var sail = _button("出航%s｜%d海里 · %d日 · 风险%d%% · 威胁%d处" % [GameData.TRADE_PORTS[destination].name, int(plan.distance_nm), int(plan.days), int(plan.risk), int(plan.threat_count)], "gold")
+		sail.pressed.connect(_trade_sail_2d.bind(destination))
+		list.add_child(sail)
+	_finish_port_service_overlay_2d(content)
+
+func _open_port_shipyard_2d(npc_id = ""):
+	if not _port_service_ready_2d():
+		return
+	var port_id = str(state.player.location)
+	var port = GameData.TRADE_PORTS[port_id]
+	var offered_hull_id = str(port.get("ship_offer", "sea_swallow"))
+	var offered_hull = Dictionary(GameData.SHIP_HULLS[offered_hull_id])
+	var content = VBoxContainer.new()
+	content.add_theme_constant_override("separation", 10)
+	content.add_child(_label("%s · 船坞" % port.name, 25, GOLD))
+	_port_service_intro_2d(content, "shipyard", npc_id, "只负责购买本港船型以及货舱、帆装、船甲改造。")
+	_consume_port_notice_2d(content)
+	var list = _port_service_scroll_2d(content, 500)
+	list.add_child(_label("本港船型｜Lv.%d %s\n基础%.1f节 · 货舱%d格 · 船甲%d\n%s" % [int(offered_hull.level), str(offered_hull.name), float(offered_hull.base_knots), int(offered_hull.capacity), int(offered_hull.armor), str(offered_hull.trait)], 15, TEAL))
+	var buy_ship = _button("当前船只" if str(state.ship.get("hull_id", "sea_swallow")) == offered_hull_id else "购买%s · %d银币" % [str(offered_hull.name), int(offered_hull.price)], "gold")
+	buy_ship.disabled = str(state.ship.get("hull_id", "sea_swallow")) == offered_hull_id or int(state.player.silver) < int(offered_hull.price) or state.cargo_used() > int(offered_hull.capacity) + int(state.ship.get("hold_level", 0)) * 6
+	buy_ship.pressed.connect(_buy_ship_2d.bind(offered_hull_id))
+	list.add_child(buy_ship)
+	var profile = state.ship_speed_profile()
+	list.add_child(_label("当前｜%s · %.1f节 · %d海里/日｜货舱%d格｜船甲%d\n帆装Lv.%d · 舱板Lv.%d · 装甲Lv.%d" % [str(state.ship.name), float(profile.knots), int(profile.nm_per_day), state.cargo_capacity(), state.ship_armor(), int(state.ship.speed), int(state.ship.get("hold_level", 0)), int(state.ship.get("armor", 0))], 14, GOLD))
+	for upgrade_entry in [{"id": "hold", "text": "强化舱板 +6格"}, {"id": "speed", "text": "强化帆装 +1.5节"}, {"id": "armor", "text": "强化装甲 -6%风险"}]:
+		var upgrade = _button(upgrade_entry.text, "primary")
+		upgrade.disabled = (upgrade_entry.id == "hold" and int(state.ship.get("hold_level", 0)) >= 3) or (upgrade_entry.id == "speed" and int(state.ship.speed) >= 4) or (upgrade_entry.id == "armor" and int(state.ship.get("armor", 0)) >= 3)
+		upgrade.pressed.connect(_trade_upgrade_2d.bind(upgrade_entry.id))
+		list.add_child(upgrade)
+	_finish_port_service_overlay_2d(content)
+
+func _open_port_orders_2d(npc_id = ""):
+	if not _port_service_ready_2d():
+		return
+	var port_id = str(state.player.location)
+	var port = GameData.TRADE_PORTS[port_id]
+	var content = VBoxContainer.new()
+	content.add_theme_constant_override("separation", 10)
+	content.add_child(_label("%s · 商会订单" % port.name, 25, GOLD))
+	_port_service_intro_2d(content, "trade_order", npc_id, "这里只验收订单与发放贸易奖励；采购货物请回本地货栈。")
+	_consume_port_notice_2d(content)
+	var list = _port_service_scroll_2d(content, 460)
+	var order = state.current_trade_order(port_id)
+	if order.is_empty():
+		list.add_child(_label("当前没有待交付订单。", 14, MUTED))
+	else:
+		var good = GameData.TRADE_GOODS[str(order.good)]
+		var held = int(state.cargo.get(str(order.good), 0))
+		list.add_child(_label("%s%s\n%s\n交付%s×%d｜货舱%d/%d｜奖金%d银｜声望+%d" % [str(order.title), " · 主线" if bool(order.get("story", false)) else "", str(order.description), str(good.name), int(order.amount), held, int(order.amount), int(order.bonus), int(order.reputation)], 14, INK))
+		var claim = _button("向%s商会交付" % port.name, "gold")
+		claim.disabled = not state.trade_order_can_claim(port_id)
+		claim.pressed.connect(_claim_trade_order_2d)
+		list.add_child(claim)
+	var target = state.trade_contract_target()
+	list.add_child(_label("商会循环委托·第%d轮｜贸易净利润 %d/%d" % [state.trade_contract_count + 1, state.trade_contract_progress(), target], 14, TEAL))
+	var contract = _button("领取商会奖励", "gold")
+	contract.disabled = not state.trade_contract_can_claim()
+	contract.pressed.connect(_claim_trade_contract_2d)
+	list.add_child(contract)
+	_finish_port_service_overlay_2d(content)
+
+func _open_port_kitchen_2d(npc_id = ""):
+	if not _port_service_ready_2d():
+		return
+	var port_id = str(state.player.location)
+	var port = GameData.TRADE_PORTS[port_id]
+	var content = VBoxContainer.new()
+	content.add_theme_constant_override("separation", 10)
+	content.add_child(_label("%s · 港口厨房" % port.name, 25, GOLD))
+	_port_service_intro_2d(content, "cook", npc_id, "只把货舱里的产地食材烹制为可在背包使用的远航补给。")
+	_consume_port_notice_2d(content)
+	var list = _port_service_scroll_2d(content, 500)
+	var recipes = state.available_recipes(port_id)
+	if recipes.is_empty():
+		list.add_child(_label("本港暂时没有可烹制的远航餐。", 14, MUTED))
+	for recipe in recipes:
+		var ingredients = []
+		var can_cook = int(state.player.silver) >= int(recipe.silver)
+		for good_id in recipe.cargo:
+			var need = int(recipe.cargo[good_id])
+			var held = int(state.cargo.get(good_id, 0))
+			var source = str(GameData.TRADE_GOODS[good_id].origin)
+			ingredients.append("%s %d/%d（%s）" % [GameData.TRADE_GOODS[good_id].name, held, need, GameData.TRADE_PORTS[source].name])
+			can_cook = can_cook and held >= need
+		list.add_child(_label("%s\n%s\n材料：%s｜厨房费%d银" % [str(recipe.name), str(recipe.description), "、".join(ingredients), int(recipe.silver)], 14, INK))
+		var cook = _button("烹制%s" % str(recipe.name), "gold")
+		cook.disabled = not can_cook
+		cook.pressed.connect(_cook_recipe_2d.bind(str(recipe.id)))
+		list.add_child(cook)
+	_finish_port_service_overlay_2d(content)
+
+func _open_trade_all_in_one_legacy_2d():
 	if not state.is_trade_unlocked():
 		_show_message("港口尚未开放", "完成威尼斯四层试炼后，船老板会将贸易船海燕号交给你。")
 		return
@@ -2944,7 +3181,8 @@ func _cook_recipe_2d(recipe_id):
 		AudioDirector.play_sfx("reward")
 		call_deferred("_show_quest_claim")
 	elif bool(result.get("ok", false)):
-		_show_message("烹制完成", str(result.message))
+		inventory_notice = "✓ " + str(result.message)
+		call_deferred("_open_port_kitchen_2d")
 	else:
 		_show_message("无法烹制", str(result.get("message", "材料不足")))
 
@@ -2965,7 +3203,7 @@ func _trade_upgrade_2d(kind):
 	if bool(result.get("quest_completed", false)):
 		call_deferred("_show_quest_claim")
 	elif bool(result.get("ok", false)):
-		call_deferred("_open_trade_2d")
+		call_deferred("_open_port_shipyard_2d")
 	else:
 		_show_message("改造失败", str(result.get("message", "无法改造船只")))
 
@@ -2975,7 +3213,7 @@ func _buy_ship_2d(hull_id):
 	_refresh_hud()
 	_close_overlay()
 	if bool(result.get("ok", false)):
-		call_deferred("_open_trade_2d")
+		call_deferred("_open_port_shipyard_2d")
 	else:
 		_show_message("购船失败", str(result.get("message", "无法购买船只")))
 
@@ -2985,7 +3223,8 @@ func _claim_trade_contract_2d():
 		AudioDirector.play_sfx("reward")
 	_refresh_hud()
 	_close_overlay()
-	_show_message("商会委托", str(result.get("message", "领取失败")))
+	inventory_notice = ("✓ " if bool(result.get("ok", false)) else "！") + str(result.get("message", "领取失败"))
+	call_deferred("_open_port_orders_2d")
 
 func _claim_trade_order_2d():
 	var result = state.claim_trade_order()
@@ -2995,10 +3234,9 @@ func _claim_trade_order_2d():
 	_close_overlay()
 	if bool(result.get("quest_completed", false)):
 		call_deferred("_show_quest_claim")
-	elif bool(result.get("ok", false)):
-		_show_message("港口订单", str(result.message))
 	else:
-		_show_message("无法交付", str(result.message))
+		inventory_notice = ("✓ " if bool(result.get("ok", false)) else "！") + str(result.message)
+		call_deferred("_open_port_orders_2d")
 
 func _buy_voyage_protection_2d():
 	var result = state.buy_voyage_protection()
@@ -3006,10 +3244,9 @@ func _buy_voyage_protection_2d():
 	_close_overlay()
 	if bool(result.get("quest_completed", false)):
 		call_deferred("_show_quest_claim")
-	elif bool(result.get("ok", false)):
-		_show_message("护航物资", str(result.message))
 	else:
-		_show_message("无法购买", str(result.message))
+		inventory_notice = ("✓ " if bool(result.get("ok", false)) else "！") + str(result.message)
+		call_deferred("_open_port_harbor_2d")
 
 func _trade_sail_2d(destination):
 	_close_overlay()

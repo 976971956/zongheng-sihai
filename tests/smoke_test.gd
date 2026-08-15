@@ -26,7 +26,10 @@ func _init():
 		var merchant_npc = str(port.get("merchant_npc", ""))
 		var specialty_good = str(port.get("specialty_good", ""))
 		var stock = GameData.port_stock(str(port_id))
-		_check(merchant_npc != "" and merchant_npc in GameData.LOCATIONS[port_id].npcs and str(GameData.NPCS.get(merchant_npc, {}).get("service", "")) == "harbor", "%s必须有可在地图互动的专属贸易NPC" % port.name)
+		_check(merchant_npc != "" and merchant_npc in GameData.LOCATIONS[port_id].npcs and str(GameData.NPCS.get(merchant_npc, {}).get("service", "")) == "market", "%s必须有可在地图互动的专属货栈NPC" % port.name)
+		for service_id in ["market", "harbor", "shipyard"]:
+			var service_npc = GameData.port_service_npc(str(port_id), service_id)
+			_check(service_npc != "" and service_npc in GameData.LOCATIONS[port_id].npcs and str(GameData.NPCS.get(service_npc, {}).get("service", "")) == service_id, "%s必须由不同NPC分别承担%s职能" % [port.name, service_id])
 		_check(specialty_good != "" and specialty_good in stock and str(GameData.TRADE_GOODS.get(specialty_good, {}).get("origin", "")) == str(port_id), "%s必须出售产地归属明确的本港特色商品" % port.name)
 		for stock_good_id in stock:
 			_check(str(GameData.TRADE_GOODS.get(str(stock_good_id), {}).get("origin", "")) == str(port_id), "%s货栈不能混入其他城市出产的%s" % [port.name, GameData.TRADE_GOODS[str(stock_good_id)].name])
@@ -88,6 +91,10 @@ func _init():
 	var food_purchase = vendor_state.buy_vendor_item("tavern_keeper", "herb_fish_stew")
 	vendor_state.player.hp = max(1, int(vendor_state.get_stats().max_hp) - 70)
 	_check(bool(food_purchase.ok) and vendor_state.use_item("herb_fish_stew").ok, "酒馆老板必须真实出售可在背包使用的食物")
+	var inn_state = TestState.new()
+	inn_state.player.location = "ragusa_dock"
+	inn_state.player.silver = 100
+	_check(bool(inn_state.buy_vendor_item("ragusa_innkeeper", "universal_medicine").ok), "拉古萨旅店必须独立出售恢复药品，不能混入货栈")
 	_check(not vendor_state.buy_vendor_item("tavern_keeper", "coral_ring").ok, "不同NPC货柜必须隔离，酒馆不能出售珠宝")
 
 	var first_talk = state.talk_to("alisa")

@@ -768,8 +768,10 @@ func _npc_action_card(npc_id):
 	text_box.add_child(_label(npc.name, 14, INK))
 	text_box.add_child(_label(npc.role, 10, MUTED))
 	var service = str(npc.get("service", ""))
-	if service in ["jewelry_shop", "tavern_shop"]:
-		var shop_button = _button("珠宝" if service == "jewelry_shop" else "食物", "gold")
+	if service != "":
+		text_box.add_child(_label("职能｜%s" % GameData.npc_service_label(npc_id), 10, TEAL))
+	if service in ["jewelry_shop", "tavern_shop", "rest"]:
+		var shop_button = _button({"jewelry_shop": "珠宝", "tavern_shop": "补给", "rest": "旅店"}.get(service, "服务"), "gold")
 		shop_button.custom_minimum_size.x = 82
 		shop_button.pressed.connect(_open_vendor_shop.bind(str(npc_id)))
 		row.add_child(shop_button)
@@ -1522,10 +1524,22 @@ func _open_vendor_shop(npc_id):
 		buy.pressed.connect(_buy_from_vendor.bind(vendor_id, str(item_id)))
 		hbox.add_child(buy)
 		content.add_child(row)
+	var service = str(GameData.NPCS.get(vendor_id, {}).get("service", ""))
+	if service in ["tavern_shop", "rest"]:
+		var rest_button = _button("免费休息 · 恢复全部体力与状态", "primary")
+		rest_button.pressed.connect(_rest_from_vendor.bind(vendor_id))
+		content.add_child(rest_button)
 	_open_modal(str(shop.name), content, Vector2(700, 620))
 
 func _buy_from_vendor(npc_id, item_id):
 	var result = state.buy_vendor_item(npc_id, item_id)
+	_close_modal()
+	refresh_ui()
+	_show_toast(result.message, result.ok)
+	call_deferred("_open_vendor_shop", npc_id)
+
+func _rest_from_vendor(npc_id):
+	var result = state.rest()
 	_close_modal()
 	refresh_ui()
 	_show_toast(result.message, result.ok)

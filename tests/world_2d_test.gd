@@ -144,7 +144,7 @@ func _run():
 	scene._update_nearest_actor()
 	_check("购买食物" in scene.action_button.text, "没有酒馆对话任务时互动按钮必须显示食物服务")
 	scene._interact()
-	_check(_has_label_text(scene.overlay, "老海鸥酒馆食柜") and _has_label_text(scene.overlay, "海盐面包") and _has_label_text(scene.overlay, "香草鱼汤"), "酒馆老板必须出售可使用的食物，而不是只有对话")
+	_check(_has_label_text(scene.overlay, "老海鸥酒馆 · 恢复补给") and _has_label_text(scene.overlay, "海盐面包") and _has_label_text(scene.overlay, "香草鱼汤") and _has_label_text(scene.overlay, "万能药"), "酒馆老板必须独立出售食物与恢复药品，而不是只有对话")
 	scene._close_overlay()
 
 	# Every mid/late-game objective must exist in a reachable 2D region.
@@ -312,9 +312,17 @@ func _run():
 	_check(bool(equipment_upgrade.get("ok", false)) and scene.state.equipment_upgrade_level("warrior_blade") == 1 and int(scene.state.get_stats().attack) > attack_before_upgrade, "贸易银币必须可以用于强化已装备武器并提升属性")
 	scene._open_trade_2d()
 	_check(is_instance_valid(scene.overlay), "主线完成后必须能从2D地图打开港口市场")
-	_check(_has_button_text(scene.overlay, "买1") and _has_button_text(scene.overlay, "买满") and _has_button_text(scene.overlay, "全卖") and _has_button_text(scene.overlay, "拉古萨") and _has_button_text(scene.overlay, "商会交付") and _has_button_text(scene.overlay, "护航物资") and _has_label_text(scene.overlay, "银币") and _has_label_text(scene.overlay, "总声望") and _has_label_text(scene.overlay, "今日行情"), "2D港口市场必须包含资产、批量买卖、订单声望、护航、跨港航线和动态行情")
+	_check(_has_button_text(scene.overlay, "买1") and _has_button_text(scene.overlay, "买满") and _has_button_text(scene.overlay, "全卖") and _has_button_text(scene.overlay, "打开商会订单柜台") and _has_label_text(scene.overlay, "银币") and _has_label_text(scene.overlay, "今日行情") and not _has_button_text(scene.overlay, "出航拉古萨") and not _has_button_text(scene.overlay, "强化舱板"), "货栈NPC必须只展示货物买卖和订单入口，不能混入航线或船只改造")
 	_check(_has_named_node(scene.overlay, "CargoCapacityBar") and _count_visuals(scene.overlay, "trade") >= 1 and _has_label_text(scene.overlay, "货舱装载") and _has_label_text(scene.overlay, "推荐销往"), "市场必须以货舱容量条、货物图标和销地利润提示呈现，不能只有价格文字")
-	_check(_has_label_text(scene.overlay, "交易商人｜蕾娜") and _has_label_text(scene.overlay, "本港特产｜威尼斯玻璃") and _has_label_text(scene.overlay, "本港产地货栈 · 每种货物只在原产港出售") and not _has_label_text(scene.overlay, "石墙羊毛布"), "威尼斯必须由专属贸易NPC只出售本地货单，不能展示全球商品总目录")
+	_check(_has_label_text(scene.overlay, "蕾娜｜翼狮货栈") and _has_label_text(scene.overlay, "本港产地货栈 · 仅出售威尼斯玻璃") and not _has_label_text(scene.overlay, "石墙羊毛布"), "威尼斯必须由专属货栈NPC只出售本地货单，不能展示全球商品总目录")
+	scene._close_overlay()
+	scene._open_port_harbor_2d("ship_owner")
+	_check(_has_label_text(scene.overlay, "威尼斯 · 港务处") and _has_button_text(scene.overlay, "出航拉古萨") and _has_button_text(scene.overlay, "护航物资") and _has_button_text(scene.overlay, "九港航海大地图") and not _has_button_text(scene.overlay, "买1"), "航务NPC必须只提供航线、出航与护航服务")
+	scene._close_overlay()
+	scene._open_port_shipyard_2d("venice_shipwright")
+	_check(_has_label_text(scene.overlay, "威尼斯 · 船坞") and _has_button_text(scene.overlay, "强化舱板") and _has_button_text(scene.overlay, "强化帆装") and not _has_button_text(scene.overlay, "买1") and not _has_button_text(scene.overlay, "出航拉古萨"), "船匠NPC必须只提供买船和船装改造")
+	scene._close_overlay()
+	scene._open_trade_2d()
 	var silver_before = int(scene.state.player.silver)
 	scene._trade_buy_2d("venetian_glass")
 	_check(int(scene.state.cargo.get("venetian_glass", 0)) == 1 and int(scene.state.player.silver) < silver_before, "2D市场买货必须同步货舱和银币")
@@ -348,13 +356,24 @@ func _run():
 	scene._spawn_world_actors()
 	scene._update_zone(true)
 	_check(str(scene.state.player.location) == "alexandria_dock" and _has_actor(scene, "alexandria_merchant"), "亚历山大港重新进入2D地图后必须保留港口位置和当地商人")
-	_check(_has_actor(scene, "alex_lighthouse_keeper") and _has_actor(scene, "alex_shipwright"), "远洋港口必须同时生成剧情人物、港务人物和船匠，不能只有一名NPC")
+	_check(_has_actor(scene, "alex_harbormaster") and _has_actor(scene, "alex_lighthouse_keeper") and _has_actor(scene, "alex_shipwright"), "远洋港口必须同时生成货栈、港务、商会和船匠，不能把服务合并给一名NPC")
+	_check(_actor_has_label_text(scene, "alexandria_merchant", "货栈 · 买卖特产") and _actor_has_label_text(scene, "alex_harbormaster", "航务 · 航线出港") and _actor_has_label_text(scene, "alex_shipwright", "船坞 · 买船改造") and _actor_has_label_text(scene, "alex_lighthouse_keeper", "商会 · 订单交付"), "港区地图上的每名NPC名牌必须直接显示职能")
 	scene.player_actor.position = _actor_position(scene, "alexandria_merchant")
 	scene._update_nearest_actor()
 	scene._interact()
-	_check(_has_label_text(scene.overlay, "亚历山大港口市场") and _has_button_text(scene.overlay, "向亚历山大商会交付"), "非对话任务时点击亚历山大商人必须直接打开当地港口市场")
-	_check(_has_label_text(scene.overlay, "交易商人｜香料商萨米尔") and _has_label_text(scene.overlay, "本港特产｜亚历山大香料") and _has_label_text(scene.overlay, "船上外来货 · 本港收购") and _has_label_text(scene.overlay, "威尼斯玻璃 · 外来货"), "亚历山大商人必须出售自己的香料，并单独收购船上的威尼斯货物")
-	_check(_has_label_text(scene.overlay, "本港船老板｜哈伦") and _has_label_text(scene.overlay, "灯塔卡拉维尔") and _has_button_text(scene.overlay, "购买灯塔卡拉维尔"), "亚历山大船老板必须可视化展示当地专属船型及购买入口")
+	_check(_has_label_text(scene.overlay, "亚历山大 · 本地货栈") and _has_button_text(scene.overlay, "打开商会订单柜台") and not _has_button_text(scene.overlay, "购买灯塔卡拉维尔"), "非对话任务时点击亚历山大商人必须只打开当地货栈")
+	_check(_has_label_text(scene.overlay, "香料商萨米尔｜灯塔货栈") and _has_label_text(scene.overlay, "仅出售亚历山大香料") and _has_label_text(scene.overlay, "船上外来货 · 本港只收购") and _has_label_text(scene.overlay, "威尼斯玻璃 · 外来货"), "亚历山大商人必须出售自己的香料，并单独收购船上的威尼斯货物")
+	scene._close_overlay()
+	scene._open_port_shipyard_2d("alex_shipwright")
+	_check(_has_label_text(scene.overlay, "亚历山大 · 船坞") and _has_label_text(scene.overlay, "灯塔卡拉维尔") and _has_button_text(scene.overlay, "购买灯塔卡拉维尔") and not _has_label_text(scene.overlay, "亚历山大香料"), "亚历山大船匠必须独立展示当地船型，不能混入香料货单")
+	scene._close_overlay()
+	scene.state.player.location = "ragusa_dock"
+	scene._switch_region("city", "ragusa_dock")
+	scene.player_actor.position = _actor_position(scene, "ragusa_innkeeper")
+	scene._update_nearest_actor()
+	_check("恢复补给" in scene.action_button.text, "旅店NPC的互动按钮必须直接显示恢复补给职能")
+	scene._interact()
+	_check(_has_label_text(scene.overlay, "石墙旅店 · 恢复补给") and _has_label_text(scene.overlay, "万能药") and _has_button_text(scene.overlay, "免费休息"), "旅店必须独立出售恢复药品并提供休息，不能混入货物和船务")
 	scene._close_overlay()
 	await process_frame
 
@@ -377,7 +396,7 @@ func _run():
 	await _walk_task_navigation(scene)
 	await process_frame
 	await process_frame
-	_check(_has_label_text(scene.overlay, "威尼斯港口市场") and _has_label_text(scene.overlay, "本港特产｜威尼斯玻璃"), "走到原产港商人后必须自动打开正确的本地货栈")
+	_check(_has_label_text(scene.overlay, "威尼斯 · 本地货栈") and _has_label_text(scene.overlay, "仅出售威尼斯玻璃"), "走到原产港商人后必须自动打开正确的本地货栈")
 	scene._close_overlay()
 	await process_frame
 	scene.state.cargo["venetian_glass"] = 3
@@ -391,7 +410,7 @@ func _run():
 	await _walk_task_navigation(scene)
 	await process_frame
 	await process_frame
-	_check(_has_label_text(scene.overlay, "亚历山大商会订单") and _has_button_text(scene.overlay, "向亚历山大商会交付"), "抵达商会执事后必须打开可完成灯塔订单的明确交付界面")
+	_check(_has_label_text(scene.overlay, "亚历山大 · 商会订单") and _has_button_text(scene.overlay, "向亚历山大商会交付"), "抵达商会执事后必须打开可完成灯塔订单的明确交付界面")
 	scene._close_overlay()
 	await process_frame
 
@@ -623,6 +642,12 @@ func _actor_position(scene, actor_id):
 		if str(entry.id) == str(actor_id):
 			return entry.node.position
 	return Vector2.ZERO
+
+func _actor_has_label_text(scene, actor_id, fragment):
+	for entry in scene.actors:
+		if str(entry.id) == str(actor_id):
+			return _has_label_text(entry.node, fragment)
+	return false
 
 func _quest_index_by_id(quest_id):
 	for index in range(GameData.QUESTS.size()):

@@ -77,6 +77,13 @@ const HARBOR_NPC_CELLS = {
 	"yangzhou_merchant": Vector2i(3, 2),
 	"amsterdam_auctioneer": Vector2i(4, 2),
 	"amsterdam_shipwright": Vector2i(5, 2),
+	"ragusa_shipwright": Vector2i(1, 0),
+	"alex_harbormaster": Vector2i(2, 0),
+	"malta_harbormaster": Vector2i(4, 0),
+	"malta_shipwright": Vector2i(1, 0),
+	"quanzhou_shipwright": Vector2i(5, 1),
+	"athens_harbormaster": Vector2i(1, 2),
+	"yangzhou_shipwright": Vector2i(0, 2),
 	# Earlier story NPCs reuse the closest port-specific silhouette instead of
 	# falling back to the generic procedural mannequin.
 	"jeweler": Vector2i(0, 0),

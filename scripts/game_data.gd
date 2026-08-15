@@ -166,7 +166,7 @@ const LOCATIONS = {
 		"description": "高耸的石墙守着天然深港。来自巴尔干内陆的羊毛与亚得里亚沿岸的橄榄油在仓栈中堆成小山。",
 		"flavor": "拉古萨盛产羊毛布与橄榄油，威尼斯玻璃在这里很受欢迎。通过港口柜台可返回其他城市。",
 		"exits": [],
-		"npcs": ["ragusa_broker", "ragusa_harbormaster", "ragusa_innkeeper"], "enemies": [], "services": ["harbor"]
+		"npcs": ["ragusa_broker", "ragusa_harbormaster", "ragusa_shipwright", "ragusa_innkeeper"], "enemies": [], "services": ["harbor"]
 	},
 	"alexandria_dock": {
 		"name": "亚历山大 · 灯塔港",
@@ -175,13 +175,13 @@ const LOCATIONS = {
 		"description": "沙色仓库沿海岸铺开，本地香料与各国运来的玻璃器皿在不同语言的叫卖声中成交。",
 		"flavor": "亚历山大香料价格低，但返航路程更长。留足航费，别让满舱货物困在异乡。",
 		"exits": [],
-		"npcs": ["alexandria_merchant", "alex_lighthouse_keeper", "alex_shipwright"], "enemies": [], "services": ["harbor"]
+		"npcs": ["alexandria_merchant", "alex_harbormaster", "alex_lighthouse_keeper", "alex_shipwright"], "enemies": [], "services": ["harbor"]
 	},
 	"malta_dock": {
 		"name": "马耳他 · 蜂蜜石港", "tag": "贸易港", "chapter": "第七章 · 白鲸残影",
 		"description": "金色石墙围住深蓝海湾，渔船与商船挤满港池。白鲸号的旧船钟被悬在仓栈门口，每逢退潮便会自己响起。",
 		"flavor": "马耳他盛产柑橘，也保留着白鲸号最后一批船员的名册。港口厨房可把贸易货物烹制成远航补给。",
-		"exits": [], "npcs": ["malta_keeper", "malta_cook", "malta_diver"], "enemies": [], "services": ["harbor", "cook"]
+		"exits": [], "npcs": ["malta_keeper", "malta_harbormaster", "malta_shipwright", "malta_cook", "malta_diver"], "enemies": [], "services": ["harbor", "cook"]
 	},
 	"cape_town_dock": {
 		"name": "开普敦 · 风暴角港", "tag": "远征港", "chapter": "第十章 · 北河迷踪",
@@ -191,17 +191,17 @@ const LOCATIONS = {
 	"quanzhou_dock": {
 		"name": "泉州 · 刺桐港", "tag": "远征港", "chapter": "第十三章 · 妖气东来",
 		"description": "蕃坊钟声与海船号子交叠。沈砚正在核对一批从长安逃出的封妖文书。", "flavor": "刺桐青瓷从这里进入全球商路，完整运抵西方能卖出高价。",
-		"exits": [], "npcs": ["quanzhou_scholar", "quanzhou_navigator", "quanzhou_merchant"], "enemies": [], "services": ["harbor"]
+		"exits": [], "npcs": ["quanzhou_scholar", "quanzhou_navigator", "quanzhou_merchant", "quanzhou_shipwright"], "enemies": [], "services": ["harbor"]
 	},
 	"athens_dock": {
 		"name": "雅典 · 银帆港", "tag": "远征港", "chapter": "第十六章 · 地魔宝藏",
 		"description": "古老石柱俯瞰海湾，祭司卡珊德拉把潮汐星盘嵌进一块裂开的地脉石。", "flavor": "银帆坡地的新酿只在雅典装桶，是宴席与祭典都需要的远航货物。",
-		"exits": [], "npcs": ["athens_oracle", "athens_smith", "athens_innkeeper"], "enemies": [], "services": ["harbor"]
+		"exits": [], "npcs": ["athens_oracle", "athens_harbormaster", "athens_smith", "athens_innkeeper"], "enemies": [], "services": ["harbor"]
 	},
 	"yangzhou_dock": {
 		"name": "扬州 · 运河月港", "tag": "远征港", "chapter": "第二十二章 · 天魔传奇",
 		"description": "月光沿运河铺成银路，织师苏绫守着一架能把记忆织进绢纱的古机。", "flavor": "玉纱与瓷器把东方故事带往远海。",
-		"exits": [], "npcs": ["yangzhou_weaver", "yangzhou_pilot", "yangzhou_merchant"], "enemies": [], "services": ["harbor"]
+		"exits": [], "npcs": ["yangzhou_weaver", "yangzhou_pilot", "yangzhou_merchant", "yangzhou_shipwright"], "enemies": [], "services": ["harbor"]
 	},
 	"amsterdam_dock": {
 		"name": "阿姆斯特丹 · 风车港", "tag": "远征港", "chapter": "第二十五章 · 玉历宝纱",
@@ -265,32 +265,39 @@ const NPCS = {
 	"tavern_keeper": {"name": "酒馆老板", "role": "主线复命人与餐食商", "service": "tavern_shop", "dialogue": "这片鳞来自很深的海域。想知道自己是谁，先证明你能在这片大陆活下去——北门正缺人手。平时也可以来买热食和旅行干粮。"},
 	"guard_captain": {"name": "守卫队长", "role": "城市守卫", "dialogue": "城内地图能带你快速去往各处。出了北门，可就要留意自己的体力和状态了。"},
 	"jeweler": {"name": "珠宝匠贝里昂", "role": "珠宝、鉴定与装备锻造", "service": "jewelry_shop", "dialogue": "我能鉴定未知道具，也出售龙泉水和强化图纸。+1至+3只需银币，更高强化就要准备材料。"},
-	"ship_owner": {"name": "船老板", "role": "船只与航行", "service": "harbor", "dialogue": "完成威尼斯试炼后，我会把海燕号交给你。比较各港价格、控制货舱，再决定把银币压在哪批货上。"},
-	"ragusa_broker": {"name": "拉古萨经纪人", "role": "港口商人", "service": "harbor", "dialogue": "这里的羊毛和橄榄油便宜。若你从威尼斯带来玻璃，我能给出不错的价钱。"},
-	"alexandria_merchant": {"name": "香料商萨米尔", "role": "港口商人", "service": "harbor", "dialogue": "季风改变的不只是航期，也会改变香料的价格。低买高卖，但别忘了返航的费用。"},
-	"malta_keeper": {"name": "伊莎贝拉", "role": "守钟人与柑橘商会代表", "service": "harbor", "dialogue": "我守着这口船钟，也替岛上的果农经营柑橘货栈。若你真要寻找白鲸号，就先学会让同行的人平安吃上一顿饭。"},
+	"ship_owner": {"name": "船老板", "role": "威尼斯航务官 · 航线规划与护航补给", "service": "harbor", "dialogue": "完成威尼斯试炼后，我会把海燕号交给你。航线、护航物资和出港手续都来找我；买卖货物请找蕾娜。"},
+	"ragusa_broker": {"name": "拉古萨经纪人", "role": "石墙货栈 · 羊毛与橄榄油买卖", "service": "market", "dialogue": "这里的羊毛和橄榄油便宜。若你从威尼斯带来玻璃，我能给出不错的价钱。"},
+	"alexandria_merchant": {"name": "香料商萨米尔", "role": "灯塔货栈 · 香料买卖", "service": "market", "dialogue": "季风改变的不只是航期，也会改变香料的价格。低买高卖，但出港手续要去找法里德。"},
+	"malta_keeper": {"name": "伊莎贝拉", "role": "金岛货栈 · 柑橘买卖", "service": "market", "dialogue": "我守着这口船钟，也替岛上的果农经营柑橘货栈。远航餐请找特蕾莎，船务请找马尔科。"},
 	"cape_keeper": {"name": "阿曼达", "role": "北河向导", "service": "harbor", "dialogue": "风暴角不相信传说，只相信能从北河活着回来的人。"},
 	"quanzhou_scholar": {"name": "沈砚", "role": "封妖录守卷人", "service": "harbor", "dialogue": "海上的妖气与长安旧案来自同一道裂隙，我一直在等星盘的持有者。"},
-	"athens_oracle": {"name": "卡珊德拉", "role": "地脉祭司与银帆酒商会代表", "service": "harbor", "dialogue": "石柱记得海水尚未来临前的战争，神庙坡地的葡萄园也仍沿用古老的酿造法。"},
+	"athens_oracle": {"name": "卡珊德拉", "role": "银帆货栈 · 葡萄酒买卖", "service": "market", "dialogue": "石柱记得海水尚未来临前的战争，神庙坡地的葡萄园也仍沿用古老的酿造法。"},
 	"yangzhou_weaver": {"name": "苏绫", "role": "玉纱织师", "service": "harbor", "dialogue": "丝线会说谎，但断口不会。让我看看你从潮门带回的历史。"},
 	"amsterdam_cartographer": {"name": "范德海", "role": "七海制图师", "service": "harbor", "dialogue": "基德的藏宝图从来不是指向黄金，而是指向天魔舰队的补给航线。"}
-	,"venice_quartermaster": {"name": "蕾娜", "role": "码头仓库管理员", "service": "harbor", "dialogue": "货物要按占舱大小算，不要只看单件差价。真正的好商路，是返程也不空舱。"}
+	,"venice_quartermaster": {"name": "蕾娜", "role": "翼狮货栈 · 威尼斯玻璃买卖", "service": "market", "dialogue": "货物要按占舱大小算，不要只看单件差价。买卖玻璃和交商会订单找我，航线请找船老板。"}
 	,"venice_shipwright": {"name": "洛伦佐", "role": "海燕号船匠", "service": "shipyard", "dialogue": "货舱、船帆和装甲各有用处。想跑远洋，先决定这条船要成为商船还是快船。"}
-	,"ragusa_harbormaster": {"name": "娜迪娅", "role": "石墙港务官", "service": "harbor", "dialogue": "北风一到，石墙外的浪会像刀。出港前看看海图上的风险。"}
+	,"ragusa_harbormaster": {"name": "娜迪娅", "role": "石墙港务官 · 航线与护航", "service": "harbor", "dialogue": "北风一到，石墙外的浪会像刀。出港前看看海图上的风险。"}
+	,"ragusa_shipwright": {"name": "马林", "role": "石墙船坞 · 柯克船与改造", "service": "shipyard", "dialogue": "柯克船跑得不算快，但宽货舱能把两地货差真正装回来。"}
 	,"ragusa_innkeeper": {"name": "佩塔尔", "role": "石墙旅店主人", "service": "rest", "dialogue": "跑完长航线就歇一晚。满身疲惫去碰海盗，可不是勇敢。"}
+	,"alex_harbormaster": {"name": "法里德", "role": "灯塔港务官 · 航线与护航", "service": "harbor", "dialogue": "三角帆能顶着逆风走，但路线和补给仍要在离港前算清楚。"}
 	,"alex_lighthouse_keeper": {"name": "商会执事·莱拉", "role": "亚历山大商会 · 灯塔订单", "service": "trade_order", "dialogue": "这里就是亚历山大商会的订单柜台。带齐三箱威尼斯玻璃后交给我，灯塔修缮队会立即验收。"}
 	,"alex_shipwright": {"name": "哈伦", "role": "三角帆船匠", "service": "shipyard", "dialogue": "这里的逆风航线多，速度每提升一级，都能省下一整天补给。"}
+	,"malta_harbormaster": {"name": "马尔科", "role": "金岛港务官 · 航线与护航", "service": "harbor", "dialogue": "雾季出港先看海图。护航物资保不住利润，却能保住回家的机会。"}
+	,"malta_shipwright": {"name": "安杰洛", "role": "金岛船坞 · 桨帆船与改造", "service": "shipyard", "dialogue": "无风海面要靠桨，坏天气则要靠一层一层钉牢的船板。"}
 	,"malta_cook": {"name": "特蕾莎", "role": "蜂蜜石港厨师", "service": "cook", "dialogue": "柑橘、香料和橄榄油都能变成远航餐。先把配料放进货舱。"}
 	,"malta_diver": {"name": "尼科", "role": "白鲸号打捞人", "dialogue": "沉船不会消失，只会慢慢变成礁石。退潮时别错过露出的旧舱门。"}
 	,"cape_shipwright": {"name": "姆贝基", "role": "风暴角船匠", "service": "shipyard", "dialogue": "两股洋流在这里打架。船体不够硬，满舱黄金也带不回家。"}
-	,"cape_quartermaster": {"name": "扎赫拉", "role": "北河补给官", "service": "harbor", "dialogue": "我负责远征补给，也收购东方香料。选中海图节点就能比较航期与风险。"}
-	,"quanzhou_navigator": {"name": "林海", "role": "季风领航员", "service": "harbor", "dialogue": "季风不是墙，是会移动的道路。顺风时泉州到扬州只需很短的航程。"}
-	,"quanzhou_merchant": {"name": "林香", "role": "刺桐青瓷商", "service": "harbor", "dialogue": "青瓷怕风浪，却能在西方卖出数倍价钱。货舱留一格，应付路上的漂流宝箱。"}
+	,"cape_quartermaster": {"name": "扎赫拉", "role": "北河货栈 · 金砂买卖", "service": "market", "dialogue": "我收购东方香料，也出售北河金砂。路线和风险请去问阿曼达。"}
+	,"quanzhou_navigator": {"name": "林海", "role": "刺桐港务 · 季风航线与护航", "service": "harbor", "dialogue": "季风不是墙，是会移动的道路。顺风时泉州到扬州只需很短的航程。"}
+	,"quanzhou_merchant": {"name": "林香", "role": "刺桐货栈 · 青瓷买卖", "service": "market", "dialogue": "青瓷怕风浪，却能在西方卖出数倍价钱。货舱留一格，应付路上的漂流宝箱。"}
+	,"quanzhou_shipwright": {"name": "周福", "role": "刺桐船坞 · 福船与改造", "service": "shipyard", "dialogue": "水密隔舱能救下一船货，也能救下整船人的命。"}
+	,"athens_harbormaster": {"name": "德米特里", "role": "银帆港务官 · 航线与护航", "service": "harbor", "dialogue": "爱琴海的岛礁会骗过眼睛，出航前要看航线，不要只看远处的灯。"}
 	,"athens_smith": {"name": "尼科斯", "role": "银帆锻造师", "service": "shipyard", "dialogue": "船甲与战甲一样，真正救命的往往是最不起眼的一块铆钉。"}
 	,"athens_innkeeper": {"name": "艾琳娜", "role": "橄榄枝旅店主人", "service": "rest", "dialogue": "祭司负责预言，我只负责让出海的人吃饱睡好。"}
-	,"yangzhou_pilot": {"name": "阿渔", "role": "运河领航员", "service": "harbor", "dialogue": "海船进运河要看潮位。海图上的亮线，就是今天还能走的水路。"}
-	,"yangzhou_merchant": {"name": "顾七", "role": "月港玉纱商", "service": "harbor", "dialogue": "玉纱不占多少货舱，在北海却比同重黄金更抢手。真正值钱的，是知道该送去哪一座港。"}
-	,"amsterdam_auctioneer": {"name": "伊娃", "role": "七海拍卖师", "service": "harbor", "dialogue": "同一件货物，换一天、换一个港，价格就会讲完全不同的故事。"}
+	,"yangzhou_pilot": {"name": "阿渔", "role": "月港港务 · 运河航线与护航", "service": "harbor", "dialogue": "海船进运河要看潮位。海图上的亮线，就是今天还能走的水路。"}
+	,"yangzhou_merchant": {"name": "顾七", "role": "月港货栈 · 玉纱买卖", "service": "market", "dialogue": "玉纱不占多少货舱，在北海却比同重黄金更抢手。真正值钱的，是知道该送去哪一座港。"}
+	,"yangzhou_shipwright": {"name": "鲁舟", "role": "月港船坞 · 宝船与改造", "service": "shipyard", "dialogue": "宝船不是越大越好，货舱、吃水和帆装要一起算。"}
+	,"amsterdam_auctioneer": {"name": "伊娃", "role": "风车货栈 · 航海仪买卖", "service": "market", "dialogue": "同一件货物，换一天、换一个港，价格就会讲完全不同的故事。"}
 	,"amsterdam_shipwright": {"name": "威廉", "role": "风车港船匠", "service": "shipyard", "dialogue": "北海的船要快，也要能挨浪。别让货舱扩建挤掉了船体加强筋。"}
 }
 
@@ -304,6 +311,30 @@ const TRADE_PORTS = {
 	"athens_dock": {"name": "雅典", "specialty": "银帆葡萄酒", "specialty_good": "athens_wine", "stock": ["athens_wine"], "merchant_npc": "athens_oracle", "note": "银帆葡萄酒只在雅典装桶，西方庆典和东方宴席都有高价需求", "npc": "athens_oracle", "order_npc": "athens_smith", "ship_offer": "athens_trireme", "ship_seller": "尼科斯"},
 	"yangzhou_dock": {"name": "扬州", "specialty": "运河玉纱", "specialty_good": "yangzhou_silk", "stock": ["yangzhou_silk"], "merchant_npc": "yangzhou_merchant", "note": "玉纱轻且昂贵，适合装满快船远销北海", "npc": "yangzhou_weaver", "order_npc": "yangzhou_merchant", "ship_offer": "yangzhou_treasure", "ship_seller": "阿渔"},
 	"amsterdam_dock": {"name": "阿姆斯特丹", "specialty": "风车港航海仪", "specialty_good": "amsterdam_instruments", "stock": ["amsterdam_instruments"], "merchant_npc": "amsterdam_auctioneer", "note": "精密航海仪在东方稀缺，拍卖行也高价收购丝绸", "npc": "amsterdam_cartographer", "order_npc": "amsterdam_auctioneer", "ship_offer": "amsterdam_clipper", "ship_seller": "威廉"}
+}
+
+# 港口业务必须由地图上的具体人物承办，不能再由任意 NPC 打开一张全功能菜单。
+const PORT_SERVICE_NPCS = {
+	"venice_dock": {"market": "venice_quartermaster", "harbor": "ship_owner", "shipyard": "venice_shipwright"},
+	"ragusa_dock": {"market": "ragusa_broker", "harbor": "ragusa_harbormaster", "shipyard": "ragusa_shipwright", "rest": "ragusa_innkeeper"},
+	"alexandria_dock": {"market": "alexandria_merchant", "harbor": "alex_harbormaster", "shipyard": "alex_shipwright", "trade_order": "alex_lighthouse_keeper"},
+	"malta_dock": {"market": "malta_keeper", "harbor": "malta_harbormaster", "shipyard": "malta_shipwright", "cook": "malta_cook"},
+	"cape_town_dock": {"market": "cape_quartermaster", "harbor": "cape_keeper", "shipyard": "cape_shipwright"},
+	"quanzhou_dock": {"market": "quanzhou_merchant", "harbor": "quanzhou_navigator", "shipyard": "quanzhou_shipwright"},
+	"athens_dock": {"market": "athens_oracle", "harbor": "athens_harbormaster", "shipyard": "athens_smith", "rest": "athens_innkeeper"},
+	"yangzhou_dock": {"market": "yangzhou_merchant", "harbor": "yangzhou_pilot", "shipyard": "yangzhou_shipwright"},
+	"amsterdam_dock": {"market": "amsterdam_auctioneer", "harbor": "amsterdam_cartographer", "shipyard": "amsterdam_shipwright"}
+}
+
+const NPC_SERVICE_LABELS = {
+	"market": "货栈 · 买卖特产",
+	"harbor": "航务 · 航线出港",
+	"shipyard": "船坞 · 买船改造",
+	"trade_order": "商会 · 订单交付",
+	"cook": "厨房 · 烹制补给",
+	"rest": "旅店 · 恢复补给",
+	"jewelry_shop": "珠宝 · 鉴定锻造",
+	"tavern_shop": "酒馆 · 食物恢复"
 }
 
 const SHIP_HULLS = {
@@ -709,7 +740,9 @@ const ITEMS = {
 
 const VENDOR_SHOPS = {
 	"jeweler": {"name": "贝里昂珠宝铺", "description": "兼营装备锻造：出售护身珠宝、龙泉水与强化图纸；未知道具仍可在此鉴定。", "stock": ["coral_ring", "aquamarine_pendant", "dragon_spring_water", "forging_blueprint"]},
-	"tavern_keeper": {"name": "老海鸥酒馆食柜", "description": "出售能在背包中使用的热食和旅行干粮，也可以在这里免费休息。", "stock": ["sea_salt_bread", "herb_fish_stew", "small_milk"]}
+	"tavern_keeper": {"name": "老海鸥酒馆 · 恢复补给", "description": "只经营食物、牛奶和恢复用品；装备、货物与船务请前往对应店铺。", "stock": ["sea_salt_bread", "herb_fish_stew", "small_milk", "universal_medicine"]},
+	"ragusa_innkeeper": {"name": "石墙旅店 · 恢复补给", "description": "出售旅行食物、牛奶和万能药，也可以免费休息恢复全部体力与状态。", "stock": ["sea_salt_bread", "small_milk", "universal_medicine"]},
+	"athens_innkeeper": {"name": "橄榄枝旅店 · 恢复补给", "description": "出售远征前的恢复用品，也可以免费休息恢复全部体力与状态。", "stock": ["herb_fish_stew", "small_milk", "universal_medicine"]}
 }
 
 const IDENTIFY_POOL = ["linen_cap", "traveler_boots", "bronze_charm", "guard_belt", "spider_knife"]
@@ -969,6 +1002,14 @@ static func quest_dialogue(quest_id, npc_id):
 	if QUEST_DIALOGUES.has(key):
 		return str(QUEST_DIALOGUES[key])
 	return str(NPCS.get(str(npc_id), {}).get("dialogue", "没有更多消息。"))
+
+static func npc_service_label(npc_id):
+	var npc = NPCS.get(str(npc_id), {})
+	var service = str(npc.get("service", ""))
+	return str(NPC_SERVICE_LABELS.get(service, npc.get("role", "剧情人物")))
+
+static func port_service_npc(port_id, service):
+	return str(PORT_SERVICE_NPCS.get(str(port_id), {}).get(str(service), ""))
 
 static func trade_route(from_port, to_port):
 	var origin = str(from_port)
