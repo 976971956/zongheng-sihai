@@ -98,6 +98,7 @@ func _run():
 	scene.state.inventory["warrior_blade"] = 1
 	scene._open_inventory()
 	_check(_has_button_text(scene.overlay, "装备") and _has_button_text(scene.overlay, "使用"), "2D背包必须显示装备与使用按钮")
+	_check(_has_label_text(scene.overlay, "角色装备槽") and _has_label_text(scene.overlay, "背包物品") and _count_visuals(scene.overlay, "equipment") >= 7, "背包必须以六格装备面板和物品图标呈现，不能退回纯文字清单")
 	scene._equip_item_2d("warrior_blade")
 	await process_frame
 	_check(str(scene.state.equipment.weapon) == "warrior_blade", "点击装备必须更新角色装备槽")
@@ -304,7 +305,8 @@ func _run():
 	_check(bool(equipment_upgrade.get("ok", false)) and scene.state.equipment_upgrade_level("warrior_blade") == 1 and int(scene.state.get_stats().attack) > attack_before_upgrade, "贸易银币必须可以用于强化已装备武器并提升属性")
 	scene._open_trade_2d()
 	_check(is_instance_valid(scene.overlay), "主线完成后必须能从2D地图打开港口市场")
-	_check(_has_button_text(scene.overlay, "买1") and _has_button_text(scene.overlay, "买满") and _has_button_text(scene.overlay, "全卖") and _has_button_text(scene.overlay, "拉古萨") and _has_button_text(scene.overlay, "商会交付") and _has_button_text(scene.overlay, "护航物资") and _has_label_text(scene.overlay, "持有银币") and _has_label_text(scene.overlay, "总声望") and _has_label_text(scene.overlay, "今日行情"), "2D港口市场必须包含资产、批量买卖、订单声望、护航、跨港航线和动态行情")
+	_check(_has_button_text(scene.overlay, "买1") and _has_button_text(scene.overlay, "买满") and _has_button_text(scene.overlay, "全卖") and _has_button_text(scene.overlay, "拉古萨") and _has_button_text(scene.overlay, "商会交付") and _has_button_text(scene.overlay, "护航物资") and _has_label_text(scene.overlay, "银币") and _has_label_text(scene.overlay, "总声望") and _has_label_text(scene.overlay, "今日行情"), "2D港口市场必须包含资产、批量买卖、订单声望、护航、跨港航线和动态行情")
+	_check(_has_named_node(scene.overlay, "CargoCapacityBar") and _count_visuals(scene.overlay, "trade") >= 1 and _has_label_text(scene.overlay, "货舱装载") and _has_label_text(scene.overlay, "推荐销往"), "市场必须以货舱容量条、货物图标和销地利润提示呈现，不能只有价格文字")
 	_check(_has_label_text(scene.overlay, "交易商人｜蕾娜") and _has_label_text(scene.overlay, "本港特产｜威尼斯玻璃") and _has_label_text(scene.overlay, "本港产地货栈 · 每种货物只在原产港出售") and not _has_label_text(scene.overlay, "石墙羊毛布"), "威尼斯必须由专属贸易NPC只出售本地货单，不能展示全球商品总目录")
 	var silver_before = int(scene.state.player.silver)
 	scene._trade_buy_2d("venetian_glass")
@@ -508,6 +510,24 @@ func _has_label_text(node, fragment):
 		return true
 	for child in node.get_children():
 		if _has_label_text(child, fragment):
+			return true
+	return false
+
+func _count_visuals(node, visual_kind):
+	if not is_instance_valid(node):
+		return 0
+	var count = 1 if node.has_meta("visual_kind") and str(node.get_meta("visual_kind")) == str(visual_kind) else 0
+	for child in node.get_children():
+		count += _count_visuals(child, visual_kind)
+	return count
+
+func _has_named_node(node, target_name):
+	if not is_instance_valid(node):
+		return false
+	if str(node.name) == str(target_name):
+		return true
+	for child in node.get_children():
+		if _has_named_node(child, target_name):
 			return true
 	return false
 

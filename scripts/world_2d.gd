@@ -17,6 +17,7 @@ const SeaWorldMapScript = preload("res://scripts/sea_world_2d.gd")
 const ActorScript = preload("res://scripts/actor_2d.gd")
 const BattleStageScript = preload("res://scripts/battle_stage_2d.gd")
 const JoystickScript = preload("res://scripts/virtual_joystick.gd")
+const ItemIconScript = preload("res://scripts/item_icon_2d.gd")
 const MONSTER_RESPAWN_SECONDS = GameState.ENEMY_RESPAWN_SECONDS
 const MONSTER_RESPAWN_RETRY_SECONDS = 1.5
 const MONSTER_RESPAWN_SAFE_DISTANCE = 170.0
@@ -1515,20 +1516,23 @@ func _return_to_tavern_after_defeat(enemy_name, result = {}):
 
 func _open_inventory():
 	var content = VBoxContainer.new()
-	content.add_theme_constant_override("separation", 12)
-	content.add_child(_label("冒险背包", 26, GOLD))
-	content.add_child(_label("持有银币：%d｜装备可强化，也可自动换上更高战力" % int(state.player.silver), 14, GOLD))
+	content.add_theme_constant_override("separation", 10)
+	content.add_child(_label("冒险背包 · 装备舱", 26, GOLD))
 	var stats = state.get_stats()
-	content.add_child(_label("战力%d  攻击%d  防御%d  速度%d" % [state.get_power(), int(stats.attack), int(stats.defense), int(stats.speed)], 15, TEAL))
-	var equipped_names = []
-	for slot in ["weapon", "head", "body", "waist", "boots", "charm"]:
-		var equipped_id = str(state.equipment.get(slot, ""))
-		if equipped_id != "" and GameData.ITEMS.has(equipped_id):
-			equipped_names.append(str(GameData.ITEMS[equipped_id].name))
-	var equipped_text = "当前装备：%s" % ("、".join(equipped_names) if not equipped_names.is_empty() else "无")
-	var equipped_line = _label(equipped_text, 14, MUTED)
-	equipped_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	content.add_child(equipped_line)
+	var summary = HBoxContainer.new()
+	summary.add_theme_constant_override("separation", 8)
+	var power_panel = PanelContainer.new()
+	power_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	power_panel.add_theme_stylebox_override("panel", _style(Color(0.16, 0.11, 0.03, 0.94), 12, Color(GOLD, 0.55), 1, 10))
+	power_panel.add_child(_label("⚔ 战力 %d\n攻%d  防%d  速%d" % [state.get_power(), int(stats.attack), int(stats.defense), int(stats.speed)], 15, GOLD))
+	summary.add_child(power_panel)
+	var inventory_counts = _inventory_counts_2d()
+	var bag_panel = PanelContainer.new()
+	bag_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bag_panel.add_theme_stylebox_override("panel", _style(Color(0.03, 0.15, 0.17, 0.94), 12, Color(TEAL, 0.48), 1, 10))
+	bag_panel.add_child(_label("◈ 银币 %d\n装备%d  补给%d  卡片%d" % [int(state.player.silver), int(inventory_counts.equipment), int(inventory_counts.consumable), int(inventory_counts.card)], 14, TEAL))
+	summary.add_child(bag_panel)
+	content.add_child(summary)
 	var recommend = _button("一键穿戴推荐装备", "gold")
 	recommend.pressed.connect(_equip_recommended_2d)
 	content.add_child(recommend)
@@ -1550,15 +1554,20 @@ func _open_inventory():
 	items.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	items.add_theme_constant_override("separation", 8)
 	scroll.add_child(items)
-	items.add_child(_label("已装备强化｜贸易银币的主要成长用途", 15, GOLD))
+	items.add_child(_label("角色装备槽｜边框颜色代表品质", 16, GOLD))
+	var equipment_grid = GridContainer.new()
+	equipment_grid.columns = 2
+	equipment_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	equipment_grid.add_theme_constant_override("h_separation", 8)
+	equipment_grid.add_theme_constant_override("v_separation", 8)
 	for slot in ["weapon", "head", "body", "waist", "boots", "charm"]:
-		if str(state.equipment.get(slot, "")) != "":
-			items.add_child(_equipped_upgrade_card_2d(slot))
-	items.add_child(_label("背包物品", 15, GOLD))
+		equipment_grid.add_child(_equipped_upgrade_card_2d(slot))
+	items.add_child(equipment_grid)
+	items.add_child(_label("背包物品｜按装备、补给、卡片分类排列", 16, GOLD))
 	if state.inventory.is_empty():
 		items.add_child(_label("背包是空的。", 16, MUTED))
 	var item_ids = state.inventory.keys()
-	item_ids.sort()
+	item_ids.sort_custom(func(a, b): return _inventory_sort_key_2d(str(a)) < _inventory_sort_key_2d(str(b)))
 	for item_id in item_ids:
 		if not GameData.ITEMS.has(item_id):
 			continue
@@ -1571,21 +1580,33 @@ func _open_inventory():
 
 func _equipped_upgrade_card_2d(slot):
 	var item_id = str(state.equipment.get(slot, ""))
-	var item = GameData.ITEMS[item_id]
-	var level = state.equipment_upgrade_level(item_id)
+	var item = GameData.ITEMS.get(item_id, {})
+	var level = state.equipment_upgrade_level(item_id) if item_id != "" else 0
+	var rarity = str(item.get("rarity", "普通"))
 	var card = PanelContainer.new()
-	card.add_theme_stylebox_override("panel", _style(Color(0.12, 0.10, 0.04, 0.92), 10, Color(GOLD, 0.38), 1, 10))
+	card.custom_minimum_size = Vector2(288, 168)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.add_theme_stylebox_override("panel", _style(Color(0.07, 0.105, 0.105, 0.95), 11, _rarity_color_2d(rarity), 2 if item_id != "" else 1, 9))
+	var stack = VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 6)
+	card.add_child(stack)
 	var row = HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
-	card.add_child(row)
-	var info = _label("%s｜%s +%d\n%s" % [GameData.SLOT_NAMES[slot], item.name, level, _item_stats_text_2d(item.get("stats", {}))], 13, INK)
+	stack.add_child(row)
+	row.add_child(_item_visual_2d("equipment", item_id if item_id != "" else slot, rarity, slot, item_id != "", 62))
+	var item_name = str(item.get("name", "尚未装备"))
+	var stats_text = _item_stats_text_2d(item.get("stats", {})) if item_id != "" else "从背包选择该槽位装备"
+	var info = _label("%s\n%s%s\n%s" % [GameData.SLOT_NAMES[slot], item_name, "  +%d" % level if level > 0 else "", stats_text], 12, INK if item_id != "" else MUTED)
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	row.add_child(info)
-	var upgrade = _button("已满级" if level >= 3 else "强化 %d银" % state.equipment_upgrade_cost(slot), "gold")
-	upgrade.custom_minimum_size = Vector2(142, 56)
-	upgrade.disabled = level >= 3 or int(state.player.silver) < state.equipment_upgrade_cost(slot)
+	var upgrade_cost = state.equipment_upgrade_cost(slot) if item_id != "" else 0
+	var upgrade = _button("空槽位" if item_id == "" else ("已强化满级" if level >= 3 else "强化 +1 · %d银" % upgrade_cost), "gold")
+	upgrade.custom_minimum_size = Vector2(0, 48)
+	upgrade.add_theme_font_size_override("font_size", 13)
+	upgrade.disabled = item_id == "" or level >= 3 or int(state.player.silver) < upgrade_cost
 	upgrade.pressed.connect(_upgrade_equipped_2d.bind(slot))
-	row.add_child(upgrade)
+	stack.add_child(upgrade)
 	return card
 
 func _upgrade_equipped_2d(slot):
@@ -1600,15 +1621,17 @@ func _upgrade_equipped_2d(slot):
 
 func _inventory_item_card_2d(item_id, item, count):
 	var card = PanelContainer.new()
-	card.add_theme_stylebox_override("panel", _style(Color(0.04, 0.13, 0.16, 0.92), 11, Color(TEAL, 0.3), 1, 12))
+	card.add_theme_stylebox_override("panel", _style(Color(0.04, 0.13, 0.16, 0.92), 11, _rarity_color_2d(str(item.rarity)), 2, 10))
 	var row = HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	card.add_child(row)
+	row.add_child(_item_visual_2d(str(item.type), item_id, str(item.rarity), str(item.get("slot", "")), false, 76))
 	var text_stack = VBoxContainer.new()
 	text_stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	text_stack.add_theme_constant_override("separation", 3)
 	row.add_child(text_stack)
-	text_stack.add_child(_label("%s  ×%d · %s" % [item.name, count, str(item.rarity)], 15, INK))
+	text_stack.add_child(_label("%s  ×%d" % [item.name, count], 15, INK))
+	text_stack.add_child(_label("%s%s" % [str(item.rarity), " · %s" % GameData.SLOT_NAMES[str(item.slot)] if str(item.type) == "equipment" else ""], 12, _rarity_color_2d(str(item.rarity))))
 	var description = _label(str(item.description), 12, MUTED)
 	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text_stack.add_child(description)
@@ -1637,6 +1660,39 @@ func _inventory_item_card_2d(item_id, item, count):
 			action.disabled = true
 	row.add_child(action)
 	return card
+
+func _inventory_counts_2d():
+	var counts = {"equipment": 0, "consumable": 0, "card": 0, "other": 0}
+	for item_id in state.inventory:
+		if not GameData.ITEMS.has(str(item_id)):
+			continue
+		var item_type = str(GameData.ITEMS[str(item_id)].get("type", "other"))
+		var bucket = item_type if counts.has(item_type) else "other"
+		counts[bucket] += int(state.inventory[item_id])
+	return counts
+
+func _inventory_sort_key_2d(item_id):
+	if not GameData.ITEMS.has(item_id):
+		return "9_%s" % item_id
+	var item = GameData.ITEMS[item_id]
+	var type_order = {"equipment": "0", "consumable": "1", "mystery": "2", "card": "3"}
+	var rarity_order = {"唯一": "0", "神话": "1", "传说": "2", "史诗": "3", "珍稀": "4", "优秀": "5", "普通": "6", "稀有补给": "3", "远航餐食": "4", "补给": "5", "酒馆食物": "6", "未知": "7"}
+	return "%s_%s_%s" % [str(type_order.get(str(item.type), "8")), str(rarity_order.get(str(item.rarity), "8")), str(item.name)]
+
+func _rarity_color_2d(rarity):
+	var colors = {
+		"普通": MUTED, "补给": Color("69c8a8"), "酒馆食物": Color("d5a867"),
+		"稀有补给": Color("62b8ef"), "远航餐食": Color("64d9c6"), "优秀": Color("54c8a8"),
+		"珍稀": Color("65aee8"), "史诗": Color("bb7bea"), "传说": Color("efb95f"),
+		"神话": Color("ef785f"), "唯一": Color("f6df8b"), "未知": Color("88949d")
+	}
+	return Color(colors.get(str(rarity), MUTED))
+
+func _item_visual_2d(kind, item_id, rarity = "普通", slot = "", equipped = false, icon_size = 76):
+	var visual = ItemIconScript.new()
+	visual.custom_minimum_size = Vector2(icon_size, icon_size)
+	visual.configure(str(kind), str(item_id), str(rarity), str(slot), bool(equipped))
+	return visual
 
 func _item_stats_text_2d(item_stats):
 	var parts = []
@@ -2291,6 +2347,7 @@ func _open_vendor_shop_2d(npc_id):
 		var item = GameData.ITEMS[str(item_id)]
 		var row = HBoxContainer.new()
 		row.add_theme_constant_override("separation", 10)
+		row.add_child(_item_visual_2d(str(item.type), str(item_id), str(item.rarity), str(item.get("slot", "")), false, 72))
 		var text_stack = VBoxContainer.new()
 		text_stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(text_stack)
@@ -2307,7 +2364,7 @@ func _open_vendor_shop_2d(npc_id):
 		buy.pressed.connect(_buy_vendor_item_2d.bind(vendor_id, str(item_id)))
 		row.add_child(buy)
 		var card = PanelContainer.new()
-		card.add_theme_stylebox_override("panel", _style(Color(0.04, 0.13, 0.16, 0.92), 10, Color(TEAL, 0.32), 1, 10))
+		card.add_theme_stylebox_override("panel", _style(Color(0.04, 0.13, 0.16, 0.92), 10, _rarity_color_2d(str(item.rarity)), 2, 10))
 		card.add_child(row)
 		stock_list.add_child(card)
 	if vendor_id == "jeweler":
@@ -2360,10 +2417,13 @@ func _open_trade_2d():
 	var content = VBoxContainer.new()
 	content.add_theme_constant_override("separation", 10)
 	content.add_child(_label("%s港口市场" % port.name, 25, GOLD))
-	var wallet = _label("持有银币：%d" % int(state.player.silver), 20, GOLD)
-	wallet.add_theme_stylebox_override("normal", _style(Color(0.18, 0.13, 0.03, 0.94), 11, Color(GOLD, 0.66), 1, 11))
-	content.add_child(wallet)
-	content.add_child(_label("第%d日 · 货舱%d/%d · 货值%d · 浮动盈亏%+d · 本港声望%d · 总声望%d" % [state.trade_day, state.cargo_used(), state.cargo_capacity(), state.cargo_market_value(), state.cargo_unrealized_profit(), state.port_reputation_value(port_id), state.total_trade_reputation()], 14, TEAL))
+	content.add_child(_trade_dashboard_2d(port_id))
+	if inventory_notice != "":
+		var trade_notice = _label(inventory_notice, 14, GOLD)
+		trade_notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		trade_notice.add_theme_stylebox_override("normal", _style(Color(0.18, 0.13, 0.03, 0.94), 10, Color(GOLD, 0.55), 1, 8))
+		content.add_child(trade_notice)
+		inventory_notice = ""
 	var scroll = ScrollContainer.new()
 	scroll.custom_minimum_size.y = 560
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -2507,8 +2567,37 @@ func _add_trade_good_card_2d(list, good_id, can_buy):
 	var origin_id = str(good.get("origin", ""))
 	var origin_name = str(GameData.TRADE_PORTS.get(origin_id, {"name": "未知港口"}).name)
 	var stock_tag = "本港出产" if can_buy else "外来货"
-	var price_text = "买%d / 卖%d" % [state.trade_buy_price(good_id), state.trade_sell_price(good_id)] if can_buy else "本港收购%d" % state.trade_sell_price(good_id)
-	stack.add_child(_label("%s · %s｜产地%s\n%s · 持有%d%s · 均价%d · 单件预估%+d" % [good.name, stock_tag, origin_name, price_text, held, good.unit, average, estimate], 14, INK))
+	var buy_price = state.trade_buy_price(good_id)
+	var sell_price = state.trade_sell_price(good_id)
+	var market_trend = _trade_trend_2d(str(state.player.location), good_id)
+	var card_header = HBoxContainer.new()
+	card_header.add_theme_constant_override("separation", 10)
+	card_header.add_child(_item_visual_2d("trade", good_id, "传说" if can_buy else "优秀", "", false, 78))
+	var details = VBoxContainer.new()
+	details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	details.add_theme_constant_override("separation", 3)
+	details.add_child(_label("%s · %s" % [good.name, stock_tag], 16, INK))
+	details.add_child(_label("产地：%s｜每%s占%d格" % [origin_name, good.unit, int(good.space)], 12, MUTED))
+	details.add_child(_label("行情%s｜较昨日%+d银" % [str(market_trend.name), int(market_trend.delta)], 12, Color(market_trend.color)))
+	if can_buy:
+		var recommendation = _best_trade_destination_2d(good_id)
+		if not recommendation.is_empty():
+			details.add_child(_label("推荐销往%s · 约%d日 · 单件预估%+d" % [GameData.TRADE_PORTS[str(recommendation.port)].name, int(recommendation.days), int(recommendation.profit)], 12, TEAL if int(recommendation.profit) > 0 else MUTED))
+	else:
+		details.add_child(_label("持仓均价%d｜现在卖出单件%+d" % [average, estimate], 12, GOLD if estimate > 0 else RED if estimate < 0 else MUTED))
+	card_header.add_child(details)
+	var price_badge = Label.new()
+	price_badge.text = ("买入\n%d银" % buy_price) if can_buy else ("收购\n%d银" % sell_price)
+	price_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	price_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	price_badge.custom_minimum_size = Vector2(88, 72)
+	price_badge.add_theme_font_size_override("font_size", 14)
+	price_badge.add_theme_color_override("font_color", GOLD)
+	price_badge.add_theme_stylebox_override("normal", _style(Color(0.18, 0.13, 0.03, 0.96), 11, Color(GOLD, 0.58), 1, 7))
+	card_header.add_child(price_badge)
+	stack.add_child(card_header)
+	var capacity_copy = "｜最多还能买%d%s" % [state.max_buyable_cargo(good_id), good.unit] if can_buy else ""
+	stack.add_child(_label("货舱持有：%d%s｜占用%d格%s" % [held, good.unit, held * int(good.space), capacity_copy], 13, TEAL))
 	var row = HBoxContainer.new()
 	row.add_theme_constant_override("separation", 7)
 	stack.add_child(row)
@@ -2534,12 +2623,69 @@ func _add_trade_good_card_2d(list, good_id, can_buy):
 	sell_all.pressed.connect(_trade_sell_2d.bind(good_id, true))
 	row.add_child(sell_all)
 	var card = PanelContainer.new()
-	card.add_theme_stylebox_override("panel", _style(Color(0.04, 0.13, 0.16, 0.92), 10, Color(TEAL, 0.3), 1, 10))
+	var card_border = GOLD if can_buy else (TEAL if estimate >= 0 else RED)
+	card.add_theme_stylebox_override("panel", _style(Color(0.04, 0.13, 0.16, 0.94), 12, Color(card_border, 0.62), 2, 10))
 	card.add_child(stack)
 	list.add_child(card)
 
+func _trade_dashboard_2d(port_id):
+	var panel = PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", _style(Color(0.025, 0.105, 0.12, 0.96), 13, Color(TEAL, 0.48), 1, 11))
+	var stack = VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 7)
+	panel.add_child(stack)
+	var top = HBoxContainer.new()
+	top.add_theme_constant_override("separation", 8)
+	stack.add_child(top)
+	var wallet = _label("◈ %d 银币\n第%d日行情" % [int(state.player.silver), int(state.trade_day)], 16, GOLD)
+	wallet.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(wallet)
+	var value = _label("货值 %d\n浮动盈亏 %+d" % [state.cargo_market_value(), state.cargo_unrealized_profit()], 15, TEAL if state.cargo_unrealized_profit() >= 0 else RED)
+	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	value.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(value)
+	var cargo_bar = ProgressBar.new()
+	cargo_bar.name = "CargoCapacityBar"
+	cargo_bar.max_value = max(1, state.cargo_capacity())
+	cargo_bar.value = state.cargo_used()
+	cargo_bar.show_percentage = false
+	cargo_bar.custom_minimum_size.y = 20
+	cargo_bar.add_theme_stylebox_override("background", _style(Color(0.02, 0.06, 0.075, 0.95), 9, Color(TEAL, 0.30), 1, 2))
+	cargo_bar.add_theme_stylebox_override("fill", _style(Color(TEAL, 0.78), 9))
+	stack.add_child(cargo_bar)
+	stack.add_child(_label("货舱装载 %d/%d格  ·  空余%d格｜本港声望%d · 总声望%d" % [state.cargo_used(), state.cargo_capacity(), max(0, state.cargo_capacity() - state.cargo_used()), state.port_reputation_value(port_id), state.total_trade_reputation()], 13, MUTED))
+	return panel
+
+func _trade_trend_2d(port_id, good_id):
+	var today = GameData.trade_market_price(str(port_id), str(good_id), int(state.trade_day))
+	var yesterday = GameData.trade_market_price(str(port_id), str(good_id), max(1, int(state.trade_day) - 1))
+	var delta = today - yesterday
+	if delta > 0:
+		return {"name": "上涨 ↑", "delta": delta, "color": GOLD}
+	if delta < 0:
+		return {"name": "回落 ↓", "delta": delta, "color": Color("6dd3b4")}
+	return {"name": "平稳 →", "delta": 0, "color": MUTED}
+
+func _best_trade_destination_2d(good_id):
+	var best = {}
+	var buy_price = state.trade_buy_price(good_id)
+	for destination in GameData.TRADE_PORTS:
+		var destination_id = str(destination)
+		if destination_id == str(state.player.location) or not state.is_port_unlocked(destination_id):
+			continue
+		var route = GameData.trade_route(str(state.player.location), destination_id)
+		if route.is_empty():
+			continue
+		var days = max(1, int(route.days) - (int(state.ship.get("speed", 1)) - 1))
+		var destination_sell_price = state.trade_sell_price_at(destination_id, good_id, int(state.trade_day) + days)
+		var profit = destination_sell_price - buy_price
+		if best.is_empty() or profit > int(best.profit):
+			best = {"port": destination_id, "days": days, "profit": profit}
+	return best
+
 func _trade_buy_2d(good_id, buy_max = false):
 	var result = state.buy_max_cargo(good_id) if buy_max else state.buy_cargo(good_id)
+	inventory_notice = ("✓ " if bool(result.get("ok", false)) else "！") + str(result.get("message", "交易失败"))
 	_refresh_hud()
 	_close_overlay()
 	if bool(result.get("quest_completed", false)):
@@ -2561,6 +2707,7 @@ func _cook_recipe_2d(recipe_id):
 
 func _trade_sell_2d(good_id, sell_all = false):
 	var result = state.sell_all_cargo(good_id) if sell_all else state.sell_cargo(good_id)
+	inventory_notice = ("✓ " if bool(result.get("ok", false)) else "！") + str(result.get("message", "交易失败"))
 	_refresh_hud()
 	_close_overlay()
 	if bool(result.get("quest_completed", false)):
