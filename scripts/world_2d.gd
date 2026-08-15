@@ -15,6 +15,7 @@ const WorldMapScript = preload("res://scripts/world_map_2d.gd")
 const SailingMapScript = preload("res://scripts/sailing_map_2d.gd")
 const SeaWorldMapScript = preload("res://scripts/sea_world_2d.gd")
 const ActorScript = preload("res://scripts/actor_2d.gd")
+const CityBuildingScript = preload("res://scripts/city_building_2d.gd")
 const BattleStageScript = preload("res://scripts/battle_stage_2d.gd")
 const JoystickScript = preload("res://scripts/virtual_joystick.gd")
 const ItemIconScript = preload("res://scripts/item_icon_2d.gd")
@@ -79,6 +80,7 @@ var world_layer
 var map_node
 var player_actor
 var actors = []
+var city_buildings = []
 var move_target = Vector2.ZERO
 var has_move_target = false
 var nearest_actor = {}
@@ -317,12 +319,18 @@ func _spawn_world_actors():
 	for entry in actors:
 		if is_instance_valid(entry.node):
 			entry.node.queue_free()
+	for building in city_buildings:
+		if is_instance_valid(building):
+			building.queue_free()
 	for marker in enemy_respawn_markers.values():
 		if is_instance_valid(marker):
 			marker.queue_free()
 	actors = []
+	city_buildings = []
 	enemy_respawn_markers = {}
 	nearest_actor = {}
+	if current_region == "city":
+		_spawn_city_buildings()
 	if current_region == "sea":
 		if state.active_voyage.is_empty():
 			return
@@ -396,6 +404,22 @@ func _spawn_world_actors():
 			_add_actor("travel", "city", "返回%s" % GameData.TRADE_PORTS[str(expedition.port)].name, Vector2(215, 1080), Color("4e7781"), GOLD, str(expedition.port))
 	for discovery_id in DISCOVERY_SPAWNS:
 		_spawn_discovery_if_available(discovery_id)
+
+func _spawn_city_buildings():
+	var active_port = _active_city_port_id()
+	var city_data = GameData.PORT_CITY_MAPS.get(active_port, GameData.PORT_CITY_MAPS.venice_dock)
+	for building_data in Array(city_data.get("buildings", [])):
+		var resolved_data = Dictionary(building_data)
+		if not bool(resolved_data.get("foreground", true)):
+			continue
+		var footprint = Rect2(resolved_data.get("footprint", Rect2()))
+		if footprint.size.x <= 0.0 or footprint.size.y <= 0.0:
+			continue
+		var building = CityBuildingScript.new()
+		building.position = _world_point(Vector2(footprint.get_center().x, footprint.end.y))
+		building.configure(active_port, resolved_data, WORLD_SCALE)
+		world_layer.add_child(building)
+		city_buildings.append(building)
 
 func _spawn_next_dungeon_enemy(enemy_ids):
 	for enemy_id in enemy_ids:

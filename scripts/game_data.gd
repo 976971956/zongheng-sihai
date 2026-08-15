@@ -333,12 +333,12 @@ const PORT_CITY_MAPS = {
 		"style": "venice", "title": "水都翼狮城", "landmark": "圣马可钟楼与大运河",
 		"districts": ["海边小屋", "老海鸥酒馆", "翼狮广场", "海风市场", "造船码头"],
 		"buildings": [
-			{"id": "venice_seaside_house", "name": "海边小屋", "footprint": Rect2(20, 175, 180, 150)},
-			{"id": "venice_west_gate_tower", "name": "翼狮西门塔", "footprint": Rect2(238, 35, 75, 180)},
-			{"id": "venice_east_gate_tower", "name": "翼狮东门塔", "footprint": Rect2(407, 35, 75, 180)},
-			{"id": "venice_tavern_house", "name": "老海鸥酒馆", "footprint": Rect2(20, 735, 175, 160)},
-			{"id": "venice_market_loggia", "name": "海风市场廊房", "footprint": Rect2(560, 420, 140, 180)},
-			{"id": "venice_dock_warehouse", "name": "玻璃货栈", "footprint": Rect2(530, 735, 170, 105)}
+			{"id": "venice_seaside_house", "name": "海边小屋", "model": "hall", "npc_ids": ["alisa"], "footprint": Rect2(20, 175, 180, 150)},
+			{"id": "venice_west_gate_tower", "name": "翼狮西门塔", "foreground": false, "footprint": Rect2(238, 35, 75, 180)},
+			{"id": "venice_east_gate_tower", "name": "翼狮东门塔", "foreground": false, "footprint": Rect2(407, 35, 75, 180)},
+			{"id": "venice_tavern_house", "name": "老海鸥酒馆", "model": "hall", "npc_ids": ["tavern_keeper"], "footprint": Rect2(20, 735, 175, 160)},
+			{"id": "venice_market_loggia", "name": "海风市场廊房", "model": "market", "npc_ids": ["jeweler"], "footprint": Rect2(560, 420, 140, 180)},
+			{"id": "venice_dock_warehouse", "name": "玻璃货栈与船坞", "model": "shipyard", "npc_ids": ["venice_quartermaster", "ship_owner", "venice_shipwright"], "footprint": Rect2(530, 735, 170, 105)}
 		],
 		"npc_positions": {
 			"alisa": Vector2(150, 365), "tavern_keeper": Vector2(180, 675), "guard_captain": Vector2(360, 690),
@@ -351,11 +351,11 @@ const PORT_CITY_MAPS = {
 		"districts": ["石门商街", "橄榄仓栈", "风墙旅店", "柯克船坞"],
 		"buildings": [
 			{"id": "ragusa_cliff_house", "name": "海崖石宅", "footprint": Rect2(0, 190, 230, 155)},
-			{"id": "ragusa_olive_store", "name": "橄榄仓栈", "footprint": Rect2(0, 470, 190, 150)},
+			{"id": "ragusa_olive_store", "name": "橄榄仓栈", "model": "market", "npc_ids": ["ragusa_broker"], "footprint": Rect2(0, 470, 190, 150)},
 			{"id": "ragusa_upper_bazaar", "name": "石门商馆", "footprint": Rect2(540, 180, 180, 170)},
-			{"id": "ragusa_round_bastion", "name": "圆堡值房", "footprint": Rect2(540, 430, 180, 180)},
-			{"id": "ragusa_quay_inn", "name": "风墙旅店", "footprint": Rect2(0, 650, 175, 165)},
-			{"id": "ragusa_cog_yard", "name": "柯克船棚", "footprint": Rect2(535, 675, 185, 160)}
+			{"id": "ragusa_round_bastion", "name": "圆堡港务值房", "model": "harbor", "npc_ids": ["ragusa_harbormaster"], "footprint": Rect2(540, 430, 180, 180)},
+			{"id": "ragusa_quay_inn", "name": "风墙旅店", "model": "hall", "npc_ids": ["ragusa_innkeeper"], "footprint": Rect2(0, 650, 175, 165)},
+			{"id": "ragusa_cog_yard", "name": "柯克船棚", "model": "shipyard", "npc_ids": ["ragusa_shipwright"], "footprint": Rect2(535, 675, 185, 160)}
 		],
 		"npc_positions": {"ragusa_broker": Vector2(510, 600), "ragusa_harbormaster": Vector2(220, 890), "ragusa_shipwright": Vector2(475, 900), "ragusa_innkeeper": Vector2(270, 700)}
 	},
@@ -363,12 +363,12 @@ const PORT_CITY_MAPS = {
 		"style": "alexandria", "title": "灯塔与香料之城", "landmark": "法罗斯灯塔与沙金货栈",
 		"districts": ["灯塔广场", "香料长街", "商会庭院", "三角帆船坞"],
 		"buildings": [
-			{"id": "alexandria_spice_court", "name": "蓝篷香料院", "footprint": Rect2(0, 220, 225, 220)},
+			{"id": "alexandria_spice_court", "name": "蓝篷香料院", "model": "market", "npc_ids": ["alexandria_merchant"], "footprint": Rect2(0, 220, 225, 220)},
 			{"id": "alexandria_caravan_house", "name": "驼队歇脚楼", "footprint": Rect2(0, 470, 210, 180)},
-			{"id": "alexandria_lighthouse_office", "name": "法罗斯灯塔署", "footprint": Rect2(540, 200, 180, 200)},
-			{"id": "alexandria_sandstone_store", "name": "沙金货栈", "footprint": Rect2(535, 455, 185, 210)},
+			{"id": "alexandria_lighthouse_office", "name": "法罗斯灯塔署", "model": "harbor", "npc_ids": ["alex_harbormaster"], "footprint": Rect2(540, 200, 180, 200)},
+			{"id": "alexandria_sandstone_store", "name": "亚历山大商会", "model": "hall", "npc_ids": ["alex_lighthouse_keeper"], "footprint": Rect2(535, 455, 185, 210)},
 			{"id": "alexandria_lateen_warehouse", "name": "三角帆仓房", "footprint": Rect2(0, 680, 175, 160)},
-			{"id": "alexandria_caravel_yard", "name": "卡拉维尔船棚", "footprint": Rect2(535, 680, 185, 165)}
+			{"id": "alexandria_caravel_yard", "name": "卡拉维尔船棚", "model": "shipyard", "npc_ids": ["alex_shipwright"], "footprint": Rect2(535, 680, 185, 165)}
 		],
 		"npc_positions": {"alexandria_merchant": Vector2(510, 600), "alex_harbormaster": Vector2(215, 895), "alex_lighthouse_keeper": Vector2(350, 650), "alex_shipwright": Vector2(480, 900)}
 	},
@@ -376,12 +376,12 @@ const PORT_CITY_MAPS = {
 		"style": "malta", "title": "蜂蜜石要塞", "landmark": "圣钟堡与金色海湾",
 		"districts": ["船钟广场", "柑橘货栈", "远航厨房", "桨帆船坞"],
 		"buildings": [
-			{"id": "malta_honey_barracks", "name": "蜂蜜石兵舍", "footprint": Rect2(0, 180, 235, 200)},
-			{"id": "malta_citrus_kitchen", "name": "柑橘厨房", "footprint": Rect2(0, 430, 205, 185)},
+			{"id": "malta_honey_barracks", "name": "蜂蜜石兵舍", "model": "hall", "npc_ids": ["malta_diver"], "footprint": Rect2(0, 180, 235, 200)},
+			{"id": "malta_citrus_kitchen", "name": "柑橘厨房", "model": "hall", "npc_ids": ["malta_cook"], "footprint": Rect2(0, 430, 205, 185)},
 			{"id": "malta_bell_bastion", "name": "圣钟堡塔楼", "footprint": Rect2(540, 175, 180, 180)},
-			{"id": "malta_citrus_store", "name": "金岛果品栈", "footprint": Rect2(535, 400, 185, 205)},
-			{"id": "malta_quay_house", "name": "骑士码头房", "footprint": Rect2(0, 650, 175, 170)},
-			{"id": "malta_galley_yard", "name": "桨帆船棚", "footprint": Rect2(535, 650, 185, 190)}
+			{"id": "malta_citrus_store", "name": "金岛果品栈", "model": "market", "npc_ids": ["malta_keeper"], "footprint": Rect2(535, 400, 185, 205)},
+			{"id": "malta_quay_house", "name": "骑士港务房", "model": "harbor", "npc_ids": ["malta_harbormaster"], "footprint": Rect2(0, 650, 175, 170)},
+			{"id": "malta_galley_yard", "name": "桨帆船棚", "model": "shipyard", "npc_ids": ["malta_shipwright"], "footprint": Rect2(535, 650, 185, 190)}
 		],
 		"npc_positions": {"malta_keeper": Vector2(510, 600), "malta_harbormaster": Vector2(215, 900), "malta_shipwright": Vector2(480, 900), "malta_cook": Vector2(270, 700), "malta_diver": Vector2(350, 650)}
 	},
@@ -390,11 +390,11 @@ const PORT_CITY_MAPS = {
 		"districts": ["桌山瞭望台", "北河金砂栈", "远征营地", "大帆船坞"],
 		"buildings": [
 			{"id": "cape_dutch_house", "name": "荷角白墙宅", "footprint": Rect2(0, 185, 225, 190)},
-			{"id": "cape_gold_store", "name": "北河金砂栈", "footprint": Rect2(0, 430, 210, 175)},
-			{"id": "cape_expedition_office", "name": "桌山远征署", "footprint": Rect2(540, 175, 180, 180)},
+			{"id": "cape_gold_store", "name": "北河金砂栈", "model": "market", "npc_ids": ["cape_quartermaster"], "footprint": Rect2(0, 430, 210, 175)},
+			{"id": "cape_expedition_office", "name": "桌山远征署", "model": "harbor", "npc_ids": ["cape_keeper"], "footprint": Rect2(540, 175, 180, 180)},
 			{"id": "cape_supply_shed", "name": "风暴补给棚", "footprint": Rect2(545, 410, 175, 195)},
 			{"id": "cape_lighthouse_house", "name": "双洋流灯房", "footprint": Rect2(0, 650, 180, 170)},
-			{"id": "cape_carrack_yard", "name": "大帆船船棚", "footprint": Rect2(525, 650, 195, 195)}
+			{"id": "cape_carrack_yard", "name": "大帆船船棚", "model": "shipyard", "npc_ids": ["cape_shipwright"], "footprint": Rect2(525, 650, 195, 195)}
 		],
 		"npc_positions": {"cape_keeper": Vector2(350, 650), "cape_shipwright": Vector2(475, 900), "cape_quartermaster": Vector2(510, 600)}
 	},
@@ -402,12 +402,12 @@ const PORT_CITY_MAPS = {
 		"style": "quanzhou", "title": "刺桐海丝城", "landmark": "东西塔与万国蕃坊",
 		"districts": ["封妖书院", "青瓷市舶司", "季风码头", "福船船坞"],
 		"buildings": [
-			{"id": "quanzhou_academy", "name": "封妖书院", "footprint": Rect2(0, 180, 230, 200)},
+			{"id": "quanzhou_academy", "name": "封妖书院", "model": "hall", "npc_ids": ["quanzhou_scholar"], "footprint": Rect2(0, 180, 230, 200)},
 			{"id": "quanzhou_minnan_house", "name": "刺桐红砖厝", "footprint": Rect2(0, 430, 205, 180)},
-			{"id": "quanzhou_maritime_office", "name": "市舶司衙", "footprint": Rect2(540, 175, 180, 190)},
-			{"id": "quanzhou_porcelain_store", "name": "青瓷货栈", "footprint": Rect2(535, 415, 185, 195)},
+			{"id": "quanzhou_maritime_office", "name": "市舶司衙", "model": "harbor", "npc_ids": ["quanzhou_navigator"], "footprint": Rect2(540, 175, 180, 190)},
+			{"id": "quanzhou_porcelain_store", "name": "青瓷货栈", "model": "market", "npc_ids": ["quanzhou_merchant"], "footprint": Rect2(535, 415, 185, 195)},
 			{"id": "quanzhou_fan_house", "name": "万国蕃坊", "footprint": Rect2(0, 650, 175, 170)},
-			{"id": "quanzhou_junk_yard", "name": "福船船棚", "footprint": Rect2(535, 650, 185, 195)}
+			{"id": "quanzhou_junk_yard", "name": "福船船棚", "model": "shipyard", "npc_ids": ["quanzhou_shipwright"], "footprint": Rect2(535, 650, 185, 195)}
 		],
 		"npc_positions": {"quanzhou_scholar": Vector2(350, 650), "quanzhou_navigator": Vector2(215, 895), "quanzhou_merchant": Vector2(510, 600), "quanzhou_shipwright": Vector2(480, 900)}
 	},
@@ -415,11 +415,11 @@ const PORT_CITY_MAPS = {
 		"style": "athens", "title": "银帆神庙港", "landmark": "海岬神殿与银帆柱廊",
 		"districts": ["潮汐神殿", "葡萄酒市集", "橄榄枝旅店", "银帆船坞"],
 		"buildings": [
-			{"id": "athens_tide_temple", "name": "潮汐神殿", "footprint": Rect2(0, 175, 225, 190)},
-			{"id": "athens_olive_inn", "name": "橄榄枝旅店", "footprint": Rect2(0, 430, 205, 180)},
-			{"id": "athens_wine_stoa", "name": "葡萄酒柱廊", "footprint": Rect2(540, 175, 180, 190)},
-			{"id": "athens_smithy", "name": "银帆锻造坊", "footprint": Rect2(535, 415, 185, 195)},
-			{"id": "athens_quay_villa", "name": "海岬庭院宅", "footprint": Rect2(0, 650, 175, 170)},
+			{"id": "athens_tide_temple", "name": "潮汐神殿", "model": "hall", "footprint": Rect2(0, 175, 225, 190)},
+			{"id": "athens_olive_inn", "name": "橄榄枝旅店", "model": "hall", "npc_ids": ["athens_innkeeper"], "footprint": Rect2(0, 430, 205, 180)},
+			{"id": "athens_wine_stoa", "name": "葡萄酒柱廊", "model": "market", "npc_ids": ["athens_oracle"], "footprint": Rect2(540, 175, 180, 190)},
+			{"id": "athens_smithy", "name": "银帆锻造坊", "model": "shipyard", "npc_ids": ["athens_smith"], "footprint": Rect2(535, 415, 185, 195)},
+			{"id": "athens_quay_villa", "name": "海岬港务庭院", "model": "harbor", "npc_ids": ["athens_harbormaster"], "footprint": Rect2(0, 650, 175, 170)},
 			{"id": "athens_trireme_yard", "name": "三列桨船棚", "footprint": Rect2(535, 650, 185, 195)}
 		],
 		"npc_positions": {"athens_oracle": Vector2(510, 600), "athens_harbormaster": Vector2(215, 895), "athens_smith": Vector2(480, 900), "athens_innkeeper": Vector2(270, 700)}
@@ -428,12 +428,12 @@ const PORT_CITY_MAPS = {
 		"style": "yangzhou", "title": "运河月港", "landmark": "月桥、玉纱坊与大运河",
 		"districts": ["月桥织坊", "玉纱东市", "运河港务", "宝船船坞"],
 		"buildings": [
-			{"id": "yangzhou_moon_weavery", "name": "月桥织坊", "footprint": Rect2(0, 175, 230, 205)},
+			{"id": "yangzhou_moon_weavery", "name": "月桥织坊", "model": "hall", "npc_ids": ["yangzhou_weaver"], "footprint": Rect2(0, 175, 230, 205)},
 			{"id": "yangzhou_courtyard_house", "name": "粉墙黛瓦院", "footprint": Rect2(0, 430, 205, 180)},
-			{"id": "yangzhou_silk_market", "name": "玉纱东市", "footprint": Rect2(540, 175, 180, 195)},
-			{"id": "yangzhou_pilot_house", "name": "运河港务房", "footprint": Rect2(535, 420, 185, 190)},
+			{"id": "yangzhou_silk_market", "name": "玉纱东市", "model": "market", "npc_ids": ["yangzhou_merchant"], "footprint": Rect2(540, 175, 180, 195)},
+			{"id": "yangzhou_pilot_house", "name": "运河港务房", "model": "harbor", "npc_ids": ["yangzhou_pilot"], "footprint": Rect2(535, 420, 185, 190)},
 			{"id": "yangzhou_moon_gate_house", "name": "月门水榭", "footprint": Rect2(0, 650, 175, 170)},
-			{"id": "yangzhou_treasure_yard", "name": "宝船船棚", "footprint": Rect2(535, 650, 185, 195)}
+			{"id": "yangzhou_treasure_yard", "name": "宝船船棚", "model": "shipyard", "npc_ids": ["yangzhou_shipwright"], "footprint": Rect2(535, 650, 185, 195)}
 		],
 		"npc_positions": {"yangzhou_weaver": Vector2(350, 650), "yangzhou_pilot": Vector2(215, 895), "yangzhou_merchant": Vector2(510, 600), "yangzhou_shipwright": Vector2(480, 900)}
 	},
@@ -442,11 +442,11 @@ const PORT_CITY_MAPS = {
 		"districts": ["制图师塔楼", "航海仪拍卖街", "风车仓区", "飞剪船坞"],
 		"buildings": [
 			{"id": "amsterdam_canal_house", "name": "阶梯山墙宅", "footprint": Rect2(0, 185, 215, 190)},
-			{"id": "amsterdam_map_tower", "name": "制图师塔楼", "footprint": Rect2(0, 425, 195, 175)},
-			{"id": "amsterdam_auction_house", "name": "七海拍卖馆", "footprint": Rect2(550, 185, 170, 180)},
+			{"id": "amsterdam_map_tower", "name": "制图师港务塔楼", "model": "harbor", "npc_ids": ["amsterdam_cartographer"], "footprint": Rect2(0, 425, 195, 175)},
+			{"id": "amsterdam_auction_house", "name": "七海拍卖馆", "model": "market", "npc_ids": ["amsterdam_auctioneer"], "footprint": Rect2(550, 185, 170, 180)},
 			{"id": "amsterdam_windmill_store", "name": "风车仓房", "footprint": Rect2(545, 425, 175, 180)},
 			{"id": "amsterdam_quay_house", "name": "运河码头宅", "footprint": Rect2(0, 645, 165, 165)},
-			{"id": "amsterdam_clipper_yard", "name": "飞剪船棚", "footprint": Rect2(545, 645, 175, 200)}
+			{"id": "amsterdam_clipper_yard", "name": "飞剪船棚", "model": "shipyard", "npc_ids": ["amsterdam_shipwright"], "footprint": Rect2(545, 645, 175, 200)}
 		],
 		"npc_positions": {"amsterdam_cartographer": Vector2(215, 895), "amsterdam_auctioneer": Vector2(510, 600), "amsterdam_shipwright": Vector2(480, 900)}
 	}

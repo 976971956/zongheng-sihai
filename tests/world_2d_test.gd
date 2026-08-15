@@ -23,6 +23,10 @@ func _run():
 
 	_check(is_instance_valid(scene.world_layer), "世界地图必须成功创建")
 	_check(is_instance_valid(scene.player_actor), "玩家角色必须成功创建")
+	_check(scene.city_buildings.size() == _foreground_building_count("venice_dock"), "城市背景与NPC对应房屋必须分层生成，不能把店铺继续画死在背景里")
+	for initial_building in scene.city_buildings:
+		_check(initial_building.get_parent() == scene.world_layer and initial_building != scene.map_node and initial_building.z_index < scene.player_actor.z_index, "独立房屋必须位于背景之上、人物之下的专用层级")
+		_check(is_instance_valid(initial_building.art_sprite) and initial_building.art_sprite.texture is AtlasTexture, "每栋独立房屋都必须绑定透明建筑图集模型")
 	_check(scene.player_actor.display_id == "player", "主角必须使用独立的新版角色模型")
 	_check(scene.player_actor.art_sprite.hframes == 4 and scene.player_actor.art_sprite.vframes == 2, "主角必须使用多帧行走图集")
 	scene.player_actor.set_motion(Vector2.RIGHT)
@@ -479,6 +483,7 @@ func _run():
 	# 九城地图、NPC位置与碰撞要逐城切换，每名人物都必须使用精灵模型。
 	scene.state.quest_index = GameData.QUESTS.size()
 	var modeled_city_art_paths = {}
+	var modeled_city_building_art = {}
 	for modeled_port_id in GameData.TRADE_PORTS:
 		scene._switch_region("city", str(modeled_port_id))
 		_check(str(scene.map_node.city_port_id) == str(modeled_port_id), "%s必须加载自己的城内地图主题" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
@@ -486,6 +491,20 @@ func _run():
 		_check(modeled_city_art_path.ends_with("/%s_city_v%s.png" % [str(modeled_port_id).trim_suffix("_dock"), "2" if str(modeled_port_id) == "venice_dock" else "1"]), "%s必须加载与港口一一对应的独立手绘背景" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
 		_check(not modeled_city_art_paths.has(modeled_city_art_path), "%s不能复用其他城市的房屋与背景图" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
 		modeled_city_art_paths[modeled_city_art_path] = true
+		_check(scene.city_buildings.size() == _foreground_building_count(str(modeled_port_id)), "%s必须把配置中的前景房屋生成为独立节点，背景地标不能冒充NPC店铺" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
+		var city_model_signature = []
+		var housed_npcs = {}
+		for city_building in scene.city_buildings:
+			var building_texture = city_building.art_sprite.texture as AtlasTexture
+			_check(city_building.port_id == str(modeled_port_id) and city_building.get_parent() == scene.world_layer and city_building.z_index < scene.player_actor.z_index, "%s的房屋必须保持本城归属并绘制在NPC身后" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
+			_check(building_texture != null and building_texture.atlas != null and building_texture.atlas.resource_path.begins_with("res://assets/art/buildings/"), "%s的房屋必须使用独立透明建筑素材，不能截取城市背景冒充" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
+			city_model_signature.append("%s:%s" % [building_texture.atlas.resource_path, building_texture.region])
+			for housed_npc_id in city_building.npc_ids:
+				housed_npcs[str(housed_npc_id)] = city_building.building_id
+		for service_npc_id in GameData.LOCATIONS[str(modeled_port_id)].npcs:
+			if str(GameData.NPCS[str(service_npc_id)].get("service", "")) != "":
+				_check(housed_npcs.has(str(service_npc_id)), "%s的职能NPC%s必须明确归属于身后的独立房屋" % [GameData.TRADE_PORTS[str(modeled_port_id)].name, GameData.NPCS[str(service_npc_id)].name])
+		modeled_city_building_art["|".join(city_model_signature)] = true
 		for modeled_building in Array(GameData.PORT_CITY_MAPS[str(modeled_port_id)].buildings):
 			var modeled_footprint = Rect2(Dictionary(modeled_building).footprint)
 			_check(not scene._is_walkable(scene._world_point(modeled_footprint.get_center())), "%s的%s必须拥有不可穿透的实体碰撞" % [GameData.TRADE_PORTS[str(modeled_port_id)].name, str(Dictionary(modeled_building).name)])
@@ -500,6 +519,7 @@ func _run():
 				path_avoids_buildings = path_avoids_buildings and scene._is_walkable(Vector2(city_path_point))
 			_check(path_avoids_buildings, "%s前往%s的道路必须绕开本城全部实体房屋" % [GameData.TRADE_PORTS[str(modeled_port_id)].name, GameData.NPCS[str(modeled_npc_id)].name])
 	_check(modeled_city_art_paths.size() == GameData.TRADE_PORTS.size(), "九座港口必须拥有九张互不复用的城内背景")
+	_check(modeled_city_building_art.size() == GameData.TRADE_PORTS.size(), "九座港口必须使用可区分的本地建筑模型组合")
 	scene._switch_region("city", "venice_dock")
 	var tavern_footprint = Rect2(GameData.PORT_CITY_MAPS.venice_dock.buildings[3].footprint)
 	var wall_test_start = scene._world_point(Vector2(tavern_footprint.end.x + 22.0, tavern_footprint.get_center().y))
@@ -680,6 +700,13 @@ func _has_actor(scene, actor_id):
 		if str(entry.id) == actor_id:
 			return true
 	return false
+
+func _foreground_building_count(port_id):
+	var count = 0
+	for building_data in Array(GameData.PORT_CITY_MAPS[str(port_id)].buildings):
+		if bool(Dictionary(building_data).get("foreground", true)):
+			count += 1
+	return count
 
 func _actor_model_id(scene, actor_id):
 	for entry in scene.actors:

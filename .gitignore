@@ -12,3 +12,5 @@ boss_guide_preview.png
 mobile_preview.png
 mobile_battle_preview.png
 character_atlas_v1_chroma.png
+assets/art/buildings/*_chroma.png
+!assets/art/buildings/*.webp.import
