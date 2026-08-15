@@ -35,7 +35,7 @@ func _init():
 			_check(GameData.LOCATIONS[port_id].npcs.size() >= 3, "%s至少需要剧情、贸易和港口服务三名可互动人物" % GameData.TRADE_PORTS[port_id].name)
 	_check(specialty_goods.size() == GameData.TRADE_PORTS.size(), "九座城市必须各有不同的特色商品，不能重复套用同一批特产")
 	var athens_to_ragusa = GameData.trade_route_path("athens_dock", "ragusa_dock", GameData.TRADE_PORTS.keys())
-	_check(athens_to_ragusa == ["athens_dock", "venice_dock", "ragusa_dock"], "没有直达航线时必须按最短航期规划可执行的港口中转路径")
+	_check(athens_to_ragusa == ["athens_dock", "ragusa_dock"], "雅典至拉古萨必须直接通航，不能被固定路线强制到威尼斯中转")
 	for good_id in GameData.TRADE_GOODS:
 		_check(GameData.TRADE_GOODS[good_id].prices.size() == GameData.TRADE_PORTS.size(), "%s必须在九港都有独立收购价" % GameData.TRADE_GOODS[good_id].name)
 		var selling_ports = []
@@ -49,7 +49,7 @@ func _init():
 	for port_id in GameData.TRADE_PORTS:
 		route_market.player.location = str(port_id)
 		var opportunity = route_market.best_trade_opportunity()
-		_check(not opportunity.is_empty() and str(opportunity.good_id) == str(GameData.TRADE_PORTS[port_id].specialty_good) and int(opportunity.total_profit) > 0, "%s必须至少有一条从本地特产低买、沿直达航线高卖的盈利商路" % GameData.TRADE_PORTS[port_id].name)
+		_check(not opportunity.is_empty() and str(opportunity.good_id) == str(GameData.TRADE_PORTS[port_id].specialty_good) and int(opportunity.total_profit) > 0, "%s必须至少有一条从本地特产低买、沿自由航线高卖的盈利商路" % GameData.TRADE_PORTS[port_id].name)
 	var opening_story = state.story_progress()
 	_check(int(opening_story.total) == GameData.QUESTS.size() and str(opening_story.chapter) == "序章·失去的名字", "任务系统必须返回总进度与当前章节")
 	var gear_state = TestState.new()

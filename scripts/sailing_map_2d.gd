@@ -112,15 +112,15 @@ func _draw():
 	draw_style_box(_panel_style(), Rect2(Vector2.ZERO, size))
 	_draw_landmasses()
 	_draw_currents()
-	for route_key in GameData.TRADE_ROUTES:
-		var route_ports = str(route_key).split("|")
-		if route_ports.size() != 2:
-			continue
-		var a = str(route_ports[0])
-		var b = str(route_ports[1])
-		var highlighted = (a == current_port and b == selected_port) or (b == current_port and a == selected_port)
-		var route_color = Color(GOLD, 0.9) if highlighted else Color(TEAL, 0.25)
-		draw_dashed_line(PORT_POSITIONS[a], PORT_POSITIONS[b], route_color, 2.5 if highlighted else 1.5, 8.0)
+	# The chart is a free-sailing map: show every currently available destination
+	# radiating from the moored port instead of a fixed network of route edges.
+	if PORT_POSITIONS.has(current_port):
+		for destination in PORT_POSITIONS:
+			if str(destination) == current_port or game_state == null or not game_state.is_port_unlocked(str(destination)):
+				continue
+			var highlighted = str(destination) == selected_port
+			var route_color = Color(GOLD, 0.9) if highlighted else Color(TEAL, 0.16)
+			draw_dashed_line(PORT_POSITIONS[current_port], PORT_POSITIONS[destination], route_color, 2.5 if highlighted else 1.2, 9.0)
 	for port_id in PORT_POSITIONS:
 		var unlocked = game_state != null and game_state.is_port_unlocked(port_id)
 		var node_color = MUTED

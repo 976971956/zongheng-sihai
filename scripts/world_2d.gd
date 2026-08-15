@@ -1922,12 +1922,9 @@ func _open_task_sailing_route(target_port):
 			unlocked_ports.append(str(port_id))
 	var path = GameData.trade_route_path(str(state.player.location), destination, unlocked_ports)
 	if path.size() < 2:
-		_show_message("暂时无法规划航线", "当前已发现的港口无法连接到%s。" % GameData.TRADE_PORTS[destination].name)
+		_show_message("暂时无法规划航线", "%s尚未加入当前海图。" % GameData.TRADE_PORTS[destination].name)
 		return
-	var next_port = str(path[1])
-	_open_sailing_map(next_port)
-	if next_port != destination and is_instance_valid(sailing_route_label):
-		sailing_route_label.text += "\n任务航线：本段先到%s中转，最终前往%s；抵港后再次点击任务导航。" % [GameData.TRADE_PORTS[next_port].name, GameData.TRADE_PORTS[destination].name]
+	_open_sailing_map(destination)
 
 func _continue_task_navigation():
 	if not task_navigation_active or task_navigation_target.is_empty():
@@ -2179,7 +2176,7 @@ func _open_sailing_map(preselect = ""):
 	sailing_map.custom_minimum_size = Vector2(610, 500)
 	sailing_map.port_selected.connect(_select_sailing_destination)
 	content.add_child(sailing_map)
-	sailing_route_label = _label("选择一座亮起的港口。原作的“出航”和“传送”现在是两套独立功能。", 15, INK)
+	sailing_route_label = _label("自由航线：任意两座已发现港口均可直航。距离决定航期，航经海域决定敌人与怪物。", 15, INK)
 	sailing_route_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	sailing_route_label.custom_minimum_size.y = 70
 	sailing_route_label.add_theme_stylebox_override("normal", _style(Color(0.03, 0.14, 0.17, 0.94), 10, Color(TEAL, 0.45), 1, 10))
@@ -2214,7 +2211,7 @@ func _select_sailing_destination(port_id):
 		return
 	var route = GameData.trade_route(str(state.player.location), sailing_destination)
 	if route.is_empty():
-		sailing_route_label.text = "%s与%s之间没有直达航线，需要先在相邻港口中转。" % [GameData.TRADE_PORTS[str(state.player.location)].name, GameData.TRADE_PORTS[sailing_destination].name]
+		sailing_route_label.text = "无法取得%s与%s之间的航海距离。" % [GameData.TRADE_PORTS[str(state.player.location)].name, GameData.TRADE_PORTS[sailing_destination].name]
 		sailing_confirm_button.disabled = true
 		sailing_transfer_button.disabled = true
 		return
@@ -2222,11 +2219,10 @@ func _select_sailing_destination(port_id):
 	var days = int(plan.days)
 	var risk = int(plan.risk)
 	var destination = GameData.TRADE_PORTS[sailing_destination]
-	var region_id = GameData.sea_region_for_route(str(state.player.location), sailing_destination)
 	var threats = []
 	for enemy_id in Array(plan.enemy_ids):
 		threats.append("%sLv.%d" % [GameData.ENEMIES[str(enemy_id)].name, int(GameData.ENEMIES[str(enemy_id)].level)])
-	sailing_route_label.text = "%s → %s｜%s · %s｜%d海里 · 预计%d日｜风险%d%%\n威胁情报：%s｜建议角色Lv.%d；敌人均可绕行\n正常出航免费｜付费传送%d银币｜特产：%s" % [GameData.TRADE_PORTS[str(state.player.location)].name, destination.name, GameData.SEA_REGIONS[region_id].name, str(plan.tier_name), int(plan.distance_nm), days, risk, "、".join(threats), int(plan.recommended_level), int(route.fee), destination.specialty]
+	sailing_route_label.text = "%s → %s｜全港直航 · %s｜%d海里 · 预计%d日｜风险%d%%\n航经：%s｜威胁情报：%s｜建议角色Lv.%d；敌人均可绕行\n正常出航免费｜付费传送%d银币｜特产：%s" % [GameData.TRADE_PORTS[str(state.player.location)].name, destination.name, str(plan.tier_name), int(plan.distance_nm), days, risk, str(plan.waters_text), "、".join(threats), int(plan.recommended_level), int(route.fee), destination.specialty]
 	if int(state.player.level) + 5 < int(plan.recommended_level):
 		sailing_route_label.text += "\n⚠ 当前等级偏低：建议手动绕开强敌、强化装备，或使用付费传送。"
 	elif state.voyage_protection > 0:
@@ -2471,9 +2467,11 @@ func _open_trade_2d():
 		list.add_child(_label("船上外来货 · 本港收购", 16, TEAL))
 		for good_id in foreign_cargo:
 			_add_trade_good_card_2d(list, str(good_id), false)
-	list.add_child(_label("直达航线 · 出航与传送分开", 16, GOLD))
+	list.add_child(_label("自由航线 · 已发现港口均可直航", 16, GOLD))
 	for destination in GameData.TRADE_PORTS:
 		if destination == port_id:
+			continue
+		if not state.is_port_unlocked(str(destination)):
 			continue
 		var route = GameData.trade_route(port_id, destination)
 		if route.is_empty():

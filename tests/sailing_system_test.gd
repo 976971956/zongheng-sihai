@@ -13,9 +13,19 @@ func _init():
 	call_deferred("_run")
 
 func _run():
-	for route_key in GameData.TRADE_ROUTES:
-		var route_data = GameData.TRADE_ROUTES[route_key]
-		_check(int(route_data.get("distance_nm", 0)) > 0, "每条直达航线都必须配置可展示和计算的海里数：%s" % route_key)
+	var port_ids = GameData.TRADE_PORTS.keys()
+	var route_pair_count = 0
+	for origin_index in range(port_ids.size()):
+		for destination_index in range(origin_index + 1, port_ids.size()):
+			var origin_id = str(port_ids[origin_index])
+			var destination_id = str(port_ids[destination_index])
+			var route_data = GameData.trade_route(origin_id, destination_id)
+			var reverse_route = GameData.trade_route(destination_id, origin_id)
+			_check(not route_data.is_empty() and int(route_data.distance_nm) > 0 and int(route_data.days) >= 2, "%s与%s必须能动态生成直达航程" % [origin_id, destination_id])
+			_check(int(route_data.distance_nm) == int(reverse_route.distance_nm) and int(route_data.fee) == int(reverse_route.fee), "港口距离与传送费必须双向一致：%s↔%s" % [origin_id, destination_id])
+			_check(GameData.trade_route_path(origin_id, destination_id, port_ids) == [origin_id, destination_id], "任意两座已发现港口必须直接通航，不应强制中转")
+			route_pair_count += 1
+	_check(route_pair_count == 36, "九港必须形成36组全互通港口对")
 	var state = TestState.new()
 	state.quest_index = GameData.QUESTS.size()
 	state.player.level = 8
@@ -24,12 +34,19 @@ func _run():
 	var coastal_plan = state.voyage_plan("ragusa_dock")
 	var regional_plan = state.voyage_plan("alexandria_dock")
 	var oceanic_plan = state.voyage_plan("cape_town_dock")
-	_check(int(coastal_plan.distance_nm) == 420 and str(coastal_plan.tier) == "coastal" and int(coastal_plan.threat_count) == 1, "威尼斯至拉古萨必须是420海里的单威胁近海航程")
+	_check(int(coastal_plan.distance_nm) == 420 and str(coastal_plan.tier) == "coastal" and int(coastal_plan.threat_count) == 1 and coastal_plan.enemy_ids == ["coastal_pirate"], "威尼斯至拉古萨必须是420海里的单海盗近海航程")
 	_check(str(regional_plan.tier) == "regional" and int(regional_plan.threat_count) == 2 and "reef_serpent" in regional_plan.enemy_ids, "跨海航线必须同时规划海盗与礁海怪物")
 	_check(str(oceanic_plan.tier) == "oceanic" and int(oceanic_plan.threat_count) == 2 and not ("black_flag_privateer" in oceanic_plan.enemy_ids), "中低等级玩家的远洋航线不能过早出现Lv.52黑旗私掠舰")
+	_check(int(coastal_plan.distance_nm) < int(regional_plan.distance_nm) and int(regional_plan.distance_nm) < int(oceanic_plan.distance_nm), "近海、跨海与远洋距离必须按真实港口跨度递增")
 	state.player.level = 55
 	var veteran_oceanic_plan = state.voyage_plan("cape_town_dock")
 	_check(int(veteran_oceanic_plan.threat_count) == 3 and "black_flag_privateer" in veteran_oceanic_plan.enemy_ids, "高等级玩家进入高风险远洋时必须出现第三段私掠舰威胁")
+	var north_sea_plan = state.voyage_plan("venice_dock", "amsterdam_dock")
+	var east_asia_plan = state.voyage_plan("yangzhou_dock", "quanzhou_dock")
+	var intercontinental_plan = state.voyage_plan("quanzhou_dock", "venice_dock")
+	_check("fog_siren" in north_sea_plan.enemy_ids or "drowned_sailor" in north_sea_plan.enemy_ids, "北海航程必须出现雾歌海妖或溺潮水手，不能复用地中海固定敌群：%s" % north_sea_plan)
+	_check(east_asia_plan.enemy_ids == ["reef_serpent"], "泉州至扬州近海必须生成东亚礁海怪物")
+	_check(intercontinental_plan.zone_ids == ["mediterranean", "indian_ocean", "east_asia"] and "印度洋" in str(intercontinental_plan.waters_text), "威尼斯至泉州必须记录完整跨海域航迹")
 	state.ship.armor = 3
 	state.voyage_protection = 1
 	var protected_oceanic_plan = state.voyage_plan("cape_town_dock")
@@ -116,7 +133,8 @@ func _run():
 	long_state.mark_sea_encounter_defeated(str(first_encounter.id))
 	_check(long_state.sea_encounters_remaining() == 2 and not bool(long_state.active_voyage.pirate_defeated), "击败一处远洋威胁不能错误清空其余敌人")
 	var second_enemy = long_state.sea_enemy_id()
-	_check(second_enemy == "abyss_kraken", "击败远洋掠夺者后必须继续面对深海巨章")
+	var expected_second_enemy = str(Dictionary(long_state.active_voyage.encounters[1]).enemy_id)
+	_check(second_enemy == expected_second_enemy and second_enemy != str(first_encounter.enemy_id), "击败第一处海域威胁后必须继续面对航迹中下一种敌人")
 	long_state.cargo["venetian_glass"] = 3
 	var ocean_storm = long_state.resolve_sea_storm()
 	_check(int(ocean_storm.get("lost_count", 0)) == 2 and int(long_state.cargo.get("venetian_glass", 0)) == 1, "未防护的远洋风暴必须损失两单位货物")

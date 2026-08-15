@@ -1105,6 +1105,8 @@ func best_trade_opportunity():
 	for destination in GameData.TRADE_PORTS:
 		if str(destination) == str(player.location):
 			continue
+		if not is_port_unlocked(str(destination)):
+			continue
 		var route = GameData.trade_route(str(player.location), str(destination))
 		if route.is_empty():
 			continue
@@ -1298,17 +1300,16 @@ func voyage_plan(port_id, origin_override = ""):
 	var tier_id = GameData.sea_voyage_tier(distance_nm)
 	var tier = GameData.SEA_VOYAGE_TIERS[tier_id]
 	var risk = _voyage_risk_for_route(route)
-	var threat_count = int(tier.minimum_threats)
-	if tier_id == "regional" and risk >= 22:
+	var threat_count = 1
+	if distance_nm > int(GameData.SEA_VOYAGE_TIERS.coastal.max_distance_nm):
 		threat_count = 2
-	elif tier_id == "oceanic" and risk >= 36 and int(player.level) >= 45:
+	if distance_nm >= 4800 and int(player.level) >= 25:
 		threat_count = 3
-	var roster = ["coastal_pirate"]
-	if tier_id == "regional":
-		roster = ["coastal_pirate", "reef_serpent"]
-	elif tier_id == "oceanic":
-		roster = ["ocean_raider", "abyss_kraken", "black_flag_privateer"]
-	var enemy_ids = roster.slice(0, min(threat_count, roster.size()))
+	if threat_count >= 3 and (int(ship.get("armor", 0)) >= 2 or voyage_protection > 0):
+		threat_count -= 1
+	var zone_ids = Array(route.get("zone_ids", GameData.sea_zones_for_route(origin, destination)))
+	var enemy_plan = _voyage_enemy_roster(zone_ids, tier_id, threat_count)
+	var enemy_ids = Array(enemy_plan.enemy_ids)
 	var recommended_level = 1
 	for enemy_id in enemy_ids:
 		recommended_level = max(recommended_level, int(GameData.ENEMIES[str(enemy_id)].level))
@@ -1317,12 +1318,82 @@ func voyage_plan(port_id, origin_override = ""):
 		"distance_nm": distance_nm, "tier": tier_id, "tier_name": str(tier.name),
 		"days": max(1, int(route.days) - (int(ship.get("speed", 1)) - 1)),
 		"risk": risk, "threat_count": enemy_ids.size(), "enemy_ids": enemy_ids,
+		"enemy_zones": Array(enemy_plan.enemy_zones), "zone_ids": zone_ids,
+		"waters_text": str(route.get("waters_text", GameData.sea_waters_text(zone_ids))),
 		"recommended_level": recommended_level, "description": str(tier.description)
 	}
+
+func _voyage_enemy_roster(zone_ids, tier_id, threat_count):
+	var candidates = []
+	var candidate_zones = {}
+	for zone_id in Array(zone_ids):
+		for enemy_id in Array(GameData.SEA_ZONE_ENEMIES.get(str(zone_id), [])):
+			var resolved_enemy = str(enemy_id)
+			if not resolved_enemy in candidates:
+				candidates.append(resolved_enemy)
+				candidate_zones[resolved_enemy] = str(zone_id)
+	if not "coastal_pirate" in candidates:
+		candidates.append("coastal_pirate")
+		candidate_zones["coastal_pirate"] = str(Array(zone_ids).front()) if not Array(zone_ids).is_empty() else "mediterranean"
+	var level_cap = int(player.level) + 8
+	if tier_id == "coastal":
+		level_cap = min(level_cap, 12)
+	elif tier_id == "regional":
+		level_cap = max(12, min(level_cap, 29))
+	else:
+		level_cap = max(36, level_cap)
+	level_cap = max(5, level_cap)
+	var eligible = []
+	for enemy_id in candidates:
+		var enemy_level = int(GameData.ENEMIES[str(enemy_id)].level)
+		if enemy_level <= level_cap and (str(enemy_id) != "black_flag_privateer" or int(player.level) >= 45):
+			eligible.append(str(enemy_id))
+	var target_level = min(max(1, int(player.level)), level_cap)
+	eligible.sort_custom(func(a, b):
+		var level_a = int(GameData.ENEMIES[str(a)].level)
+		var level_b = int(GameData.ENEMIES[str(b)].level)
+		var delta_a = abs(level_a - target_level)
+		var delta_b = abs(level_b - target_level)
+		return level_a > level_b if delta_a == delta_b else delta_a < delta_b
+	)
+	var desired_count = min(int(threat_count), eligible.size())
+	var enemy_ids = []
+	var enemy_zones = []
+	if desired_count > 0 and not Array(zone_ids).is_empty():
+		var origin_signatures = Array(GameData.SEA_ZONE_SIGNATURE_ENEMIES.get(str(Array(zone_ids).front()), []))
+		for enemy_id in eligible:
+			if str(enemy_id) in origin_signatures:
+				enemy_ids.append(str(enemy_id))
+				break
+	if desired_count >= 2:
+		var strongest_enemy = ""
+		var strongest_level = -1
+		for enemy_id in eligible:
+			var enemy_level = int(GameData.ENEMIES[str(enemy_id)].level)
+			if not str(enemy_id) in enemy_ids and enemy_level > strongest_level:
+				strongest_enemy = str(enemy_id)
+				strongest_level = enemy_level
+		if strongest_enemy != "":
+			enemy_ids.append(strongest_enemy)
+	if desired_count >= 3 and not Array(zone_ids).is_empty():
+		var destination_signatures = Array(GameData.SEA_ZONE_SIGNATURE_ENEMIES.get(str(Array(zone_ids).back()), []))
+		for enemy_id in eligible:
+			if str(enemy_id) in destination_signatures and not str(enemy_id) in enemy_ids:
+				enemy_ids.append(str(enemy_id))
+				break
+	for enemy_id in eligible:
+		if enemy_ids.size() >= desired_count:
+			break
+		if not str(enemy_id) in enemy_ids:
+			enemy_ids.append(str(enemy_id))
+	for enemy_id in enemy_ids:
+		enemy_zones.append(str(candidate_zones.get(str(enemy_id), "mediterranean")))
+	return {"enemy_ids": enemy_ids, "enemy_zones": enemy_zones}
 
 func _build_sea_encounters(plan):
 	var encounters = []
 	var enemy_ids = Array(plan.get("enemy_ids", []))
+	var enemy_zones = Array(plan.get("enemy_zones", []))
 	var count = clamp(enemy_ids.size(), 1, 3)
 	var positions = Array(SEA_ENCOUNTER_POSITIONS[count])
 	for index in range(enemy_ids.size()):
@@ -1330,7 +1401,8 @@ func _build_sea_encounters(plan):
 		var position = Vector2(positions[index])
 		encounters.append({
 			"id": "sea_%d" % (index + 1), "enemy_id": enemy_id,
-			"kind": "monster" if enemy_id in ["reef_serpent", "abyss_kraken"] else "pirate",
+			"kind": "pirate" if enemy_id in ["coastal_pirate", "ocean_raider", "black_flag_privateer"] else "monster",
+			"zone_id": str(enemy_zones[index]) if index < enemy_zones.size() else "mediterranean",
 			"x": position.x, "y": position.y, "defeated": false
 		})
 	return encounters
@@ -1349,13 +1421,14 @@ func begin_voyage(port_id):
 		return {"ok": false, "message": "该港口尚未从主线海图中解锁。"}
 	var plan = voyage_plan(destination)
 	if plan.is_empty():
-		return {"ok": false, "message": "两座港口之间没有直达航线，需要中转。"}
+		return {"ok": false, "message": "无法计算两座港口之间的航海距离。"}
 	var escorted = voyage_protection > 0
 	active_voyage = {
 		"origin": str(player.location), "destination": destination,
 		"region": GameData.sea_region_for_route(str(player.location), destination),
 		"days": int(plan.days), "risk": int(plan.risk),
 		"distance_nm": int(plan.distance_nm), "tier": str(plan.tier), "tier_name": str(plan.tier_name),
+		"zone_ids": Array(plan.zone_ids), "waters_text": str(plan.waters_text),
 		"recommended_level": int(plan.recommended_level),
 		"x": 540.0, "y": 1580.0, "pirate_defeated": false,
 		"treasure_claimed": false, "storm_resolved": false,
@@ -1364,10 +1437,10 @@ func begin_voyage(port_id):
 	}
 	if escorted:
 		voyage_protection = 0
-	message_history.push_front("海燕号从%s正常出航，驶入%s：%d海里，预计%d日。" % [GameData.TRADE_PORTS[str(player.location)].name, GameData.SEA_REGIONS[str(active_voyage.region)].name, int(active_voyage.distance_nm), int(active_voyage.days)])
+	message_history.push_front("海燕号从%s正常出航，航经%s：%d海里，预计%d日。" % [GameData.TRADE_PORTS[str(player.location)].name, str(active_voyage.waters_text), int(active_voyage.distance_nm), int(active_voyage.days)])
 	_trim_history()
 	save_game()
-	return {"ok": true, "message": "已驶入%s：%s，共%d海里，侦测到%d处威胁。驾驶海燕号抵达%s。" % [GameData.SEA_REGIONS[str(active_voyage.region)].name, str(plan.tier_name), int(plan.distance_nm), int(plan.threat_count), GameData.TRADE_PORTS[destination].name], "voyage": active_voyage.duplicate(true)}
+	return {"ok": true, "message": "自由航线已启航：航经%s，%s，共%d海里，侦测到%d处威胁。驾驶海燕号抵达%s。" % [str(plan.waters_text), str(plan.tier_name), int(plan.distance_nm), int(plan.threat_count), GameData.TRADE_PORTS[destination].name], "voyage": active_voyage.duplicate(true)}
 
 func update_voyage_position(position, persist = false):
 	if active_voyage.is_empty():
@@ -1514,7 +1587,7 @@ func transfer_to(port_id):
 		return {"ok": false, "message": "该港口尚未发现。"}
 	var route = GameData.trade_route(str(player.location), destination)
 	if route.is_empty():
-		return {"ok": false, "message": "两座港口之间没有直达传送船。"}
+		return {"ok": false, "message": "无法计算两座港口之间的传送距离。"}
 	var fee = int(route.fee)
 	if int(player.silver) < fee:
 		return {"ok": false, "message": "还需要%d银币支付传送费。" % (fee - int(player.silver))}
@@ -1546,7 +1619,7 @@ func sail_to(port_id):
 		return {"ok": false, "message": "该港口尚未从主线海图中解锁。继续推进章节即可发现这条航路。"}
 	var route = GameData.trade_route(player.location, port_id)
 	if route.is_empty():
-		return {"ok": false, "message": "两座港口之间没有直达航线。"}
+		return {"ok": false, "message": "无法计算两座港口之间的航海距离。"}
 	var fee = int(route.fee)
 	if int(player.silver) < fee:
 		return {"ok": false, "message": "至少需要%d银币支付航费。" % fee}
@@ -1668,6 +1741,10 @@ func _normalize_active_voyage():
 		active_voyage.tier = str(plan.tier)
 	if not active_voyage.has("tier_name"):
 		active_voyage.tier_name = str(plan.tier_name)
+	if not active_voyage.has("zone_ids"):
+		active_voyage.zone_ids = Array(plan.zone_ids)
+	if not active_voyage.has("waters_text"):
+		active_voyage.waters_text = str(plan.waters_text)
 	if not active_voyage.has("recommended_level"):
 		active_voyage.recommended_level = int(plan.recommended_level)
 	var saved_encounters = active_voyage.get("encounters", [])

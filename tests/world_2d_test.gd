@@ -385,7 +385,7 @@ func _run():
 	scene._close_overlay()
 	await process_frame
 
-	# 无直达航线的采购任务必须给出可执行的下一段中转，而不是只说“需要中转”。
+	# 跨港采购任务必须直接打开目标产地，不能被旧固定航线强制中转。
 	scene.state.quest_index = _quest_index_by_id("earth_order")
 	scene.state.quest_progress = 0
 	scene.state.cargo.erase("olive_oil")
@@ -396,7 +396,7 @@ func _run():
 	scene._refresh_waypoint()
 	_check("航线导航" in scene.navigation_button.text and "采购亚得里亚橄榄油" in scene.navigation_button.text, "跨港采购时导航按钮必须明确显示航线与采购目标")
 	scene._navigate_to_quest()
-	_check(is_instance_valid(scene.sailing_map) and str(scene.sailing_destination) == "venice_dock" and "先到威尼斯中转" in scene.sailing_route_label.text and "最终前往拉古萨" in scene.sailing_route_label.text, "雅典至拉古萨无直达航线时必须自动规划雅典→威尼斯→拉古萨的下一段")
+	_check(is_instance_valid(scene.sailing_map) and str(scene.sailing_destination) == "ragusa_dock" and "雅典" in scene.sailing_route_label.text and "拉古萨" in scene.sailing_route_label.text and "全港直航" in scene.sailing_route_label.text, "雅典至拉古萨采购导航必须直接选择目的港，不能再强制到威尼斯中转")
 	scene._close_overlay()
 	await process_frame
 
@@ -434,7 +434,8 @@ func _run():
 	_check(is_instance_valid(scene.sailing_map) and scene.sailing_map.port_buttons.size() == GameData.TRADE_PORTS.size(), "航海图必须显示全部九座港口节点")
 	_check(not scene.sailing_map.port_buttons["amsterdam_dock"].disabled, "主线完成后九座港口必须全部在海图上解锁")
 	scene.sailing_map.select_port("venice_dock")
-	_check("亚历山大" in scene.sailing_route_label.text and "威尼斯" in scene.sailing_route_label.text and "1680海里" in scene.sailing_route_label.text and "威胁情报" in scene.sailing_route_label.text and "当前等级偏低" in scene.sailing_route_label.text and "正常出航免费" in scene.sailing_route_label.text and "付费传送" in scene.sailing_route_label.text and not scene.sailing_confirm_button.disabled, "选择港口后必须显示距离、威胁、低等级警告以及免费出航/付费传送")
+	var selected_voyage_distance = int(GameData.trade_route("alexandria_dock", "venice_dock").distance_nm)
+	_check("亚历山大" in scene.sailing_route_label.text and "威尼斯" in scene.sailing_route_label.text and ("%d海里" % selected_voyage_distance) in scene.sailing_route_label.text and "航经" in scene.sailing_route_label.text and "威胁情报" in scene.sailing_route_label.text and "当前等级偏低" in scene.sailing_route_label.text and "正常出航免费" in scene.sailing_route_label.text and "付费传送" in scene.sailing_route_label.text and not scene.sailing_confirm_button.disabled, "选择港口后必须显示动态距离、途经海域、威胁、低等级警告以及免费出航/付费传送")
 	var origin_before_departure = str(scene.state.player.location)
 	var silver_before_departure = int(scene.state.player.silver)
 	scene._start_sailing_voyage()
@@ -458,7 +459,7 @@ func _run():
 	scene.player_actor.position = Vector2(540, 365)
 	scene._update_sea_voyage(0.1)
 	_check(str(scene.state.player.location) == "venice_dock" and scene.current_region == "city" and _has_actor(scene, "ship_owner"), "船只驶入目的港后才可结算抵港并重建当地NPC")
-	_check(_has_label_text(scene.overlay, "航行抵达") and _has_label_text(scene.overlay, "完成1680海里航程"), "抵港后必须显示实际航程和航期结算")
+	_check(_has_label_text(scene.overlay, "航行抵达") and _has_label_text(scene.overlay, "完成%d海里航程" % selected_voyage_distance), "抵港后必须显示动态计算的实际航程和航期结算")
 	scene._close_overlay()
 
 	var boss_state = TestState.new()

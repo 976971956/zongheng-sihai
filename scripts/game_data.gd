@@ -325,25 +325,19 @@ const TRADE_GOODS = {
 	"athens_wine": {"name": "银帆葡萄酒", "unit": "桶", "space": 2, "origin": "athens_dock", "prices": {"venice_dock": 86, "ragusa_dock": 76, "alexandria_dock": 72, "malta_dock": 68, "cape_town_dock": 104, "quanzhou_dock": 116, "athens_dock": 34, "yangzhou_dock": 108, "amsterdam_dock": 92}}
 }
 
-const TRADE_ROUTES = {
-	"ragusa_dock|venice_dock": {"days": 2, "distance_nm": 420, "fee": 14, "risk": 14},
-	"alexandria_dock|venice_dock": {"days": 5, "distance_nm": 1680, "fee": 30, "risk": 30},
-	"alexandria_dock|ragusa_dock": {"days": 4, "distance_nm": 1380, "fee": 24, "risk": 24},
-	"malta_dock|venice_dock": {"days": 4, "distance_nm": 1120, "fee": 26, "risk": 24},
-	"malta_dock|ragusa_dock": {"days": 3, "distance_nm": 760, "fee": 20, "risk": 20},
-	"alexandria_dock|malta_dock": {"days": 3, "distance_nm": 890, "fee": 22, "risk": 22}
-	,"cape_town_dock|malta_dock": {"days": 8, "distance_nm": 4850, "fee": 52, "risk": 38}
-	,"cape_town_dock|quanzhou_dock": {"days": 10, "distance_nm": 6900, "fee": 66, "risk": 42}
-	,"athens_dock|quanzhou_dock": {"days": 7, "distance_nm": 5600, "fee": 44, "risk": 32}
-	,"athens_dock|venice_dock": {"days": 3, "distance_nm": 1050, "fee": 20, "risk": 18}
-	,"venice_dock|yangzhou_dock": {"days": 9, "distance_nm": 6500, "fee": 58, "risk": 38}
-	,"amsterdam_dock|yangzhou_dock": {"days": 8, "distance_nm": 7200, "fee": 50, "risk": 34}
-	,"amsterdam_dock|venice_dock": {"days": 4, "distance_nm": 1900, "fee": 28, "risk": 22}
-	,"quanzhou_dock|venice_dock": {"days": 8, "distance_nm": 6100, "fee": 50, "risk": 36}
-	,"athens_dock|yangzhou_dock": {"days": 7, "distance_nm": 5450, "fee": 46, "risk": 32}
-	,"cape_town_dock|venice_dock": {"days": 9, "distance_nm": 5200, "fee": 60, "risk": 40}
-	,"amsterdam_dock|quanzhou_dock": {"days": 9, "distance_nm": 7600, "fee": 58, "risk": 38}
-	,"quanzhou_dock|yangzhou_dock": {"days": 3, "distance_nm": 720, "fee": 18, "risk": 16}
+# 港口不再依赖预先枚举的固定航线。经纬度用于计算球面距离，海区与
+# 港湾类型用于加入海峡、运河和绕岸航行的里程；任意两座已发现港口
+# 都能据此生成一条对称的直达航程。
+const PORT_NAVIGATION = {
+	"venice_dock": {"latitude": 45.4408, "longitude": 12.3155, "zone": "mediterranean", "basin": "adriatic"},
+	"ragusa_dock": {"latitude": 42.6507, "longitude": 18.0944, "zone": "mediterranean", "basin": "adriatic"},
+	"athens_dock": {"latitude": 37.9838, "longitude": 23.7275, "zone": "mediterranean", "basin": "aegean"},
+	"malta_dock": {"latitude": 35.8989, "longitude": 14.5146, "zone": "mediterranean", "basin": "central_med"},
+	"alexandria_dock": {"latitude": 31.2001, "longitude": 29.9187, "zone": "mediterranean", "basin": "east_med"},
+	"cape_town_dock": {"latitude": -33.9249, "longitude": 18.4241, "zone": "africa", "basin": "cape"},
+	"quanzhou_dock": {"latitude": 24.8741, "longitude": 118.6757, "zone": "east_asia", "basin": "china_coast"},
+	"yangzhou_dock": {"latitude": 32.3942, "longitude": 119.4129, "zone": "east_asia", "basin": "china_coast"},
+	"amsterdam_dock": {"latitude": 52.3676, "longitude": 4.9041, "zone": "north_sea", "basin": "north_sea"}
 }
 
 const SEA_VOYAGE_TIERS = {
@@ -365,25 +359,82 @@ static func sea_voyage_tier(distance_nm):
 const SEA_REGIONS = {
 	"mediterranean": {"name": "地中海", "ports": ["venice_dock", "ragusa_dock", "athens_dock", "malta_dock", "alexandria_dock"]},
 	"north_sea": {"name": "北海", "ports": ["amsterdam_dock", "venice_dock"]},
+	"atlantic": {"name": "大西洋", "ports": ["amsterdam_dock", "cape_town_dock"]},
 	"africa": {"name": "非洲海域", "ports": ["alexandria_dock", "malta_dock", "cape_town_dock"]},
 	"indian_ocean": {"name": "印度洋", "ports": ["cape_town_dock", "quanzhou_dock", "athens_dock", "yangzhou_dock"]},
 	"east_asia": {"name": "东亚海域", "ports": ["quanzhou_dock", "yangzhou_dock", "amsterdam_dock"]},
 	"new_world": {"name": "新大陆", "ports": []}
 }
 
+const SEA_ZONE_RISK = {
+	"mediterranean": 0, "north_sea": 3, "atlantic": 5,
+	"africa": 3, "indian_ocean": 5, "east_asia": 2
+}
+
+const SEA_ZONE_ENEMIES = {
+	"mediterranean": ["coastal_pirate", "reef_serpent", "ocean_raider"],
+	"north_sea": ["drowned_sailor", "fog_siren", "ocean_raider", "black_flag_privateer"],
+	"atlantic": ["drowned_sailor", "ocean_raider", "fog_siren", "abyss_kraken", "black_flag_privateer"],
+	"africa": ["wreck_crab", "ocean_raider", "abyss_kraken", "black_flag_privateer"],
+	"indian_ocean": ["reef_serpent", "wreck_crab", "ocean_raider", "abyss_kraken", "black_flag_privateer"],
+	"east_asia": ["reef_serpent", "fog_siren", "ocean_raider", "black_flag_privateer"]
+}
+
+const SEA_ZONE_SIGNATURE_ENEMIES = {
+	"mediterranean": ["coastal_pirate", "reef_serpent"],
+	"north_sea": ["drowned_sailor", "fog_siren"],
+	"atlantic": ["drowned_sailor", "fog_siren", "abyss_kraken"],
+	"africa": ["wreck_crab", "abyss_kraken"],
+	"indian_ocean": ["reef_serpent", "wreck_crab", "abyss_kraken"],
+	"east_asia": ["reef_serpent", "fog_siren"]
+}
+
+static func sea_zone_for_port(port_id):
+	return str(PORT_NAVIGATION.get(str(port_id), {}).get("zone", "mediterranean"))
+
+static func sea_zones_for_route(origin, destination):
+	var first = sea_zone_for_port(origin)
+	var last = sea_zone_for_port(destination)
+	if first == last:
+		return [first]
+	if first == "mediterranean" and last == "africa":
+		return [first, "atlantic", last]
+	if first == "africa" and last == "mediterranean":
+		return [first, "atlantic", last]
+	if first == "mediterranean" and last == "east_asia":
+		return [first, "indian_ocean", last]
+	if first == "east_asia" and last == "mediterranean":
+		return [first, "indian_ocean", last]
+	if first == "north_sea" and last == "mediterranean":
+		return [first, "atlantic", last]
+	if first == "mediterranean" and last == "north_sea":
+		return [first, "atlantic", last]
+	if first == "north_sea" and last == "africa":
+		return [first, "atlantic", last]
+	if first == "africa" and last == "north_sea":
+		return [first, "atlantic", last]
+	if first == "north_sea" and last == "east_asia":
+		return [first, "atlantic", "indian_ocean", last]
+	if first == "east_asia" and last == "north_sea":
+		return [first, "indian_ocean", "atlantic", last]
+	if first == "africa" and last == "east_asia":
+		return [first, "indian_ocean", last]
+	if first == "east_asia" and last == "africa":
+		return [first, "indian_ocean", last]
+	return [first, last]
+
+static func sea_waters_text(zone_ids):
+	var names = []
+	for zone_id in Array(zone_ids):
+		if SEA_REGIONS.has(str(zone_id)):
+			names.append(str(SEA_REGIONS[str(zone_id)].name))
+	return " → ".join(names)
+
 static func sea_region_for_route(origin, destination):
-	var a = str(origin)
-	var b = str(destination)
-	for region_id in SEA_REGIONS:
-		var ports = Array(SEA_REGIONS[region_id].ports)
-		if a in ports and b in ports:
-			return str(region_id)
-	if "cape_town_dock" in [a, b]:
-		return "indian_ocean"
-	if "amsterdam_dock" in [a, b]:
-		return "north_sea"
-	if a in ["quanzhou_dock", "yangzhou_dock"] or b in ["quanzhou_dock", "yangzhou_dock"]:
-		return "east_asia"
+	var zones = sea_zones_for_route(origin, destination)
+	for priority in ["indian_ocean", "atlantic", "north_sea", "africa", "east_asia", "mediterranean"]:
+		if priority in zones:
+			return priority
 	return "mediterranean"
 
 const TRADE_EVENTS = [
@@ -478,9 +529,9 @@ const ENEMIES = {
 	,"ocean_raider": {"name": "远洋掠夺者", "level": 24, "rank": "海上精英", "sea_enemy": true, "hp": 720, "attack": 54, "defense": 34, "speed": 28, "exp": 1450, "silver": [170, 240], "drops": ["unknown_equipment", "universal_medicine", "corsair_card"], "effect": {"name": "缓慢", "chance": 0.18, "rounds": 2}, "intro": "远洋掠夺船借着逆光逼近，弩手已经占据上风位。"}
 	,"abyss_kraken": {"name": "深海巨章", "level": 36, "rank": "海上首领", "sea_enemy": true, "hp": 1320, "attack": 80, "defense": 54, "speed": 38, "exp": 5600, "silver": [380, 520], "drops": ["unknown_equipment", "stamina_tonic", "siren_charm"], "effect": {"name": "缓慢", "chance": 0.22, "rounds": 2}, "special": {"name": "触腕绞船", "every": 3, "damage_multiplier": 1.42}, "intro": "墨色海水突然沸腾，巨大的触腕从船底升起，试图绞断龙骨。"}
 	,"black_flag_privateer": {"name": "黑旗私掠舰", "level": 52, "rank": "海上首领", "sea_enemy": true, "hp": 2350, "attack": 108, "defense": 80, "speed": 58, "exp": 16500, "silver": [900, 1180], "drops": ["unknown_equipment", "stamina_tonic", "black_sail_charm"], "special": {"name": "舷炮齐射", "every": 3, "damage_multiplier": 1.48}, "intro": "三层黑帆同时升起，私掠舰封死航道并亮出整排舷炮。"}
-	,"wreck_crab": {"name": "覆甲礁蟹", "level": 21, "rank": "副本", "hp": 640, "attack": 48, "defense": 32, "speed": 16, "exp": 1100, "silver": [120, 170], "drops": ["stamina_tonic", "whale_bone_sabre"], "intro": "覆满船钉的巨蟹从白鲸号龙骨下爬出，铁螯砸向礁石。"}
-	,"drowned_sailor": {"name": "溺潮水手", "level": 24, "rank": "副本精英", "hp": 760, "attack": 54, "defense": 36, "speed": 23, "exp": 1500, "silver": [150, 210], "drops": ["survivor_coat", "universal_medicine"], "effect": {"name": "缓慢", "chance": 0.20, "rounds": 2}, "intro": "水手幻影攥着腐朽缆绳，仍在执行二十年前没有完成的封舱命令。"}
-	,"fog_siren": {"name": "雾歌海妖", "level": 27, "rank": "副本精英", "hp": 900, "attack": 60, "defense": 40, "speed": 31, "exp": 2100, "silver": [190, 260], "drops": ["siren_charm", "stamina_tonic"], "effect": {"name": "诅咒", "chance": 0.24, "rounds": 3}, "intro": "白雾凝成披着船帆的身影，歌声正一点点抹去你的名字。"}
+	,"wreck_crab": {"name": "覆甲礁蟹", "level": 21, "rank": "副本", "sea_enemy": true, "hp": 640, "attack": 48, "defense": 32, "speed": 16, "exp": 1100, "silver": [120, 170], "drops": ["stamina_tonic", "whale_bone_sabre"], "intro": "覆满船钉的巨蟹从白鲸号龙骨下爬出，铁螯砸向礁石。"}
+	,"drowned_sailor": {"name": "溺潮水手", "level": 24, "rank": "副本精英", "sea_enemy": true, "hp": 760, "attack": 54, "defense": 36, "speed": 23, "exp": 1500, "silver": [150, 210], "drops": ["survivor_coat", "universal_medicine"], "effect": {"name": "缓慢", "chance": 0.20, "rounds": 2}, "intro": "水手幻影攥着腐朽缆绳，仍在执行二十年前没有完成的封舱命令。"}
+	,"fog_siren": {"name": "雾歌海妖", "level": 27, "rank": "副本精英", "sea_enemy": true, "hp": 900, "attack": 60, "defense": 40, "speed": 31, "exp": 2100, "silver": [190, 260], "drops": ["siren_charm", "stamina_tonic"], "effect": {"name": "诅咒", "chance": 0.24, "rounds": 3}, "intro": "白雾凝成披着船帆的身影，歌声正一点点抹去你的名字。"}
 	,"abyss_siren": {"name": "深渊海妖·涅瑞娅", "level": 29, "rank": "副本 Boss", "hp": 1120, "attack": 68, "defense": 45, "speed": 36, "exp": 3500, "silver": [320, 430], "drops": ["whale_bone_sabre", "survivor_coat", "siren_charm"], "effect": {"name": "诅咒", "chance": 0.28, "rounds": 3}, "special": {"name": "鲸落挽歌", "every": 3, "damage_multiplier": 1.48}, "intro": "涅瑞娅从鲸心船舱升起。她身后的潮水里，映出白鲸号沉没的最后一夜。"}
 	,"basin_leviathan": {"name": "北河吞金兽", "level": 36, "rank": "副本 Boss", "hp": 1500, "attack": 78, "defense": 55, "speed": 39, "exp": 9000, "silver": [520, 680], "drops": ["basin_charm"], "effect": {"name": "中毒", "chance": 0.20, "rounds": 3}, "special": {"name": "金砂洪流", "every": 3, "damage_multiplier": 1.42}, "intro": "吞金兽卷起整条北河的金砂，聚宝盆在它胸口像第二颗心脏般搏动。"}
 	,"nine_tail_fox": {"name": "九尾灯妖·妲罗", "level": 43, "rank": "副本 Boss", "hp": 1800, "attack": 90, "defense": 65, "speed": 48, "exp": 12000, "silver": [680, 860], "drops": ["demon_mask"], "effect": {"name": "诅咒", "chance": 0.24, "rounds": 3}, "special": {"name": "长安幻夜", "every": 3, "damage_multiplier": 1.44}, "intro": "九盏妖灯同时亮起，妲罗用你最珍惜的记忆编织出第十条尾巴。"}
@@ -806,9 +857,64 @@ static func quest_dialogue(quest_id, npc_id):
 	return str(NPCS.get(str(npc_id), {}).get("dialogue", "没有更多消息。"))
 
 static func trade_route(from_port, to_port):
-	var ports = [str(from_port), str(to_port)]
-	ports.sort()
-	return TRADE_ROUTES.get("%s|%s" % ports, {})
+	var origin = str(from_port)
+	var destination = str(to_port)
+	if origin == destination or not PORT_NAVIGATION.has(origin) or not PORT_NAVIGATION.has(destination):
+		return {}
+	var distance_nm = port_distance_nm(origin, destination)
+	var zone_ids = sea_zones_for_route(origin, destination)
+	var base_risk = 12 + int(round(float(distance_nm) / 450.0))
+	for zone_id in zone_ids:
+		base_risk += int(SEA_ZONE_RISK.get(str(zone_id), 0))
+	return {
+		"days": max(2, int(ceil(float(distance_nm) / 360.0))),
+		"distance_nm": distance_nm,
+		"fee": clamp(8 + int(ceil(float(distance_nm) / 75.0)), 14, 80),
+		"risk": clamp(base_risk, 12, 48),
+		"zone_ids": zone_ids,
+		"waters_text": sea_waters_text(zone_ids)
+	}
+
+static func port_distance_nm(from_port, to_port):
+	var origin = str(from_port)
+	var destination = str(to_port)
+	if origin == destination or not PORT_NAVIGATION.has(origin) or not PORT_NAVIGATION.has(destination):
+		return 0
+	var a = PORT_NAVIGATION[origin]
+	var b = PORT_NAVIGATION[destination]
+	var latitude_a = deg_to_rad(float(a.latitude))
+	var latitude_b = deg_to_rad(float(b.latitude))
+	var latitude_delta = latitude_b - latitude_a
+	var longitude_delta = deg_to_rad(float(b.longitude) - float(a.longitude))
+	var haversine = sin(latitude_delta * 0.5) * sin(latitude_delta * 0.5) + cos(latitude_a) * cos(latitude_b) * sin(longitude_delta * 0.5) * sin(longitude_delta * 0.5)
+	haversine = clamp(haversine, 0.0, 1.0)
+	var great_circle_nm = 3440.065 * 2.0 * atan2(sqrt(haversine), sqrt(1.0 - haversine))
+	var detour = _maritime_detour(a, b)
+	return max(1, int(round((great_circle_nm * float(detour.multiplier) + float(detour.extra_nm)) / 10.0)) * 10)
+
+static func _maritime_detour(a, b):
+	var zone_a = str(a.zone)
+	var zone_b = str(b.zone)
+	if zone_a == zone_b:
+		if zone_a == "mediterranean":
+			if str(a.basin) == str(b.basin):
+				return {"multiplier": 1.20, "extra_nm": 60}
+			if "adriatic" in [str(a.basin), str(b.basin)]:
+				return {"multiplier": 1.35, "extra_nm": 60}
+			return {"multiplier": 1.15, "extra_nm": 60}
+		if zone_a == "east_asia":
+			return {"multiplier": 1.45, "extra_nm": 60}
+		return {"multiplier": 1.18, "extra_nm": 60}
+	var zones = [zone_a, zone_b]
+	zones.sort()
+	match "%s|%s" % zones:
+		"mediterranean|north_sea": return {"multiplier": 1.12, "extra_nm": 1700}
+		"east_asia|north_sea": return {"multiplier": 1.45, "extra_nm": 1800}
+		"africa|north_sea": return {"multiplier": 1.08, "extra_nm": 900}
+		"east_asia|mediterranean": return {"multiplier": 1.32, "extra_nm": 350}
+		"africa|mediterranean": return {"multiplier": 1.12, "extra_nm": 250}
+		"africa|east_asia": return {"multiplier": 1.08, "extra_nm": 200}
+		_: return {"multiplier": 1.18, "extra_nm": 90}
 
 static func trade_route_path(from_port, to_port, allowed_ports = []):
 	var origin = str(from_port)
@@ -817,56 +923,9 @@ static func trade_route_path(from_port, to_port, allowed_ports = []):
 		return []
 	if origin == destination:
 		return [origin]
-	var available = {}
-	if Array(allowed_ports).is_empty():
-		for port_id in TRADE_PORTS:
-			available[str(port_id)] = true
-	else:
-		for port_id in Array(allowed_ports):
-			if TRADE_PORTS.has(str(port_id)):
-				available[str(port_id)] = true
-	available[origin] = true
-	available[destination] = true
-	var distances = {}
-	var previous = {}
-	var unvisited = []
-	for port_id in available:
-		distances[str(port_id)] = 1000000
-		unvisited.append(str(port_id))
-	distances[origin] = 0
-	while not unvisited.is_empty():
-		var current = ""
-		var current_distance = 1000001
-		for port_id in unvisited:
-			if int(distances[str(port_id)]) < current_distance:
-				current = str(port_id)
-				current_distance = int(distances[current])
-		if current == "" or current_distance >= 1000000:
-			break
-		unvisited.erase(current)
-		if current == destination:
-			break
-		for neighbor in available:
-			var neighbor_id = str(neighbor)
-			if neighbor_id == current or not neighbor_id in unvisited:
-				continue
-			var route = trade_route(current, neighbor_id)
-			if route.is_empty():
-				continue
-			var candidate_distance = current_distance + max(1, int(route.get("days", 1)))
-			if candidate_distance < int(distances[neighbor_id]):
-				distances[neighbor_id] = candidate_distance
-				previous[neighbor_id] = current
-	if not previous.has(destination):
+	if not Array(allowed_ports).is_empty() and not destination in Array(allowed_ports):
 		return []
-	var path = [destination]
-	var cursor = destination
-	while cursor != origin:
-		cursor = str(previous.get(cursor, ""))
-		if cursor == "":
-			return []
-		path.push_front(cursor)
-	return path
+	return [origin, destination]
 
 static func port_stock(port_id):
 	if not TRADE_PORTS.has(str(port_id)):

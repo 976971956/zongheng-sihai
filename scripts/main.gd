@@ -1888,9 +1888,11 @@ func _open_harbor():
 		for good_id in foreign_cargo:
 			_add_journal_trade_good_card(market, str(good_id), false)
 
-	market.add_child(_small_caption("可用航线 · 原作出航与传送分开"))
+	market.add_child(_small_caption("自由航线 · 已发现港口均可直航，距离与海域决定威胁"))
 	for destination in GameData.TRADE_PORTS:
 		if destination == port_id:
+			continue
+		if not state.is_port_unlocked(str(destination)):
 			continue
 		var route = GameData.trade_route(port_id, destination)
 		if route.is_empty():
