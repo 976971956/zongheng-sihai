@@ -1386,6 +1386,9 @@ func _inventory_row(item_id, count):
 	text_stack.add_child(_label(item.description, 11, MUTED))
 	if item.type == "equipment":
 		text_stack.add_child(_label(_stats_text(item.get("stats", {})), 10, Color("86b8c0")))
+		var set_name = state.equipment_set_name(item_id)
+		if set_name != "":
+			text_stack.add_child(_label("套装 · %s" % set_name, 10, GOLD))
 		var delta = state.equipment_score_delta(item_id)
 		text_stack.add_child(_label("较当前战力 %+d" % delta if delta != 0 else "与当前装备战力相当", 10, GOLD if delta > 0 else MUTED))
 
@@ -1398,6 +1401,8 @@ func _inventory_row(item_id, count):
 		action_text = "鉴定"
 	elif item.type == "card":
 		action_text = "已启用" if str(state.active_card) == str(item_id) else "启用"
+	elif item.type == "material":
+		action_text = "锻造材料"
 	var action = _button(action_text, "primary" if item.type != "card" else "ghost")
 	action.custom_minimum_size.x = 80
 	if item.type == "equipment":
@@ -1548,7 +1553,7 @@ func _open_character():
 	summary_row.add_child(fill)
 	summary_row.add_child(_label("体力 %d  ·  攻击 %d  ·  防御 %d  ·  敏捷 %d" % [stats.max_hp, stats.attack, stats.defense, stats.speed], 12, MUTED))
 	content.add_child(summary)
-	content.add_child(_label("持有银币：%d｜强化装备会消耗银币" % int(state.player.silver), 12, GOLD))
+	content.add_child(_label("持有银币：%d｜装备最高可强化至+10" % int(state.player.silver), 12, GOLD))
 	var recommend = _button("一键穿戴推荐装备", "gold")
 	recommend.pressed.connect(func():
 		var result = state.equip_recommended()
@@ -1580,15 +1585,21 @@ func _open_character():
 			row.add_child(_label(_stats_text(item.stats), 11, Color("86b8c0")))
 		content.add_child(card)
 
-	var set_count = 0
-	for item_id in state.equipment.values():
-		if item_id != "" and GameData.ITEMS[item_id].get("set", "") == "warrior":
-			set_count += 1
-	var set_text = "武士套 %d/5｜每件掉落+4%%｜2件额外+8%%｜4件额外+12%%" % set_count
-	var set_label = _label(set_text, 12, GOLD if set_count >= 2 else MUTED)
-	set_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	set_label.add_theme_stylebox_override("normal", _style(Color(0.18, 0.13, 0.04, 0.45), 10, Color(0.45, 0.34, 0.12, 0.6), 1, 10))
-	content.add_child(set_label)
+	content.add_child(_small_caption("套装共鸣"))
+	var visible_set_count = 0
+	for set_progress in state.equipment_set_progress():
+		if int(set_progress.count) <= 0:
+			continue
+		visible_set_count += 1
+		var stage_texts = []
+		for stage in Array(set_progress.stages):
+			stage_texts.append("%s%d件 %s" % ["✓" if bool(stage.active) else "○", int(stage.pieces), str(stage.text)])
+		var set_label = _label("%s %d/%d\n%s" % [str(set_progress.name), int(set_progress.count), int(set_progress.total), "｜".join(stage_texts)], 11, GOLD)
+		set_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		set_label.add_theme_stylebox_override("normal", _style(Color(0.18, 0.13, 0.04, 0.45), 10, Color(0.45, 0.34, 0.12, 0.6), 1, 10))
+		content.add_child(set_label)
+	if visible_set_count == 0:
+		content.add_child(_label("尚未穿戴套装装备。", 11, MUTED))
 	var social_parts = []
 	social_parts.append("队伍：独自冒险" if state.party_members.is_empty() else "队伍：%s（攻防+5%%）" % state.party_members[0])
 	social_parts.append("宠物：无" if state.pet.is_empty() else "宠物：%s（战斗自动协战）" % state.pet.name)
@@ -2109,7 +2120,7 @@ func _show_welcome():
 	content.add_child(flow)
 
 	content.add_child(_label("快速提示", 13, INK))
-	content.add_child(_label("• 攻击一次只刷新一个回合，也可开启自动攻击\n• 战斗药品栏可恢复体力、解除中毒与虚弱等状态\n• 未知道具要带回海风市场鉴定，武士套提高掉落率\n• 任务完成会主动弹出领奖，领取后继续引导下一任务", 12, MUTED))
+	content.add_child(_label("• 攻击一次只刷新一个回合，也可开启自动攻击\n• 战斗药品栏可恢复体力、解除中毒与虚弱等状态\n• 未知道具要带回海风市场鉴定；套装按2件、4件或整套激活共鸣\n• 装备+1至+3只需银币，+4以后需要龙泉水与强化图纸\n• 任务完成会主动弹出领奖，领取后继续引导下一任务", 12, MUTED))
 
 	var start = _button("开始航程", "primary")
 	start.pressed.connect(_close_modal)

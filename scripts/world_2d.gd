@@ -1692,7 +1692,7 @@ func _open_character():
 	equipment_stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	equipment_stack.add_theme_constant_override("separation", 8)
 	scroll.add_child(equipment_stack)
-	equipment_stack.add_child(_label("当前已装备｜可使用银币强化至 +3", 16, GOLD))
+	equipment_stack.add_child(_label("当前已装备｜最高强化 +10", 16, GOLD))
 	var equipment_grid = GridContainer.new()
 	equipment_grid.columns = 2
 	equipment_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1701,6 +1701,15 @@ func _open_character():
 	for slot in ["weapon", "head", "body", "waist", "boots", "charm"]:
 		equipment_grid.add_child(_equipped_upgrade_card_2d(slot))
 	equipment_stack.add_child(equipment_grid)
+	equipment_stack.add_child(_label("套装共鸣｜凑齐指定件数逐级激活", 16, GOLD))
+	var visible_set_count = 0
+	for set_progress in state.equipment_set_progress():
+		if int(set_progress.count) <= 0:
+			continue
+		visible_set_count += 1
+		equipment_stack.add_child(_equipment_set_card_2d(set_progress))
+	if visible_set_count == 0:
+		equipment_stack.add_child(_label("尚未穿戴套装装备。副本 Boss 会掉落带套装标记的部件。", 13, MUTED))
 	var bag = _button("打开物品背包", "primary")
 	bag.pressed.connect(_switch_overlay_to_inventory)
 	content.add_child(bag)
@@ -1738,7 +1747,7 @@ func _open_inventory():
 	var inventory_counts = _inventory_counts_2d()
 	var bag_panel = PanelContainer.new()
 	bag_panel.add_theme_stylebox_override("panel", _style(Color(0.03, 0.15, 0.17, 0.94), 12, Color(TEAL, 0.48), 1, 10))
-	bag_panel.add_child(_label("◈ 银币 %d｜装备%d · 补给%d · 卡片%d\n装备后物品会移入独立的角色装备页" % [int(state.player.silver), int(inventory_counts.equipment), int(inventory_counts.consumable), int(inventory_counts.card)], 14, TEAL))
+	bag_panel.add_child(_label("◈ 银币 %d｜装备%d · 补给%d · 材料%d · 卡片%d\n装备后物品会移入独立的角色装备页" % [int(state.player.silver), int(inventory_counts.equipment), int(inventory_counts.consumable), int(inventory_counts.material), int(inventory_counts.card)], 14, TEAL))
 	content.add_child(bag_panel)
 	var card_name = "未启用"
 	if state.active_card != "" and GameData.ITEMS.has(state.active_card):
@@ -1794,17 +1803,29 @@ func _equipped_upgrade_card_2d(slot):
 	row.add_child(_item_visual_2d("equipment", item_id if item_id != "" else slot, rarity, slot, item_id != "", 62))
 	var item_name = str(item.get("name", "尚未装备"))
 	var stats_text = _item_stats_text_2d(item.get("stats", {})) if item_id != "" else "从背包选择该槽位装备"
-	var info = _label("%s\n%s%s\n%s" % [GameData.SLOT_NAMES[slot], item_name, "  +%d" % level if level > 0 else "", stats_text], 12, INK if item_id != "" else MUTED)
+	var set_name = state.equipment_set_name(item_id)
+	var set_text = "\n套装 · %s" % set_name if set_name != "" else ""
+	var info = _label("%s\n%s%s\n%s%s" % [GameData.SLOT_NAMES[slot], item_name, "  +%d" % level if level > 0 else "", stats_text, set_text], 12, INK if item_id != "" else MUTED)
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	row.add_child(info)
-	var upgrade_cost = state.equipment_upgrade_cost(slot) if item_id != "" else 0
-	var upgrade = _button("空槽位" if item_id == "" else ("已强化满级" if level >= 3 else "强化 +1 · %d银" % upgrade_cost), "gold")
+	var upgrade = _button("空槽位" if item_id == "" else ("已强化满级 +10" if level >= 10 else "强化至 +%d\n%s" % [level + 1, state.equipment_upgrade_requirement_text(slot)]), "gold")
 	upgrade.custom_minimum_size = Vector2(0, 48)
 	upgrade.add_theme_font_size_override("font_size", 13)
-	upgrade.disabled = item_id == "" or level >= 3 or int(state.player.silver) < upgrade_cost
+	upgrade.disabled = item_id == "" or level >= 10
 	upgrade.pressed.connect(_upgrade_equipped_2d.bind(slot))
 	stack.add_child(upgrade)
+	return card
+
+func _equipment_set_card_2d(set_progress):
+	var card = PanelContainer.new()
+	card.add_theme_stylebox_override("panel", _style(Color(0.10, 0.11, 0.08, 0.95), 11, Color(GOLD, 0.58), 1, 10))
+	var stack = VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 4)
+	card.add_child(stack)
+	stack.add_child(_label("%s  %d/%d" % [str(set_progress.name), int(set_progress.count), int(set_progress.total)], 14, GOLD))
+	for stage in Array(set_progress.stages):
+		stack.add_child(_label("%s %d件｜%s" % ["✓" if bool(stage.active) else "○", int(stage.pieces), str(stage.text)], 12, TEAL if bool(stage.active) else MUTED))
 	return card
 
 func _upgrade_equipped_2d(slot):
@@ -1835,6 +1856,9 @@ func _inventory_item_card_2d(item_id, item, count):
 	text_stack.add_child(description)
 	if str(item.type) == "equipment":
 		text_stack.add_child(_label(_item_stats_text_2d(item.get("stats", {})), 12, TEAL))
+		var set_name = state.equipment_set_name(item_id)
+		if set_name != "":
+			text_stack.add_child(_label("套装 · %s" % set_name, 12, GOLD))
 		var delta = state.equipment_score_delta(item_id)
 		var comparison = "较当前战力 %+d" % delta if delta != 0 else "与当前装备战力相当"
 		text_stack.add_child(_label(comparison, 12, GOLD if delta > 0 else MUTED))
@@ -1854,13 +1878,16 @@ func _inventory_item_card_2d(item_id, item, count):
 			action.text = "已启用" if str(state.active_card) == str(item_id) else "启用"
 			action.disabled = str(state.active_card) == str(item_id)
 			action.pressed.connect(_equip_card_2d.bind(item_id))
+		"material":
+			action.text = "锻造材料"
+			action.disabled = true
 		_:
 			action.disabled = true
 	row.add_child(action)
 	return card
 
 func _inventory_counts_2d():
-	var counts = {"equipment": 0, "consumable": 0, "card": 0, "other": 0}
+	var counts = {"equipment": 0, "consumable": 0, "material": 0, "card": 0, "other": 0}
 	for item_id in state.inventory:
 		if not GameData.ITEMS.has(str(item_id)):
 			continue
@@ -1873,7 +1900,7 @@ func _inventory_sort_key_2d(item_id):
 	if not GameData.ITEMS.has(item_id):
 		return "9_%s" % item_id
 	var item = GameData.ITEMS[item_id]
-	var type_order = {"equipment": "0", "consumable": "1", "mystery": "2", "card": "3"}
+	var type_order = {"equipment": "0", "consumable": "1", "material": "2", "mystery": "3", "card": "4"}
 	var rarity_order = {"唯一": "0", "神话": "1", "传说": "2", "史诗": "3", "珍稀": "4", "优秀": "5", "普通": "6", "稀有补给": "3", "远航餐食": "4", "补给": "5", "酒馆食物": "6", "未知": "7"}
 	return "%s_%s_%s" % [str(type_order.get(str(item.type), "8")), str(rarity_order.get(str(item.rarity), "8")), str(item.name)]
 

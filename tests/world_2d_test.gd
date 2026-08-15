@@ -106,6 +106,9 @@ func _run():
 	scene._equip_item_2d("warrior_blade")
 	await process_frame
 	_check(str(scene.state.equipment.weapon) == "warrior_blade", "点击装备必须更新角色装备槽")
+	scene._open_character()
+	_check(_has_label_text(scene.overlay, "武士套装") and _has_label_text(scene.overlay, "套装共鸣") and _has_button_text(scene.overlay, "强化至 +1"), "角色装备页必须显示套装进度、分段共鸣和+10强化入口")
+	scene._open_inventory()
 	var item_count_before = int(scene.state.inventory.get("small_milk", 0))
 	var max_hp = int(scene.state.get_stats().max_hp)
 	scene.state.player.hp = max_hp - 50

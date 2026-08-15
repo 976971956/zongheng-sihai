@@ -264,7 +264,7 @@ const NPCS = {
 	"alisa": {"name": "艾丽莎", "role": "救命恩人", "dialogue": "父亲在沙滩上发现了你。你什么都不记得了吗？拿好这片鳞，去威尼斯酒馆问问老板吧。"},
 	"tavern_keeper": {"name": "酒馆老板", "role": "主线复命人与餐食商", "service": "tavern_shop", "dialogue": "这片鳞来自很深的海域。想知道自己是谁，先证明你能在这片大陆活下去——北门正缺人手。平时也可以来买热食和旅行干粮。"},
 	"guard_captain": {"name": "守卫队长", "role": "城市守卫", "dialogue": "城内地图能带你快速去往各处。出了北门，可就要留意自己的体力和状态了。"},
-	"jeweler": {"name": "珠宝匠贝里昂", "role": "珠宝售卖与鉴定", "service": "jewelry_shop", "dialogue": "我这里有能直接佩戴的珊瑚指环和海蓝石吊坠，也能替你鉴定怪物身上掉下来的未知道具。"},
+	"jeweler": {"name": "珠宝匠贝里昂", "role": "珠宝、鉴定与装备锻造", "service": "jewelry_shop", "dialogue": "我能鉴定未知道具，也出售龙泉水和强化图纸。+1至+3只需银币，更高强化就要准备材料。"},
 	"ship_owner": {"name": "船老板", "role": "船只与航行", "service": "harbor", "dialogue": "完成威尼斯试炼后，我会把海燕号交给你。比较各港价格、控制货舱，再决定把银币压在哪批货上。"},
 	"ragusa_broker": {"name": "拉古萨经纪人", "role": "港口商人", "service": "harbor", "dialogue": "这里的羊毛和橄榄油便宜。若你从威尼斯带来玻璃，我能给出不错的价钱。"},
 	"alexandria_merchant": {"name": "香料商萨米尔", "role": "港口商人", "service": "harbor", "dialogue": "季风改变的不只是航期，也会改变香料的价格。低买高卖，但别忘了返航的费用。"},
@@ -615,6 +615,48 @@ const ENEMIES = {
 	,"tide_void_emperor": {"name": "潮虚帝", "level": 99, "rank": "副本 Boss", "hp": 5600, "attack": 202, "defense": 168, "speed": 110, "exp": 40000, "silver": [2800, 3300], "drops": ["tidekeeper_regalia"], "effect": {"name": "诅咒", "chance": 0.30, "rounds": 3}, "special": {"name": "终潮归零", "every": 3, "damage_multiplier": 1.58}, "intro": "所有潮门的阴影汇成一位无面帝王。它要抹去海洋、陆地以及你一路找回的名字。"}
 }
 
+# 旧版以手持、头戴、身穿、腰戴、脚穿和佩戴构成装备组合，并通过完整套装
+# 提供额外攻防与特殊属性。当前单机版压缩到 Lv.1–100，以分段共鸣保留换装取舍。
+const EQUIPMENT_SETS = {
+	"warrior": {
+		"name": "武士套装", "total": 5,
+		"bonuses": [
+			{"pieces": 2, "stats": {"attack": 3, "defense": 2}, "drop_bonus": 0.08, "text": "攻击+3、防御+2、寻宝+8%"},
+			{"pieces": 4, "stats": {"max_hp": 24, "speed": 3}, "drop_bonus": 0.12, "text": "体力+24、速度+3、寻宝+12%"},
+			{"pieces": 5, "stats": {"attack": 5, "defense": 4, "speed": 2}, "text": "攻击+5、防御+4、速度+2"}
+		]
+	},
+	"black_sail": {
+		"name": "黑帆征服套", "total": 4,
+		"bonuses": [
+			{"pieces": 2, "stats": {"attack": 6, "speed": 3}, "text": "攻击+6、速度+3"},
+			{"pieces": 4, "stats": {"max_hp": 55, "attack": 8, "defense": 6}, "text": "体力+55、攻击+8、防御+6"}
+		]
+	},
+	"white_whale": {
+		"name": "白鲸遗航套", "total": 3,
+		"bonuses": [
+			{"pieces": 2, "stats": {"max_hp": 60, "defense": 8}, "text": "体力+60、防御+8"},
+			{"pieces": 3, "stats": {"attack": 12, "speed": 6}, "text": "攻击+12、速度+6"}
+		]
+	},
+	"earth_legacy": {
+		"name": "地魔遗珍套", "total": 6,
+		"bonuses": [
+			{"pieces": 2, "stats": {"max_hp": 80, "defense": 10}, "text": "体力+80、防御+10"},
+			{"pieces": 4, "stats": {"attack": 18, "speed": 8}, "text": "攻击+18、速度+8"},
+			{"pieces": 6, "stats": {"max_hp": 160, "attack": 20, "defense": 20}, "text": "体力+160、攻击+20、防御+20"}
+		]
+	},
+	"tidekeeper": {
+		"name": "四海守潮套", "total": 3,
+		"bonuses": [
+			{"pieces": 2, "stats": {"max_hp": 180, "attack": 24, "defense": 18}, "text": "体力+180、攻击+24、防御+18"},
+			{"pieces": 3, "stats": {"attack": 36, "defense": 28, "speed": 18}, "text": "攻击+36、防御+28、速度+18"}
+		]
+	}
+}
+
 const ITEMS = {
 	"rusty_sabre": {"name": "旧海军弯刀", "type": "equipment", "slot": "weapon", "rarity": "普通", "description": "失事后仅剩的防身武器。", "stats": {"attack": 3}, "price": 0},
 	"linen_cap": {"name": "亚麻水手帽", "type": "equipment", "slot": "head", "rarity": "普通", "description": "威尼斯常见的水手帽。", "stats": {"max_hp": 8, "defense": 1}, "price": 24},
@@ -640,31 +682,33 @@ const ITEMS = {
 	"aquamarine_pendant": {"name": "海蓝石吊坠", "type": "equipment", "slot": "charm", "rarity": "珍稀", "description": "水色宝石会随潮汐发亮，提高攻击与行动速度。", "stats": {"max_hp": 12, "attack": 3, "speed": 2}, "price": 160},
 	"stamina_tonic": {"name": "体力宝", "type": "consumable", "rarity": "稀有补给", "description": "恢复 160 点体力。", "heal": 160, "price": 200},
 	"universal_medicine": {"name": "万能药", "type": "consumable", "rarity": "补给", "description": "解除中毒、虚弱、缓慢和诅咒。", "heal": 0, "cure_status": true, "price": 16}
-	,"corsair_cutlass": {"name": "黑帆弯刀", "type": "equipment", "slot": "weapon", "rarity": "史诗", "description": "从远洋海盗手中缴获的弯刀。", "stats": {"attack": 18, "speed": 3}, "price": 360}
-	,"gunner_coat": {"name": "炮手皮甲", "type": "equipment", "slot": "body", "rarity": "史诗", "description": "内衬缝有防止火星灼伤的厚皮。", "stats": {"max_hp": 48, "defense": 12}, "price": 390}
-	,"captain_hat": {"name": "黑帆船长帽", "type": "equipment", "slot": "head", "rarity": "史诗", "description": "帽檐下藏着一枚被刮去图案的徽章。", "stats": {"max_hp": 26, "defense": 7, "speed": 4}, "price": 420}
-	,"black_sail_charm": {"name": "黑帆航路仪", "type": "equipment", "slot": "charm", "rarity": "传说", "description": "记录神秘鳞片航路的精密仪器。", "stats": {"max_hp": 55, "attack": 9, "defense": 7, "speed": 5}, "price": 680}
+	,"corsair_cutlass": {"name": "黑帆弯刀", "type": "equipment", "slot": "weapon", "rarity": "史诗", "set": "black_sail", "description": "从远洋海盗手中缴获的弯刀。", "stats": {"attack": 18, "speed": 3}, "price": 360}
+	,"gunner_coat": {"name": "炮手皮甲", "type": "equipment", "slot": "body", "rarity": "史诗", "set": "black_sail", "description": "内衬缝有防止火星灼伤的厚皮。", "stats": {"max_hp": 48, "defense": 12}, "price": 390}
+	,"captain_hat": {"name": "黑帆船长帽", "type": "equipment", "slot": "head", "rarity": "史诗", "set": "black_sail", "description": "帽檐下藏着一枚被刮去图案的徽章。", "stats": {"max_hp": 26, "defense": 7, "speed": 4}, "price": 420}
+	,"black_sail_charm": {"name": "黑帆航路仪", "type": "equipment", "slot": "charm", "rarity": "传说", "set": "black_sail", "description": "记录神秘鳞片航路的精密仪器。", "stats": {"max_hp": 55, "attack": 9, "defense": 7, "speed": 5}, "price": 680}
 	,"tide_seal": {"name": "潮纹银章", "type": "equipment", "slot": "charm", "rarity": "传说", "description": "艾丽莎父亲留下的银章，背面刻着你失去的名字。", "stats": {"max_hp": 70, "attack": 12, "defense": 8, "speed": 6}, "price": 880}
 	,"lighthouse_compass": {"name": "灯塔星盘", "type": "equipment", "slot": "charm", "rarity": "传说", "description": "萨米尔从灯塔密室取出的星盘，指针会追随发光鳞片的潮汐。", "stats": {"max_hp": 92, "attack": 16, "defense": 11, "speed": 9}, "price": 1280}
 	,"maltese_stew": {"name": "马耳他海风炖汤", "type": "consumable", "rarity": "远航餐食", "description": "恢复160点体力；接下来3场战斗最大体力+45、攻击+6、防御+3。", "heal": 160, "meal_battles": 3, "price": 120}
-	,"whale_bone_sabre": {"name": "白鲸骨刃", "type": "equipment", "slot": "weapon", "rarity": "传说", "description": "以白鲸号断裂龙骨与潮纹钢重铸的长刃。", "stats": {"attack": 26, "speed": 5}, "price": 1450}
-	,"survivor_coat": {"name": "遗航者外套", "type": "equipment", "slot": "body", "rarity": "传说", "description": "衣袋里仍缝着白鲸号船员名册的一角。", "stats": {"max_hp": 78, "defense": 18, "speed": 3}, "price": 1520}
-	,"siren_charm": {"name": "雾歌耳坠", "type": "equipment", "slot": "charm", "rarity": "传说", "description": "雾歌海妖凝成的水晶，使持有者不再迷失于海雾。", "stats": {"max_hp": 105, "attack": 19, "defense": 14, "speed": 11}, "price": 1780}
-	,"white_whale_coat": {"name": "白鲸守望衣", "type": "equipment", "slot": "body", "rarity": "神话", "description": "伊莎贝拉依照先祖遗图缝制的航海衣，内衬记录着下一段北河航路。", "stats": {"max_hp": 120, "attack": 7, "defense": 24, "speed": 5}, "price": 2280}
+	,"whale_bone_sabre": {"name": "白鲸骨刃", "type": "equipment", "slot": "weapon", "rarity": "传说", "set": "white_whale", "description": "以白鲸号断裂龙骨与潮纹钢重铸的长刃。", "stats": {"attack": 26, "speed": 5}, "price": 1450}
+	,"survivor_coat": {"name": "遗航者外套", "type": "equipment", "slot": "body", "rarity": "传说", "set": "white_whale", "description": "衣袋里仍缝着白鲸号船员名册的一角。", "stats": {"max_hp": 78, "defense": 18, "speed": 3}, "price": 1520}
+	,"siren_charm": {"name": "雾歌耳坠", "type": "equipment", "slot": "charm", "rarity": "传说", "set": "white_whale", "description": "雾歌海妖凝成的水晶，使持有者不再迷失于海雾。", "stats": {"max_hp": 105, "attack": 19, "defense": 14, "speed": 11}, "price": 1780}
+	,"white_whale_coat": {"name": "白鲸守望衣", "type": "equipment", "slot": "body", "rarity": "神话", "set": "white_whale", "description": "伊莎贝拉依照先祖遗图缝制的航海衣，内衬记录着下一段北河航路。", "stats": {"max_hp": 120, "attack": 7, "defense": 24, "speed": 5}, "price": 2280}
 	,"basin_charm": {"name": "聚宝潮盆", "type": "equipment", "slot": "charm", "rarity": "神话", "description": "不再吞噬欲望的聚宝盆，会把远征者的勇气化为潮光。", "stats": {"max_hp": 150, "attack": 28, "defense": 22, "speed": 12}, "price": 3200}
-	,"demon_mask": {"name": "镇妖明光冠", "type": "equipment", "slot": "head", "rarity": "神话", "description": "由照妖镜片重铸，能让佩戴者看穿幻城。", "stats": {"max_hp": 115, "attack": 16, "defense": 28, "speed": 15}, "price": 3900}
-	,"earth_armor": {"name": "地魔镇岳甲", "type": "equipment", "slot": "body", "rarity": "神话", "description": "卸去黄金锁链后留下的地脉重甲。", "stats": {"max_hp": 230, "attack": 12, "defense": 42, "speed": 6}, "price": 4700}
-	,"tira_sword": {"name": "蒂拉之剑", "type": "equipment", "slot": "weapon", "rarity": "神话", "description": "只服从不被力量支配之人的潮刃。", "stats": {"attack": 54, "defense": 10, "speed": 17}, "price": 5600}
-	,"celestial_belt": {"name": "破军星环", "type": "equipment", "slot": "waist", "rarity": "神话", "description": "天魔将坠落后留下的星轨腰环。", "stats": {"max_hp": 140, "attack": 24, "defense": 30, "speed": 19}, "price": 6600}
-	,"jade_boots": {"name": "玉历踏月靴", "type": "equipment", "slot": "boots", "rarity": "神话", "description": "每一步都踏在真实发生过的历史上。", "stats": {"max_hp": 125, "attack": 15, "defense": 26, "speed": 34}, "price": 7700}
-	,"furnace_core": {"name": "熄火炉心", "type": "equipment", "slot": "charm", "rarity": "神话", "description": "黑炉熄灭后凝成的冷核，蕴含被释放的潮能。", "stats": {"max_hp": 260, "attack": 45, "defense": 38, "speed": 22}, "price": 8900}
-	,"demon_crown": {"name": "九港守夜冠", "type": "equipment", "slot": "head", "rarity": "神话", "description": "九港居民共同重铸的王冠，不属于任何一位国王。", "stats": {"max_hp": 210, "attack": 32, "defense": 48, "speed": 25}, "price": 10200}
-	,"divine_shears": {"name": "天工神剪", "type": "equipment", "slot": "weapon", "rarity": "神话", "description": "能剪断谎言，也能把破裂的命运重新裁合。", "stats": {"max_hp": 160, "attack": 78, "defense": 20, "speed": 29}, "price": 11800}
-	,"tidekeeper_regalia": {"name": "四海守潮圣装", "type": "equipment", "slot": "body", "rarity": "唯一", "description": "十三卷航海日志与九港誓言共同织成的最终圣装。", "stats": {"max_hp": 420, "attack": 42, "defense": 72, "speed": 32}, "price": 15000}
+	,"demon_mask": {"name": "镇妖明光冠", "type": "equipment", "slot": "head", "rarity": "神话", "set": "earth_legacy", "description": "由照妖镜片重铸，能让佩戴者看穿幻城。", "stats": {"max_hp": 115, "attack": 16, "defense": 28, "speed": 15}, "price": 3900}
+	,"earth_armor": {"name": "地魔镇岳甲", "type": "equipment", "slot": "body", "rarity": "神话", "set": "earth_legacy", "description": "卸去黄金锁链后留下的地脉重甲。", "stats": {"max_hp": 230, "attack": 12, "defense": 42, "speed": 6}, "price": 4700}
+	,"tira_sword": {"name": "蒂拉之剑", "type": "equipment", "slot": "weapon", "rarity": "神话", "set": "earth_legacy", "description": "只服从不被力量支配之人的潮刃。", "stats": {"attack": 54, "defense": 10, "speed": 17}, "price": 5600}
+	,"celestial_belt": {"name": "破军星环", "type": "equipment", "slot": "waist", "rarity": "神话", "set": "earth_legacy", "description": "天魔将坠落后留下的星轨腰环。", "stats": {"max_hp": 140, "attack": 24, "defense": 30, "speed": 19}, "price": 6600}
+	,"jade_boots": {"name": "玉历踏月靴", "type": "equipment", "slot": "boots", "rarity": "神话", "set": "earth_legacy", "description": "每一步都踏在真实发生过的历史上。", "stats": {"max_hp": 125, "attack": 15, "defense": 26, "speed": 34}, "price": 7700}
+	,"furnace_core": {"name": "熄火炉心", "type": "equipment", "slot": "charm", "rarity": "神话", "set": "earth_legacy", "description": "黑炉熄灭后凝成的冷核，蕴含被释放的潮能。", "stats": {"max_hp": 260, "attack": 45, "defense": 38, "speed": 22}, "price": 8900}
+	,"demon_crown": {"name": "九港守夜冠", "type": "equipment", "slot": "head", "rarity": "神话", "set": "tidekeeper", "description": "九港居民共同重铸的王冠，不属于任何一位国王。", "stats": {"max_hp": 210, "attack": 32, "defense": 48, "speed": 25}, "price": 10200}
+	,"divine_shears": {"name": "天工神剪", "type": "equipment", "slot": "weapon", "rarity": "神话", "set": "tidekeeper", "description": "能剪断谎言，也能把破裂的命运重新裁合。", "stats": {"max_hp": 160, "attack": 78, "defense": 20, "speed": 29}, "price": 11800}
+	,"tidekeeper_regalia": {"name": "四海守潮圣装", "type": "equipment", "slot": "body", "rarity": "唯一", "set": "tidekeeper", "description": "十三卷航海日志与九港誓言共同织成的最终圣装。", "stats": {"max_hp": 420, "attack": 42, "defense": 72, "speed": 32}, "price": 15000}
+	,"dragon_spring_water": {"name": "龙泉水", "type": "material", "rarity": "锻造材料", "description": "装备强化至+4以上时用于稳定潮纹。", "price": 120}
+	,"forging_blueprint": {"name": "强化图纸", "type": "material", "rarity": "锻造材料", "description": "装备强化至+8以上时必须使用的通用图纸。", "price": 260}
 }
 
 const VENDOR_SHOPS = {
-	"jeweler": {"name": "贝里昂珠宝铺", "description": "出售可直接装备的护身珠宝；未知道具仍可在海风市场鉴定。", "stock": ["coral_ring", "aquamarine_pendant"]},
+	"jeweler": {"name": "贝里昂珠宝铺", "description": "兼营装备锻造：出售护身珠宝、龙泉水与强化图纸；未知道具仍可在此鉴定。", "stock": ["coral_ring", "aquamarine_pendant", "dragon_spring_water", "forging_blueprint"]},
 	"tavern_keeper": {"name": "老海鸥酒馆食柜", "description": "出售能在背包中使用的热食和旅行干粮，也可以在这里免费休息。", "stock": ["sea_salt_bread", "herb_fish_stew", "small_milk"]}
 }
 

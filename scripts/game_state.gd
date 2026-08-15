@@ -107,14 +107,11 @@ func get_stats():
 		"speed": 6 + (level - 1),
 		"drop_bonus": 0.0
 	}
-	var warrior_count = 0
 	for slot in equipment:
 		var item_id = equipment[slot]
 		if item_id == "" or not GameData.ITEMS.has(item_id):
 			continue
 		var item = GameData.ITEMS[item_id]
-		if item.get("set", "") == "warrior":
-			warrior_count += 1
 		stats.drop_bonus += float(item.get("drop_bonus", 0.0))
 		for key in item.get("stats", {}):
 			stats[key] = stats.get(key, 0) + int(item.stats[key])
@@ -125,11 +122,10 @@ func get_stats():
 				var bonus_rate = 0.10 if key == "max_hp" else 0.14
 				stats[key] = stats.get(key, 0) + max(1, int(round(float(base_value) * bonus_rate))) * upgrade_level
 
-	# The original early Warrior set was desirable mainly for item-find.
-	if warrior_count >= 2:
-		stats.drop_bonus += 0.08
-	if warrior_count >= 4:
-		stats.drop_bonus += 0.12
+	var set_bonus_stats = equipment_set_bonus_stats()
+	stats.drop_bonus += float(set_bonus_stats.get("drop_bonus", 0.0))
+	for key in ["max_hp", "attack", "defense", "speed"]:
+		stats[key] += int(set_bonus_stats.get(key, 0))
 
 	# One monster card can be active at a time, creating a readable build choice.
 	match active_card:
@@ -362,34 +358,84 @@ func equipment_item_score(item_id):
 	score += float(item.get("drop_bonus", 0.0)) * 100.0
 	return int(round(score))
 
+func equipment_set_counts(loadout = null):
+	var resolved_loadout = equipment if typeof(loadout) != TYPE_DICTIONARY else Dictionary(loadout)
+	var counts = {}
+	for set_id in GameData.EQUIPMENT_SETS:
+		counts[str(set_id)] = 0
+	for slot in resolved_loadout:
+		var item_id = str(resolved_loadout[slot])
+		if item_id == "" or not GameData.ITEMS.has(item_id):
+			continue
+		var set_id = str(GameData.ITEMS[item_id].get("set", ""))
+		if set_id != "" and GameData.EQUIPMENT_SETS.has(set_id):
+			counts[set_id] = int(counts.get(set_id, 0)) + 1
+	return counts
+
+func equipment_set_bonus_stats(loadout = null):
+	var bonus_stats = {"max_hp": 0, "attack": 0, "defense": 0, "speed": 0, "drop_bonus": 0.0}
+	var counts = equipment_set_counts(loadout)
+	for set_id in GameData.EQUIPMENT_SETS:
+		var piece_count = int(counts.get(str(set_id), 0))
+		for stage in Array(GameData.EQUIPMENT_SETS[set_id].bonuses):
+			if piece_count < int(stage.pieces):
+				continue
+			bonus_stats.drop_bonus += float(stage.get("drop_bonus", 0.0))
+			for key in Dictionary(stage.get("stats", {})):
+				bonus_stats[key] = bonus_stats.get(key, 0) + int(stage.stats[key])
+	return bonus_stats
+
+func equipment_set_progress(loadout = null):
+	var counts = equipment_set_counts(loadout)
+	var progress = []
+	for set_id in GameData.EQUIPMENT_SETS:
+		var definition = Dictionary(GameData.EQUIPMENT_SETS[set_id])
+		var stages = []
+		for stage in Array(definition.bonuses):
+			stages.append({"pieces": int(stage.pieces), "text": str(stage.text), "active": int(counts.get(str(set_id), 0)) >= int(stage.pieces)})
+		progress.append({"id": str(set_id), "name": str(definition.name), "count": int(counts.get(str(set_id), 0)), "total": int(definition.total), "stages": stages})
+	return progress
+
+func equipment_set_name(item_id):
+	if not GameData.ITEMS.has(str(item_id)):
+		return ""
+	var set_id = str(GameData.ITEMS[str(item_id)].get("set", ""))
+	return str(GameData.EQUIPMENT_SETS[set_id].name) if GameData.EQUIPMENT_SETS.has(set_id) else ""
+
+func equipment_loadout_score(loadout = null):
+	var resolved_loadout = equipment if typeof(loadout) != TYPE_DICTIONARY else Dictionary(loadout)
+	var score = 0
+	for item_id in resolved_loadout.values():
+		score += equipment_item_score(str(item_id))
+	var bonus = equipment_set_bonus_stats(resolved_loadout)
+	score += int(round(float(bonus.max_hp) * 0.35 + float(bonus.attack) * 2.2 + float(bonus.defense) * 1.8 + float(bonus.speed) * 1.2 + float(bonus.drop_bonus) * 100.0))
+	return score
+
 func equipment_score_delta(item_id):
 	if not GameData.ITEMS.has(item_id):
 		return 0
 	var slot = str(GameData.ITEMS[item_id].get("slot", ""))
-	var current_id = str(equipment.get(slot, ""))
-	return equipment_item_score(item_id) - equipment_item_score(current_id)
+	var candidate_loadout = equipment.duplicate(true)
+	candidate_loadout[slot] = str(item_id)
+	return equipment_loadout_score(candidate_loadout) - equipment_loadout_score(equipment)
 
 func equip_recommended():
-	var choices = {}
-	for slot in GameData.SLOT_NAMES:
-		var current_id = str(equipment.get(slot, ""))
-		choices[slot] = current_id
-	for item_id in inventory:
-		if int(inventory[item_id]) <= 0 or not GameData.ITEMS.has(item_id):
-			continue
-		var item = GameData.ITEMS[item_id]
-		if str(item.get("type", "")) != "equipment":
-			continue
-		var slot = str(item.get("slot", ""))
-		if equipment_item_score(item_id) > equipment_item_score(str(choices.get(slot, ""))):
-			choices[slot] = str(item_id)
 	var equipped_names = []
-	for slot in GameData.SLOT_NAMES:
-		var chosen_id = str(choices.get(slot, ""))
-		if chosen_id != "" and chosen_id != str(equipment.get(slot, "")):
-			var result = equip_item(chosen_id)
-			if bool(result.get("ok", false)):
-				equipped_names.append(str(GameData.ITEMS[chosen_id].name))
+	for pass_index in range(GameData.SLOT_NAMES.size()):
+		var best_item_id = ""
+		var best_delta = 0
+		for item_id in inventory:
+			if int(inventory[item_id]) <= 0 or not GameData.ITEMS.has(item_id) or str(GameData.ITEMS[item_id].get("type", "")) != "equipment":
+				continue
+			var delta = equipment_score_delta(str(item_id))
+			if delta > best_delta:
+				best_delta = delta
+				best_item_id = str(item_id)
+		if best_item_id == "":
+			break
+		var result = equip_item(best_item_id)
+		if bool(result.get("ok", false)):
+			equipped_names.append(str(GameData.ITEMS[best_item_id].name))
 	if equipped_names.is_empty():
 		return {"ok": false, "message": "当前已穿戴背包中战力最高的装备。", "count": 0}
 	return {"ok": true, "message": "已自动换上：%s" % "、".join(equipped_names), "count": equipped_names.size()}
@@ -953,19 +999,53 @@ func equipment_upgrade_cost(slot):
 	if item_id == "" or not GameData.ITEMS.has(item_id):
 		return 0
 	var level = equipment_upgrade_level(item_id)
-	return 55 + level * 70 + int(round(float(GameData.ITEMS[item_id].get("price", 0)) * 0.22))
+	return 55 + level * 85 + int(round(float(GameData.ITEMS[item_id].get("price", 0)) * (0.18 + float(level) * 0.025)))
+
+func equipment_upgrade_requirements(slot):
+	var item_id = str(equipment.get(str(slot), ""))
+	if item_id == "" or not GameData.ITEMS.has(item_id):
+		return {"target": 0, "silver": 0, "dragon_spring_water": 0, "forging_blueprint": 0}
+	var target = equipment_upgrade_level(item_id) + 1
+	return {
+		"target": target,
+		"silver": equipment_upgrade_cost(slot),
+		"dragon_spring_water": 0 if target <= 3 else (1 if target <= 7 else 2),
+		"forging_blueprint": 1 if target >= 8 else 0
+	}
+
+func equipment_upgrade_requirement_text(slot):
+	var requirements = equipment_upgrade_requirements(slot)
+	if int(requirements.target) <= 0:
+		return ""
+	var parts = ["%d银" % int(requirements.silver)]
+	if int(requirements.dragon_spring_water) > 0:
+		parts.append("龙泉水×%d" % int(requirements.dragon_spring_water))
+	if int(requirements.forging_blueprint) > 0:
+		parts.append("图纸×%d" % int(requirements.forging_blueprint))
+	return " + ".join(parts)
 
 func upgrade_equipped(slot):
 	var item_id = str(equipment.get(str(slot), ""))
 	if item_id == "" or not GameData.ITEMS.has(item_id):
 		return {"ok": false, "message": "该部位没有可以强化的装备。"}
 	var level = equipment_upgrade_level(item_id)
-	if level >= 3:
-		return {"ok": false, "message": "%s已经强化至当前上限+3。" % GameData.ITEMS[item_id].name}
+	if level >= 10:
+		return {"ok": false, "message": "%s已经强化至当前上限+10。" % GameData.ITEMS[item_id].name}
 	var cost = equipment_upgrade_cost(slot)
 	if int(player.silver) < cost:
 		return {"ok": false, "message": "强化需要%d银币，可以先通过港口贸易积累资金。" % cost}
+	var requirements = equipment_upgrade_requirements(slot)
+	var water_need = int(requirements.dragon_spring_water)
+	var blueprint_need = int(requirements.forging_blueprint)
+	if int(inventory.get("dragon_spring_water", 0)) < water_need:
+		return {"ok": false, "message": "强化至+%d还需要龙泉水×%d，可在贝里昂锻造铺购买。" % [level + 1, water_need]}
+	if int(inventory.get("forging_blueprint", 0)) < blueprint_need:
+		return {"ok": false, "message": "强化至+%d还需要强化图纸×%d，可在贝里昂锻造铺购买。" % [level + 1, blueprint_need]}
 	player.silver -= cost
+	if water_need > 0:
+		_remove_item("dragon_spring_water", water_need)
+	if blueprint_need > 0:
+		_remove_item("forging_blueprint", blueprint_need)
 	equipment_upgrades[item_id] = level + 1
 	player.hp = min(int(player.hp), int(get_stats().max_hp))
 	var quest_completed = _advance_quest("upgrade_equipment", str(slot))

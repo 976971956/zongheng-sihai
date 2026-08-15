@@ -57,11 +57,33 @@ func _init():
 	var power_before_recommend = gear_state.get_power()
 	var recommend_result = gear_state.equip_recommended()
 	_check(bool(recommend_result.ok) and str(gear_state.equipment.weapon) == "warrior_blade" and gear_state.get_power() > power_before_recommend, "一键推荐必须自动换上背包中更强的装备")
+	var set_state = TestState.new()
+	set_state.equipment = {"weapon": "warrior_blade", "head": "warrior_circlet", "body": "warrior_coat", "waist": "warrior_belt", "boots": "warrior_boots", "charm": ""}
+	var warrior_bonus = set_state.equipment_set_bonus_stats()
+	_check(int(set_state.equipment_set_counts().warrior) == 5 and int(warrior_bonus.attack) == 8 and int(warrior_bonus.defense) == 6 and int(warrior_bonus.speed) == 5 and is_equal_approx(float(warrior_bonus.drop_bonus), 0.20), "武士套必须按2件、4件、5件逐级叠加战斗与寻宝共鸣")
+	set_state.inventory["corsair_cutlass"] = 1
+	var preserve_set_result = set_state.equip_recommended()
+	_check(not bool(preserve_set_result.ok) and str(set_state.equipment.weapon) == "warrior_blade", "一键推荐必须计算拆套损失，不能只按单件数值破坏完整套装")
+	var forge_state = TestState.new()
+	forge_state.player.silver = 10000
+	forge_state.equipment.weapon = "warrior_blade"
+	for forge_step in range(3):
+		_check(bool(forge_state.upgrade_equipped("weapon").ok), "装备+1至+3必须只消耗银币并稳定成功")
+	_check(not bool(forge_state.upgrade_equipped("weapon").ok) and forge_state.equipment_upgrade_level("warrior_blade") == 3, "装备强化至+4必须先准备龙泉水")
+	forge_state.inventory["dragon_spring_water"] = 1
+	_check(bool(forge_state.upgrade_equipped("weapon").ok) and forge_state.equipment_upgrade_level("warrior_blade") == 4 and int(forge_state.inventory.get("dragon_spring_water", 0)) == 0, "装备强化至+4必须消耗一份龙泉水")
+	forge_state.inventory["dragon_spring_water"] = 5
+	for forge_step in range(3):
+		_check(bool(forge_state.upgrade_equipped("weapon").ok), "装备+5至+7必须消耗龙泉水并稳定成功")
+	_check(not bool(forge_state.upgrade_equipped("weapon").ok) and forge_state.equipment_upgrade_level("warrior_blade") == 7, "装备强化至+8必须同时准备强化图纸")
+	forge_state.inventory["forging_blueprint"] = 1
+	_check(bool(forge_state.upgrade_equipped("weapon").ok) and forge_state.equipment_upgrade_level("warrior_blade") == 8 and int(forge_state.inventory.get("forging_blueprint", 0)) == 0, "装备强化至+8必须消耗图纸与两份龙泉水")
 	var vendor_state = TestState.new()
 	vendor_state.player.silver = 500
 	vendor_state.player.location = "venice_market"
 	var jewelry_purchase = vendor_state.buy_vendor_item("jeweler", "coral_ring")
 	_check(bool(jewelry_purchase.ok) and int(vendor_state.inventory.get("coral_ring", 0)) == 1 and vendor_state.equip_item("coral_ring").ok, "珠宝商必须真实出售可穿戴珠宝")
+	_check(bool(vendor_state.buy_vendor_item("jeweler", "dragon_spring_water").ok), "贝里昂锻造铺必须出售高阶强化所需的龙泉水")
 	vendor_state.player.location = "venice_tavern"
 	var food_purchase = vendor_state.buy_vendor_item("tavern_keeper", "herb_fish_stew")
 	vendor_state.player.hp = max(1, int(vendor_state.get_stats().max_hp) - 70)
