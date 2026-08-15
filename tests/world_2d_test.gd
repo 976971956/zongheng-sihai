@@ -460,14 +460,20 @@ func _run():
 
 	# 九城地图、NPC位置与碰撞要逐城切换，每名人物都必须使用精灵模型。
 	scene.state.quest_index = GameData.QUESTS.size()
+	var modeled_city_art_paths = {}
 	for modeled_port_id in GameData.TRADE_PORTS:
 		scene._switch_region("city", str(modeled_port_id))
 		_check(str(scene.map_node.city_port_id) == str(modeled_port_id), "%s必须加载自己的城内地图主题" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
+		var modeled_city_art_path = str(scene.map_node.city_art_path(str(modeled_port_id)))
+		_check(modeled_city_art_path.ends_with("/%s_city_v%s.png" % [str(modeled_port_id).trim_suffix("_dock"), "2" if str(modeled_port_id) == "venice_dock" else "1"]), "%s必须加载与港口一一对应的独立手绘背景" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
+		_check(not modeled_city_art_paths.has(modeled_city_art_path), "%s不能复用其他城市的房屋与背景图" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
+		modeled_city_art_paths[modeled_city_art_path] = true
 		for modeled_npc_id in GameData.LOCATIONS[str(modeled_port_id)].npcs:
 			var expected_position = scene._world_point(Vector2(GameData.PORT_CITY_MAPS[str(modeled_port_id)].npc_positions[str(modeled_npc_id)]))
 			_check(_actor_has_art(scene, str(modeled_npc_id)), "%s的%s必须拥有可见人物精灵" % [GameData.TRADE_PORTS[str(modeled_port_id)].name, GameData.NPCS[str(modeled_npc_id)].name])
 			var position_is_reachable = true if str(modeled_port_id) == "venice_dock" else scene._is_walkable(expected_position)
 			_check(_actor_position(scene, str(modeled_npc_id)).distance_to(expected_position) < 1.0 and position_is_reachable, "%s的%s必须生成在地图配置的可行走街区" % [GameData.TRADE_PORTS[str(modeled_port_id)].name, GameData.NPCS[str(modeled_npc_id)].name])
+	_check(modeled_city_art_paths.size() == GameData.TRADE_PORTS.size(), "九座港口必须拥有九张互不复用的城内背景")
 	scene._switch_region("city", "athens_dock")
 	scene._open_world_map()
 	_check(_has_label_text(scene.overlay, "雅典 · 城内地图") and _has_label_text(scene.overlay, "海岬神殿与银帆柱廊") and _has_button_text(scene.overlay, "卡珊德拉｜货栈 · 买卖特产") and _has_button_text(scene.overlay, "艾琳娜｜旅店 · 恢复补给"), "每座城市的城内地图必须展示本地地标、人物和职能")

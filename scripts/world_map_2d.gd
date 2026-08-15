@@ -1,6 +1,16 @@
 extends Node2D
 
-const CITY_ART = preload("res://assets/art/maps/venice_city_v2.png")
+const CITY_ARTS = {
+	"venice_dock": preload("res://assets/art/maps/venice_city_v2.png"),
+	"ragusa_dock": preload("res://assets/art/maps/ragusa_city_v1.png"),
+	"alexandria_dock": preload("res://assets/art/maps/alexandria_city_v1.png"),
+	"malta_dock": preload("res://assets/art/maps/malta_city_v1.png"),
+	"cape_town_dock": preload("res://assets/art/maps/cape_town_city_v1.png"),
+	"quanzhou_dock": preload("res://assets/art/maps/quanzhou_city_v1.png"),
+	"athens_dock": preload("res://assets/art/maps/athens_city_v1.png"),
+	"yangzhou_dock": preload("res://assets/art/maps/yangzhou_city_v1.png"),
+	"amsterdam_dock": preload("res://assets/art/maps/amsterdam_city_v1.png")
+}
 const FIELD_ART = preload("res://assets/art/maps/venice_field_v2.png")
 const DUNGEON_ART = preload("res://assets/art/maps/training_dungeon_v2.png")
 const BASE_MAP_SIZE = Vector2(720, 1280)
@@ -31,18 +41,24 @@ func set_city_port(value):
 	city_port_id = str(value) if GameData.PORT_CITY_MAPS.has(str(value)) else "venice_dock"
 	queue_redraw()
 
+func city_art_path(port_id = ""):
+	var selected_port_id = city_port_id if str(port_id).is_empty() else str(port_id)
+	var texture = CITY_ARTS.get(selected_port_id, CITY_ARTS.venice_dock)
+	return str(texture.resource_path)
+
 func _process(delta):
 	wave_time += delta
 	queue_redraw()
 
 func _draw():
 	if region_mode == "city":
+		var city_texture = CITY_ARTS.get(city_port_id, CITY_ARTS.venice_dock)
+		draw_texture_rect(city_texture, Rect2(Vector2.ZERO, WORLD_SIZE), false)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * WORLD_SCALE)
-		_draw_port_city()
 		_draw_art_overlays()
 		draw_set_transform(Vector2.ZERO)
 		return
-	var texture = CITY_ART
+	var texture = FIELD_ART
 	if region_mode == "field":
 		texture = FIELD_ART
 	elif region_mode in ["dungeon", "black_sail", "white_whale", "legacy"]:

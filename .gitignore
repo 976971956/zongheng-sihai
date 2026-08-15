@@ -4,6 +4,7 @@ build/*
 !build/web/
 !build/web/**
 *.import
+!assets/art/maps/*_city_v1.png.import
 *_preview.png
 preview.png
 battle_preview.png
