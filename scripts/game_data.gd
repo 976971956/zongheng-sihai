@@ -810,6 +810,64 @@ static func trade_route(from_port, to_port):
 	ports.sort()
 	return TRADE_ROUTES.get("%s|%s" % ports, {})
 
+static func trade_route_path(from_port, to_port, allowed_ports = []):
+	var origin = str(from_port)
+	var destination = str(to_port)
+	if not TRADE_PORTS.has(origin) or not TRADE_PORTS.has(destination):
+		return []
+	if origin == destination:
+		return [origin]
+	var available = {}
+	if Array(allowed_ports).is_empty():
+		for port_id in TRADE_PORTS:
+			available[str(port_id)] = true
+	else:
+		for port_id in Array(allowed_ports):
+			if TRADE_PORTS.has(str(port_id)):
+				available[str(port_id)] = true
+	available[origin] = true
+	available[destination] = true
+	var distances = {}
+	var previous = {}
+	var unvisited = []
+	for port_id in available:
+		distances[str(port_id)] = 1000000
+		unvisited.append(str(port_id))
+	distances[origin] = 0
+	while not unvisited.is_empty():
+		var current = ""
+		var current_distance = 1000001
+		for port_id in unvisited:
+			if int(distances[str(port_id)]) < current_distance:
+				current = str(port_id)
+				current_distance = int(distances[current])
+		if current == "" or current_distance >= 1000000:
+			break
+		unvisited.erase(current)
+		if current == destination:
+			break
+		for neighbor in available:
+			var neighbor_id = str(neighbor)
+			if neighbor_id == current or not neighbor_id in unvisited:
+				continue
+			var route = trade_route(current, neighbor_id)
+			if route.is_empty():
+				continue
+			var candidate_distance = current_distance + max(1, int(route.get("days", 1)))
+			if candidate_distance < int(distances[neighbor_id]):
+				distances[neighbor_id] = candidate_distance
+				previous[neighbor_id] = current
+	if not previous.has(destination):
+		return []
+	var path = [destination]
+	var cursor = destination
+	while cursor != origin:
+		cursor = str(previous.get(cursor, ""))
+		if cursor == "":
+			return []
+		path.push_front(cursor)
+	return path
+
 static func port_stock(port_id):
 	if not TRADE_PORTS.has(str(port_id)):
 		return []

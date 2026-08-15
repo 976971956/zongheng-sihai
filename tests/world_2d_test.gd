@@ -340,10 +340,27 @@ func _run():
 	scene.state.quest_index = 22
 	scene.state.quest_progress = 0
 	scene.state.completed_trade_orders.erase("alexandria_lighthouse_glass")
+	scene.state.cargo.erase("venetian_glass")
+	scene.state.cargo_costs.erase("venetian_glass")
+	var procurement_target = scene._quest_navigation_target()
+	_check(str(procurement_target.location) == "venice_dock" and str(procurement_target.actor_id) == "venice_quartermaster" and "采购威尼斯玻璃" in str(procurement_target.name), "商会订单缺货时任务导航必须先指向货物原产港与当地商人")
+	scene._navigate_to_quest()
+	_check(is_instance_valid(scene.sailing_map) and str(scene.sailing_destination) == "venice_dock", "缺少订单货物且身处外港时，任务导航必须打开返回原产港的航线")
+	scene._close_overlay()
+	await process_frame
+	scene._switch_region("city", "venice_dock")
+	scene.player_actor.position = scene._spawn_for_location("venice_dock")
+	scene._navigate_to_quest()
+	_check(scene.task_navigation_active and not is_instance_valid(scene.overlay), "抵达采购港后任务导航必须让角色走向当地商人，不能原地弹出市场")
+	await _walk_task_navigation(scene)
+	await process_frame
+	await process_frame
+	_check(_has_label_text(scene.overlay, "威尼斯港口市场") and _has_label_text(scene.overlay, "本港特产｜威尼斯玻璃"), "走到原产港商人后必须自动打开正确的本地货栈")
+	scene._close_overlay()
+	await process_frame
 	scene.state.cargo["venetian_glass"] = 3
 	scene.state.cargo_costs["venetian_glass"] = 72
-	scene.state.player.location = "alexandria_dock"
-	scene._spawn_world_actors()
+	scene._switch_region("city", "alexandria_dock")
 	scene.player_actor.position = scene._spawn_for_location("alexandria_dock")
 	var guild_target = scene._quest_navigation_target()
 	_check(str(guild_target.actor_id) == "alex_lighthouse_keeper" and _has_actor(scene, "alex_lighthouse_keeper"), "灯塔修缮任务必须指向地图上的亚历山大商会执事")
@@ -355,6 +372,38 @@ func _run():
 	_check(_has_label_text(scene.overlay, "亚历山大商会订单") and _has_button_text(scene.overlay, "向亚历山大商会交付"), "抵达商会执事后必须打开可完成灯塔订单的明确交付界面")
 	scene._close_overlay()
 	await process_frame
+
+	# 无直达航线的采购任务必须给出可执行的下一段中转，而不是只说“需要中转”。
+	scene.state.quest_index = _quest_index_by_id("earth_order")
+	scene.state.quest_progress = 0
+	scene.state.cargo.erase("olive_oil")
+	scene.state.cargo_costs.erase("olive_oil")
+	scene._switch_region("city", "athens_dock")
+	var multi_hop_target = scene._quest_navigation_target()
+	_check(str(multi_hop_target.location) == "ragusa_dock" and str(multi_hop_target.actor_id) == "ragusa_broker", "王陵灯油缺货时必须导航到唯一产地拉古萨")
+	scene._refresh_waypoint()
+	_check("航线导航" in scene.navigation_button.text and "采购亚得里亚橄榄油" in scene.navigation_button.text, "跨港采购时导航按钮必须明确显示航线与采购目标")
+	scene._navigate_to_quest()
+	_check(is_instance_valid(scene.sailing_map) and str(scene.sailing_destination) == "venice_dock" and "先到威尼斯中转" in scene.sailing_route_label.text and "最终前往拉古萨" in scene.sailing_route_label.text, "雅典至拉古萨无直达航线时必须自动规划雅典→威尼斯→拉古萨的下一段")
+	scene._close_overlay()
+	await process_frame
+
+	# 多产地烹饪任务应按缺口逐项导航，货齐后才指向厨房。
+	scene.state.quest_index = _quest_index_by_id("island_feast")
+	scene.state.cargo.erase("olive_oil")
+	scene.state.cargo.erase("spices")
+	scene.state.cargo.erase("citrus")
+	var recipe_target = scene._quest_navigation_target()
+	_check(str(recipe_target.location) == "ragusa_dock" and "采购亚得里亚橄榄油" in str(recipe_target.name), "海风炖汤任务必须先导航到拉古萨采购缺少的橄榄油")
+	scene.state.cargo["olive_oil"] = 1
+	recipe_target = scene._quest_navigation_target()
+	_check(str(recipe_target.location) == "alexandria_dock" and "采购亚历山大香料" in str(recipe_target.name), "橄榄油备齐后必须继续导航到亚历山大采购香料")
+	scene.state.cargo["spices"] = 1
+	recipe_target = scene._quest_navigation_target()
+	_check(str(recipe_target.location) == "malta_dock" and "采购金岛柑橘" in str(recipe_target.name), "外来配料备齐后必须导航到马耳他采购本地柑橘")
+	scene.state.cargo["citrus"] = 2
+	recipe_target = scene._quest_navigation_target()
+	_check(str(recipe_target.location) == "malta_dock" and str(recipe_target.actor_id) == "malta_cook" and "厨房" in str(recipe_target.name), "全部配料备齐后导航必须切换到马耳他厨师")
 
 	# 九港每名可见NPC都必须使用精灵模型，不能回退成同一套通用线框小人。
 	scene.state.quest_index = GameData.QUESTS.size()
@@ -487,3 +536,9 @@ func _actor_position(scene, actor_id):
 		if str(entry.id) == str(actor_id):
 			return entry.node.position
 	return Vector2.ZERO
+
+func _quest_index_by_id(quest_id):
+	for index in range(GameData.QUESTS.size()):
+		if str(GameData.QUESTS[index].id) == str(quest_id):
+			return index
+	return -1

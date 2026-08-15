@@ -34,6 +34,8 @@ func _init():
 		if port_id != "venice_dock":
 			_check(GameData.LOCATIONS[port_id].npcs.size() >= 3, "%s至少需要剧情、贸易和港口服务三名可互动人物" % GameData.TRADE_PORTS[port_id].name)
 	_check(specialty_goods.size() == GameData.TRADE_PORTS.size(), "九座城市必须各有不同的特色商品，不能重复套用同一批特产")
+	var athens_to_ragusa = GameData.trade_route_path("athens_dock", "ragusa_dock", GameData.TRADE_PORTS.keys())
+	_check(athens_to_ragusa == ["athens_dock", "venice_dock", "ragusa_dock"], "没有直达航线时必须按最短航期规划可执行的港口中转路径")
 	for good_id in GameData.TRADE_GOODS:
 		_check(GameData.TRADE_GOODS[good_id].prices.size() == GameData.TRADE_PORTS.size(), "%s必须在九港都有独立收购价" % GameData.TRADE_GOODS[good_id].name)
 		var selling_ports = []

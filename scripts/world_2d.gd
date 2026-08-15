@@ -1421,7 +1421,8 @@ func _update_battle_result(result):
 		elif fled:
 			battle_action_button.text = "返回地图"
 		else:
-			battle_action_button.text = "返回威尼斯酒馆"
+			var return_port = str(result.get("return_port", ""))
+			battle_action_button.text = "返回%s" % GameData.TRADE_PORTS[return_port].name if bool(result.get("lost_at_sea", false)) and GameData.TRADE_PORTS.has(return_port) else "返回威尼斯酒馆"
 		battle_action_button.disabled = false
 		if is_instance_valid(battle_auto_button):
 			battle_auto_button.text = "战斗结束"
@@ -1506,7 +1507,7 @@ func _return_to_tavern_after_defeat(enemy_name, result = {}):
 		var return_port = str(result.get("return_port", "venice_dock"))
 		_leave_sea_to_port(return_port)
 		var port_name = str(GameData.TRADE_PORTS.get(return_port, GameData.TRADE_PORTS.venice_dock).name)
-		_show_message("海战失败 · 已被送回港口", "你被%s击败。护航船把海燕号拖回%s，装备、银币和货物没有额外损失。\n\n当前体力：%d / %d，可以在当地旅店休息，或付费传送返回威尼斯。" % [enemy_name, port_name, int(state.player.hp), int(state.get_stats().max_hp)])
+		_show_message("海战失败 · 已被送回港口", "你被%s击败。护航船把海燕号拖回%s，装备、银币和货物没有额外损失。\n\n当前体力：%d / %d，可以先整理装备和补给，或付费传送返回威尼斯休整。" % [enemy_name, port_name, int(state.player.hp), int(state.get_stats().max_hp)])
 		return
 	_switch_region("city", "venice_tavern")
 	var stats = state.get_stats()
@@ -1755,6 +1756,7 @@ func _quest_navigation_target():
 	var objective = quest.objective
 	var target_location = ""
 	var target_actor_id = ""
+	var target_name_override = ""
 	if objective.type == "visit":
 		target_location = str(objective.target)
 	elif objective.type == "talk":
@@ -1769,12 +1771,39 @@ func _quest_navigation_target():
 				break
 	elif objective.type == "trade_order":
 		var order = GameData.TRADE_ORDERS.get(str(objective.target), {})
-		target_location = str(order.get("port", "venice_dock"))
-		target_actor_id = str(GameData.TRADE_PORTS.get(target_location, {}).get("order_npc", ""))
+		var good_id = str(order.get("good", ""))
+		var needed = int(order.get("amount", 1))
+		var held = int(state.cargo.get(good_id, 0))
+		if GameData.TRADE_GOODS.has(good_id) and held < needed:
+			target_location = str(GameData.TRADE_GOODS[good_id].origin)
+			target_actor_id = str(GameData.TRADE_PORTS.get(target_location, {}).get("merchant_npc", ""))
+			target_name_override = "采购%s %d/%d" % [GameData.TRADE_GOODS[good_id].name, held, needed]
+		else:
+			target_location = str(order.get("port", "venice_dock"))
+			target_actor_id = str(GameData.TRADE_PORTS.get(target_location, {}).get("order_npc", ""))
 	elif objective.type == "cook":
-		target_location = str(GameData.RECIPES.get(str(objective.target), {"port": "malta_dock"}).port)
-	elif objective.type in ["trade_buy", "trade_sell", "trade_reputation", "prepare_voyage", "upgrade_ship"]:
+		var recipe = GameData.RECIPES.get(str(objective.target), {"port": "malta_dock", "cargo": {}})
+		for good_id in recipe.cargo:
+			var needed = int(recipe.cargo[good_id])
+			var held = int(state.cargo.get(str(good_id), 0))
+			if held < needed:
+				target_location = str(GameData.TRADE_GOODS[str(good_id)].origin)
+				target_actor_id = str(GameData.TRADE_PORTS.get(target_location, {}).get("merchant_npc", ""))
+				target_name_override = "采购%s %d/%d" % [GameData.TRADE_GOODS[str(good_id)].name, held, needed]
+				break
+		if target_location == "":
+			target_location = str(recipe.port)
+			target_actor_id = _port_service_npc(target_location, "cook")
+			target_name_override = "%s厨房" % GameData.TRADE_PORTS[target_location].name
+	elif objective.type == "trade_buy":
+		target_location = str(GameData.TRADE_GOODS.get(str(objective.target), {"origin": "venice_dock"}).origin)
+		target_actor_id = str(GameData.TRADE_PORTS.get(target_location, {}).get("merchant_npc", ""))
+	elif objective.type in ["trade_sell", "trade_reputation", "prepare_voyage"]:
 		target_location = str(state.player.location) if str(state.player.location) in GameData.TRADE_PORTS else "venice_dock"
+		target_actor_id = str(GameData.TRADE_PORTS.get(target_location, {}).get("merchant_npc", ""))
+	elif objective.type == "upgrade_ship":
+		target_location = str(state.player.location) if str(state.player.location) in GameData.TRADE_PORTS else "venice_dock"
+		target_actor_id = _port_service_npc(target_location, "shipyard")
 	elif objective.type == "upgrade_equipment":
 		target_location = str(state.player.location)
 	if target_location == "training_dungeon_4":
@@ -1787,14 +1816,23 @@ func _quest_navigation_target():
 	if target_location == "":
 		target_location = "venice_square"
 	var actor_id = target_actor_id if target_actor_id != "" else ("" if objective.type in ["visit", "trade_order", "trade_reputation", "prepare_voyage", "trade_buy", "trade_sell", "upgrade_ship", "cook"] else str(objective.target))
-	var target_name = GameData.objective_name(objective)
-	if objective.type == "trade_order" and target_location in GameData.TRADE_PORTS:
+	var target_name = target_name_override if target_name_override != "" else GameData.objective_name(objective)
+	if target_name_override == "" and objective.type == "trade_order" and target_location in GameData.TRADE_PORTS:
 		target_name = "%s商会" % GameData.TRADE_PORTS[target_location].name
 	return {
 		"region": str(region_by_location.get(target_location, "city")),
 		"location": target_location, "actor_id": actor_id,
 		"name": target_name
 	}
+
+func _port_service_npc(port_id, service_id):
+	var resolved_port = str(port_id)
+	if not GameData.LOCATIONS.has(resolved_port):
+		return ""
+	for npc_id in GameData.LOCATIONS[resolved_port].npcs:
+		if str(GameData.NPCS.get(str(npc_id), {}).get("service", "")) == str(service_id):
+			return str(npc_id)
+	return str(GameData.TRADE_PORTS.get(resolved_port, {}).get("merchant_npc", ""))
 
 func _refresh_waypoint():
 	if not is_instance_valid(waypoint_label) or not is_instance_valid(navigation_button):
@@ -1808,7 +1846,8 @@ func _refresh_waypoint():
 		_update_waypoint_screen_position()
 		return
 	var target = _quest_navigation_target()
-	navigation_button.text = "◆ 步行导航 · %s" % target.name
+	var crosses_ports = str(target.location) in GameData.TRADE_PORTS and str(state.player.location) in GameData.TRADE_PORTS and str(target.location) != str(state.player.location)
+	navigation_button.text = ("◆ 航线导航 · %s" if crosses_ports else "◆ 步行导航 · %s") % target.name
 	if str(target.region) != current_region:
 		waypoint_world_target = Vector2.ZERO
 		waypoint_label.visible = false
@@ -1856,12 +1895,9 @@ func _navigate_to_quest():
 	if needs_harbor:
 		var target_port = str(navigation_target.get("location", ""))
 		if target_port in GameData.TRADE_PORTS and str(state.player.location) in GameData.TRADE_PORTS and str(state.player.location) != target_port:
-			_open_sailing_map(target_port)
+			_open_task_sailing_route(target_port)
 			return
-		if str(state.player.location) in GameData.TRADE_PORTS and objective_type != "trade_order":
-			_open_trade_2d()
-			return
-		if objective_type == "trade_order" and str(state.player.location) == target_port:
+		if str(state.player.location) == target_port:
 			task_navigation_open_service = "trade"
 		elif target_port in GameData.TRADE_PORTS:
 			task_navigation_open_service = "sail:%s" % target_port
@@ -1874,6 +1910,24 @@ func _navigate_to_quest():
 	task_navigation_target = navigation_target
 	task_navigation_active = true
 	_continue_task_navigation()
+
+func _open_task_sailing_route(target_port):
+	var destination = str(target_port)
+	if not state.is_port_unlocked(destination):
+		_show_message("航线尚未发现", "继续推进主线，取得前往%s的海图后再来。" % GameData.TRADE_PORTS[destination].name)
+		return
+	var unlocked_ports = []
+	for port_id in GameData.TRADE_PORTS:
+		if state.is_port_unlocked(str(port_id)):
+			unlocked_ports.append(str(port_id))
+	var path = GameData.trade_route_path(str(state.player.location), destination, unlocked_ports)
+	if path.size() < 2:
+		_show_message("暂时无法规划航线", "当前已发现的港口无法连接到%s。" % GameData.TRADE_PORTS[destination].name)
+		return
+	var next_port = str(path[1])
+	_open_sailing_map(next_port)
+	if next_port != destination and is_instance_valid(sailing_route_label):
+		sailing_route_label.text += "\n任务航线：本段先到%s中转，最终前往%s；抵港后再次点击任务导航。" % [GameData.TRADE_PORTS[next_port].name, GameData.TRADE_PORTS[destination].name]
 
 func _continue_task_navigation():
 	if not task_navigation_active or task_navigation_target.is_empty():
