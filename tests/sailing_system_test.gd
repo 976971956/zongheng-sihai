@@ -1,5 +1,7 @@
 extends SceneTree
 
+const SeaWorldMapScript = preload("res://scripts/sea_world_2d.gd")
+
 class TestState extends GameState:
 	func has_save():
 		return false
@@ -39,6 +41,15 @@ func _run():
 	_check(str(oceanic_plan.tier) == "oceanic" and int(oceanic_plan.threat_count) == 6 and not ("black_flag_privateer" in oceanic_plan.enemy_ids), "中低等级玩家的长途远洋航线必须有六处威胁且不能过早出现Lv.52私掠舰")
 	_check(int(coastal_plan.distance_nm) < int(regional_plan.distance_nm) and int(regional_plan.distance_nm) < int(oceanic_plan.distance_nm), "近海、跨海与远洋距离必须按真实港口跨度递增")
 	_check(GameData.sea_port_position("venice_dock").distance_to(GameData.sea_port_position("ragusa_dock")) < GameData.sea_port_position("venice_dock").distance_to(GameData.sea_port_position("alexandria_dock")) and GameData.SEA_GLOBAL_WORLD_SIZE == Vector2(3200, 2900), "九港必须投影在同一张大地图中，近港的物理距离应更短")
+	var navigation_map = SeaWorldMapScript.new()
+	root.add_child(navigation_map)
+	navigation_map.configure({"origin": "venice_dock", "destination": "ragusa_dock", "unlocked_ports": port_ids, "world_width": 3200.0, "world_height": 2900.0})
+	for departure_port_id in port_ids:
+		var harbor_position = GameData.sea_port_position(str(departure_port_id))
+		_check(navigation_map.is_navigable(harbor_position), "%s的海上出生点必须可航行" % GameData.TRADE_PORTS[str(departure_port_id)].name)
+		for departure_direction in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
+			_check(navigation_map.is_navigable(harbor_position + departure_direction * 24.0), "%s出港后必须能立即向任意方向驾驶，不能被礁区锁在出生点" % GameData.TRADE_PORTS[str(departure_port_id)].name)
+	navigation_map.queue_free()
 	var level_one_days = int(oceanic_plan.days)
 	state.ship.speed = 4
 	var fast_oceanic_plan = state.voyage_plan("cape_town_dock")

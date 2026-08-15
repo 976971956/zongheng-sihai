@@ -448,6 +448,11 @@ func _run():
 	scene._start_sailing_voyage()
 	_check(scene.current_region == "sea" and not scene.state.active_voyage.is_empty(), "确认正常出航后必须进入可驾驶2D海域")
 	_check(scene._active_world_size() == GameData.SEA_GLOBAL_WORLD_SIZE and Vector2(float(scene.state.active_voyage.world_width), float(scene.state.active_voyage.world_height)) == GameData.SEA_GLOBAL_WORLD_SIZE, "跨海航行必须加载同一张固定比例的九港大地图（地图%s / 状态%s / 距离%d）" % [scene._active_world_size(), Vector2(float(scene.state.active_voyage.world_width), float(scene.state.active_voyage.world_height)), selected_voyage_distance])
+	var alexandria_departure_position = scene.player_actor.position
+	scene.joystick_direction = Vector2.RIGHT
+	scene._process(0.25)
+	scene.joystick_direction = Vector2.ZERO
+	_check(scene.player_actor.position.distance_to(alexandria_departure_position) > 1.0, "亚历山大等港口出航后必须能立即驾船移动，不能被港内礁区卡住")
 	_check(str(scene.state.player.location) == origin_before_departure and int(scene.state.player.silver) == silver_before_departure, "海上航行未靠港前不能提前改写位置或扣传送费")
 	_check(scene.player_actor.display_id == "player_ship" and _has_actor(scene, scene.state.sea_enemy_id()) and _has_actor(scene, "drifting_cargo"), "海域必须生成可驾驶船只、航路海盗和漂流货箱")
 	var visible_sea_ports = 0

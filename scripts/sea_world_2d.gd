@@ -68,6 +68,10 @@ func is_navigable(point):
 	var p = Vector2(point)
 	if p.x < 65.0 or p.x > world_size.x - 65.0 or p.y < 65.0 or p.y > world_size.y - 65.0:
 		return false
+	# 港口内湾必须始终保留离港水道，避免地图调整后出生点落入礁区。
+	for port_id in unlocked_ports:
+		if p.distance_to(GameData.sea_port_position(str(port_id))) <= 105.0:
+			return true
 	for reef in _reef_circles():
 		if p.distance_to(Vector2(reef.position)) < float(reef.radius) + 38.0:
 			return false
@@ -76,12 +80,12 @@ func is_navigable(point):
 func _reef_circles():
 	return [
 		{"position": Vector2(740, 720), "radius": 88.0},
-		{"position": Vector2(1260, 1040), "radius": 106.0},
+		{"position": Vector2(1450, 1160), "radius": 106.0},
 		{"position": Vector2(780, 1440), "radius": 112.0},
 		{"position": Vector2(1430, 2180), "radius": 104.0},
 		{"position": Vector2(2260, 2020), "radius": 118.0},
 		{"position": Vector2(2700, 1360), "radius": 96.0},
-		{"position": Vector2(2940, 920), "radius": 82.0}
+		{"position": Vector2(2760, 1120), "radius": 82.0}
 	]
 
 func _rebuild_map_labels():
