@@ -48,6 +48,7 @@ func _run():
 		enemy_art_signatures[signature] = enemy_id
 		enemy_model.free()
 	_check(scene.player_actor.position.x > 0 and scene.player_actor.position.y > 0, "玩家必须出生在可行走地图内")
+	_check(_has_button_text(scene, "角色") and _has_button_text(scene, "背包") and _has_button_text(scene, "任务") and _has_button_text(scene, "地图") and _has_button_text(scene, "日志"), "手机底栏必须把角色与背包拆成独立入口")
 	var saved_respawn_key = scene._enemy_spawn_key("drunk_sailor")
 	scene.state.enemy_respawns[saved_respawn_key] = scene._world_time_seconds() + 60.0
 	scene._spawn_world_actors()
@@ -98,7 +99,10 @@ func _run():
 	scene.state.inventory["warrior_blade"] = 1
 	scene._open_inventory()
 	_check(_has_button_text(scene.overlay, "装备") and _has_button_text(scene.overlay, "使用"), "2D背包必须显示装备与使用按钮")
-	_check(_has_label_text(scene.overlay, "角色装备槽") and _has_label_text(scene.overlay, "背包物品") and _count_visuals(scene.overlay, "equipment") >= 7, "背包必须以六格装备面板和物品图标呈现，不能退回纯文字清单")
+	_check(_has_label_text(scene.overlay, "物品背包") and _has_label_text(scene.overlay, "背包物品") and not _has_label_text(scene.overlay, "当前已装备") and _count_visuals(scene.overlay, "equipment") >= 1 and _count_visuals(scene.overlay, "consumable") >= 1, "物品背包必须只展示带模型的未装备物品，不能继续混入角色装备槽")
+	scene._open_character()
+	_check(_has_label_text(scene.overlay, "角色信息 · 已装备") and _has_label_text(scene.overlay, "当前已装备") and _has_named_node(scene.overlay, "CharacterPortrait") and _count_visuals(scene.overlay, "equipment") == 6 and not _has_label_text(scene.overlay, "背包物品"), "角色页必须独立展示人物立绘、属性和六个已装备槽，不能与背包混成同一列表")
+	scene._open_inventory()
 	scene._equip_item_2d("warrior_blade")
 	await process_frame
 	_check(str(scene.state.equipment.weapon) == "warrior_blade", "点击装备必须更新角色装备槽")

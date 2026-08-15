@@ -18,6 +18,7 @@ const ActorScript = preload("res://scripts/actor_2d.gd")
 const BattleStageScript = preload("res://scripts/battle_stage_2d.gd")
 const JoystickScript = preload("res://scripts/virtual_joystick.gd")
 const ItemIconScript = preload("res://scripts/item_icon_2d.gd")
+const PlayerPortraitTexture = preload("res://assets/art/characters/player_walk_v1.png")
 const MONSTER_RESPAWN_SECONDS = GameState.ENEMY_RESPAWN_SECONDS
 const MONSTER_RESPAWN_RETRY_SECONDS = 1.5
 const MONSTER_RESPAWN_SAFE_DISTANCE = 170.0
@@ -614,10 +615,11 @@ func _build_hud():
 	menu.add_theme_constant_override("separation", 7)
 	add_child(menu)
 	for entry in [
+		{"text": "角色", "call": _open_character},
 		{"text": "背包", "call": _open_inventory},
 		{"text": "任务", "call": _open_quest},
 		{"text": "地图", "call": _open_world_map},
-		{"text": "航海日志", "call": _open_full_journal}
+		{"text": "日志", "call": _open_full_journal}
 	]:
 		var button = _button(entry.text, "ghost")
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1514,28 +1516,129 @@ func _return_to_tavern_after_defeat(enemy_name, result = {}):
 	var stats = state.get_stats()
 	_show_message("战斗失败 · 已返回酒馆", "你被%s击倒。威尼斯巡逻队将你送回老海鸥酒馆，装备和银币没有损失。\n\n当前体力：%d / %d，可以与酒馆老板交谈并休息至完全恢复。" % [enemy_name, int(state.player.hp), int(stats.max_hp)])
 
+func _open_character():
+	var content = VBoxContainer.new()
+	content.add_theme_constant_override("separation", 10)
+	content.add_child(_label("角色信息 · 已装备", 26, GOLD))
+	var stats = state.get_stats()
+	var identity_panel = PanelContainer.new()
+	identity_panel.add_theme_stylebox_override("panel", _style(Color(0.03, 0.13, 0.16, 0.96), 14, Color(GOLD, 0.55), 2, 12))
+	var identity_row = HBoxContainer.new()
+	identity_row.add_theme_constant_override("separation", 14)
+	identity_panel.add_child(identity_row)
+	var portrait_frame = PanelContainer.new()
+	portrait_frame.custom_minimum_size = Vector2(170, 205)
+	portrait_frame.add_theme_stylebox_override("panel", _style(Color(0.07, 0.18, 0.19, 0.96), 16, Color(TEAL, 0.62), 2, 5))
+	var portrait = TextureRect.new()
+	portrait.name = "CharacterPortrait"
+	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	var portrait_atlas = AtlasTexture.new()
+	portrait_atlas.atlas = PlayerPortraitTexture
+	portrait_atlas.region = Rect2(0, 0, PlayerPortraitTexture.get_width() / 4.0, PlayerPortraitTexture.get_height() / 2.0)
+	portrait.texture = portrait_atlas
+	portrait_frame.add_child(portrait)
+	identity_row.add_child(portrait_frame)
+	var identity = VBoxContainer.new()
+	identity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	identity.add_theme_constant_override("separation", 7)
+	identity_row.add_child(identity)
+	identity.add_child(_label(str(state.player.name), 22, INK))
+	identity.add_child(_label("称号｜%s" % str(state.player.title), 14, GOLD))
+	identity.add_child(_label("等级 Lv.%d / %d" % [int(state.player.level), GameData.MAX_LEVEL], 15, TEAL))
+	identity.add_child(_character_progress_2d("体力 %d / %d" % [int(state.player.hp), int(stats.max_hp)], int(state.player.hp), int(stats.max_hp), TEAL))
+	var xp_needed = GameData.xp_needed(int(state.player.level)) if int(state.player.level) < GameData.MAX_LEVEL else 1
+	var xp_value = int(state.player.xp) if int(state.player.level) < GameData.MAX_LEVEL else 1
+	var xp_copy = "经验 已满级" if int(state.player.level) >= GameData.MAX_LEVEL else "经验 %d / %d" % [xp_value, xp_needed]
+	identity.add_child(_character_progress_2d(xp_copy, xp_value, xp_needed, GOLD))
+	identity.add_child(_label("战斗%d场 · 胜利%d场\n银币 %d" % [int(state.player.battles), int(state.player.victories), int(state.player.silver)], 13, MUTED))
+	content.add_child(identity_panel)
+	var stat_grid = GridContainer.new()
+	stat_grid.columns = 4
+	stat_grid.add_theme_constant_override("h_separation", 7)
+	stat_grid.add_theme_constant_override("v_separation", 7)
+	for stat_entry in [
+		{"icon": "⚔", "name": "攻击", "value": int(stats.attack), "color": RED},
+		{"icon": "◆", "name": "防御", "value": int(stats.defense), "color": TEAL},
+		{"icon": "➤", "name": "速度", "value": int(stats.speed), "color": Color("65aee8")},
+		{"icon": "✦", "name": "寻宝", "value": "%d%%" % int(round(float(stats.drop_bonus) * 100.0)), "color": GOLD}
+	]:
+		var stat_card = Label.new()
+		stat_card.text = "%s %s\n%s" % [stat_entry.icon, stat_entry.name, str(stat_entry.value)]
+		stat_card.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		stat_card.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		stat_card.custom_minimum_size = Vector2(140, 68)
+		stat_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		stat_card.add_theme_font_size_override("font_size", 14)
+		stat_card.add_theme_color_override("font_color", Color(stat_entry.color))
+		stat_card.add_theme_stylebox_override("normal", _style(Color(0.025, 0.095, 0.115, 0.96), 11, Color(stat_entry.color, 0.48), 1, 7))
+		stat_grid.add_child(stat_card)
+	content.add_child(stat_grid)
+	var recommend = _button("一键换上背包中的推荐装备", "gold")
+	recommend.pressed.connect(_equip_recommended_2d)
+	content.add_child(recommend)
+	if inventory_notice != "":
+		var notice = _label(inventory_notice, 14, GOLD)
+		notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		notice.add_theme_stylebox_override("normal", _style(Color(0.20, 0.14, 0.04, 0.9), 10, Color(GOLD, 0.6), 1, 9))
+		content.add_child(notice)
+		inventory_notice = ""
+	var scroll = ScrollContainer.new()
+	scroll.custom_minimum_size.y = 365
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	content.add_child(scroll)
+	var equipment_stack = VBoxContainer.new()
+	equipment_stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	equipment_stack.add_theme_constant_override("separation", 8)
+	scroll.add_child(equipment_stack)
+	equipment_stack.add_child(_label("当前已装备｜可使用银币强化至 +3", 16, GOLD))
+	var equipment_grid = GridContainer.new()
+	equipment_grid.columns = 2
+	equipment_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	equipment_grid.add_theme_constant_override("h_separation", 8)
+	equipment_grid.add_theme_constant_override("v_separation", 8)
+	for slot in ["weapon", "head", "body", "waist", "boots", "charm"]:
+		equipment_grid.add_child(_equipped_upgrade_card_2d(slot))
+	equipment_stack.add_child(equipment_grid)
+	var bag = _button("打开物品背包", "primary")
+	bag.pressed.connect(_switch_overlay_to_inventory)
+	content.add_child(bag)
+	var close = _button("返回地图", "ghost")
+	close.pressed.connect(_close_overlay)
+	content.add_child(close)
+	_open_overlay(content, true, Vector2(666, 1020))
+
+func _character_progress_2d(copy, value, maximum, color):
+	var stack = VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 2)
+	stack.add_child(_label(str(copy), 12, Color(color)))
+	var bar = ProgressBar.new()
+	bar.max_value = max(1, int(maximum))
+	bar.value = clamp(int(value), 0, int(maximum))
+	bar.show_percentage = false
+	bar.custom_minimum_size.y = 12
+	bar.add_theme_stylebox_override("background", _style(Color(0.015, 0.055, 0.07, 0.95), 6))
+	bar.add_theme_stylebox_override("fill", _style(Color(color, 0.82), 6))
+	stack.add_child(bar)
+	return stack
+
+func _switch_overlay_to_inventory():
+	_close_overlay()
+	call_deferred("_open_inventory")
+
+func _switch_overlay_to_character():
+	_close_overlay()
+	call_deferred("_open_character")
+
 func _open_inventory():
 	var content = VBoxContainer.new()
 	content.add_theme_constant_override("separation", 10)
-	content.add_child(_label("冒险背包 · 装备舱", 26, GOLD))
-	var stats = state.get_stats()
-	var summary = HBoxContainer.new()
-	summary.add_theme_constant_override("separation", 8)
-	var power_panel = PanelContainer.new()
-	power_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	power_panel.add_theme_stylebox_override("panel", _style(Color(0.16, 0.11, 0.03, 0.94), 12, Color(GOLD, 0.55), 1, 10))
-	power_panel.add_child(_label("⚔ 战力 %d\n攻%d  防%d  速%d" % [state.get_power(), int(stats.attack), int(stats.defense), int(stats.speed)], 15, GOLD))
-	summary.add_child(power_panel)
+	content.add_child(_label("物品背包", 26, GOLD))
 	var inventory_counts = _inventory_counts_2d()
 	var bag_panel = PanelContainer.new()
-	bag_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bag_panel.add_theme_stylebox_override("panel", _style(Color(0.03, 0.15, 0.17, 0.94), 12, Color(TEAL, 0.48), 1, 10))
-	bag_panel.add_child(_label("◈ 银币 %d\n装备%d  补给%d  卡片%d" % [int(state.player.silver), int(inventory_counts.equipment), int(inventory_counts.consumable), int(inventory_counts.card)], 14, TEAL))
-	summary.add_child(bag_panel)
-	content.add_child(summary)
-	var recommend = _button("一键穿戴推荐装备", "gold")
-	recommend.pressed.connect(_equip_recommended_2d)
-	content.add_child(recommend)
+	bag_panel.add_child(_label("◈ 银币 %d｜装备%d · 补给%d · 卡片%d\n装备后物品会移入独立的角色装备页" % [int(state.player.silver), int(inventory_counts.equipment), int(inventory_counts.consumable), int(inventory_counts.card)], 14, TEAL))
+	content.add_child(bag_panel)
 	var card_name = "未启用"
 	if state.active_card != "" and GameData.ITEMS.has(state.active_card):
 		card_name = str(GameData.ITEMS[state.active_card].name)
@@ -1554,15 +1657,6 @@ func _open_inventory():
 	items.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	items.add_theme_constant_override("separation", 8)
 	scroll.add_child(items)
-	items.add_child(_label("角色装备槽｜边框颜色代表品质", 16, GOLD))
-	var equipment_grid = GridContainer.new()
-	equipment_grid.columns = 2
-	equipment_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	equipment_grid.add_theme_constant_override("h_separation", 8)
-	equipment_grid.add_theme_constant_override("v_separation", 8)
-	for slot in ["weapon", "head", "body", "waist", "boots", "charm"]:
-		equipment_grid.add_child(_equipped_upgrade_card_2d(slot))
-	items.add_child(equipment_grid)
 	items.add_child(_label("背包物品｜按装备、补给、卡片分类排列", 16, GOLD))
 	if state.inventory.is_empty():
 		items.add_child(_label("背包是空的。", 16, MUTED))
@@ -1573,6 +1667,9 @@ func _open_inventory():
 			continue
 		var item = GameData.ITEMS[item_id]
 		items.add_child(_inventory_item_card_2d(item_id, item, int(state.inventory[item_id])))
+	var character = _button("查看角色与已装备", "gold")
+	character.pressed.connect(_switch_overlay_to_character)
+	content.add_child(character)
 	var close = _button("返回地图", "primary")
 	close.pressed.connect(_close_overlay)
 	content.add_child(close)
@@ -1617,7 +1714,7 @@ func _upgrade_equipped_2d(slot):
 	if bool(result.get("quest_completed", false)):
 		call_deferred("_show_quest_claim")
 	else:
-		call_deferred("_open_inventory")
+		call_deferred("_open_character")
 
 func _inventory_item_card_2d(item_id, item, count):
 	var card = PanelContainer.new()
@@ -1714,7 +1811,7 @@ func _equip_recommended_2d():
 	inventory_notice = ("✓ " if bool(result.get("ok", false)) else "· ") + str(result.get("message", ""))
 	_refresh_hud()
 	_close_overlay()
-	call_deferred("_open_inventory")
+	call_deferred("_open_character")
 
 func _use_item_2d(item_id):
 	var result = state.use_item(item_id)
@@ -1943,7 +2040,7 @@ func _navigate_to_quest():
 		return
 	var quest = state.get_current_quest()
 	if not quest.is_empty() and str(quest.objective.type) == "upgrade_equipment":
-		_open_inventory()
+		_open_character()
 		return
 	var navigation_target = _quest_navigation_target()
 	var objective_type = str(quest.objective.type) if not quest.is_empty() else ""
