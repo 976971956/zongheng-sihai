@@ -11,6 +11,8 @@ const TEAL = Color("38c5b5")
 const GOLD = Color("f1c66d")
 const MUTED = Color("7899a1")
 const INK = Color("e2f1f1")
+const PORT_TOUCH_RADIUS = 58.0
+const PORT_BUTTON_SIZE = Vector2(110, 48)
 
 const PORT_POSITIONS = {
 	"amsterdam_dock": Vector2(95, 88),
@@ -52,8 +54,9 @@ func _build_port_buttons():
 	for port_id in GameData.TRADE_PORTS:
 		var button = Button.new()
 		button.text = str(GameData.TRADE_PORTS[port_id].name)
-		button.custom_minimum_size = Vector2(94, 34)
-		button.position = Vector2(PORT_POSITIONS[port_id].x - 47, PORT_POSITIONS[port_id].y + 12)
+		button.custom_minimum_size = PORT_BUTTON_SIZE
+		button.size = PORT_BUTTON_SIZE
+		button.position = Vector2(PORT_POSITIONS[port_id].x - PORT_BUTTON_SIZE.x * 0.5, PORT_POSITIONS[port_id].y + 10)
 		button.add_theme_font_size_override("font_size", 13)
 		button.focus_mode = Control.FOCUS_NONE
 		button.disabled = not game_state.is_port_unlocked(port_id)
@@ -71,6 +74,27 @@ func select_port(port_id):
 	_refresh_buttons()
 	queue_redraw()
 	port_selected.emit(resolved_port)
+
+func _gui_input(event):
+	var pressed = false
+	if event is InputEventScreenTouch:
+		pressed = event.pressed
+	elif event is InputEventMouseButton:
+		pressed = event.pressed and event.button_index == MOUSE_BUTTON_LEFT
+	if not pressed or traveling or game_state == null:
+		return
+	var nearest_port = ""
+	var nearest_distance = PORT_TOUCH_RADIUS
+	for port_id in PORT_POSITIONS:
+		if not game_state.is_port_unlocked(str(port_id)):
+			continue
+		var distance = Vector2(event.position).distance_to(Vector2(PORT_POSITIONS[port_id]))
+		if distance <= nearest_distance:
+			nearest_distance = distance
+			nearest_port = str(port_id)
+	if nearest_port != "":
+		select_port(nearest_port)
+		accept_event()
 
 func _refresh_buttons():
 	for port_id in port_buttons:
@@ -128,6 +152,8 @@ func _draw():
 			node_color = GOLD if port_id == current_port else TEAL
 		if port_id == selected_port:
 			node_color = INK
+			draw_circle(PORT_POSITIONS[port_id], 18.0, Color(GOLD, 0.16))
+			draw_arc(PORT_POSITIONS[port_id], 19.0, 0.0, TAU, 32, Color(GOLD, 0.72), 3.0)
 		draw_circle(PORT_POSITIONS[port_id], 8.0, Color(DEEP_OCEAN, 0.95))
 		draw_arc(PORT_POSITIONS[port_id], 9.0, 0.0, TAU, 24, node_color, 3.0)
 		if not unlocked:

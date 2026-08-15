@@ -78,7 +78,13 @@ func _run():
 	_check(is_instance_valid(world_scene.overlay) and is_instance_valid(world_scene.sailing_map), "手机2D模式必须能打开九港可视化航海图")
 	_check(world_scene.sailing_map.custom_minimum_size.x <= 620.0 and world_scene.sailing_map.custom_minimum_size.y <= 520.0, "九港航海图必须保持在竖屏触控区域内")
 	_check(world_scene.sailing_map.port_buttons.size() == 9, "手机航海图必须显示九座可点击港口")
-	world_scene.sailing_map.select_port("ragusa_dock")
+	_check(world_scene.sailing_map.port_buttons["ragusa_dock"].size.x >= 110.0 and world_scene.sailing_map.port_buttons["ragusa_dock"].size.y >= 48.0, "港名按钮必须达到手机稳定触控尺寸")
+	var port_touch = InputEventScreenTouch.new()
+	port_touch.index = 3
+	port_touch.pressed = true
+	port_touch.position = world_scene.sailing_map.PORT_POSITIONS["ragusa_dock"] + Vector2(0, -46)
+	world_scene.sailing_map._gui_input(port_touch)
+	_check(str(world_scene.sailing_map.selected_port) == "ragusa_dock" and str(world_scene.sailing_destination) == "ragusa_dock", "手指点在港口圆点周围也必须自动选中最近港口，不能只有窄小文字按钮可点")
 	_check(is_instance_valid(world_scene.sailing_transfer_button) and "正常出航" in world_scene.sailing_confirm_button.text and "付费传送" in world_scene.sailing_transfer_button.text, "手机航海图必须把正常出航与付费传送显示为两个独立触控按钮")
 	_check("消耗" in world_scene.sailing_route_label.text and "潜水寻宝" in world_scene.sailing_route_label.text and "风暴" in world_scene.sailing_route_label.text, "手机航线详情必须显示体力成本、潜水收益与风暴货损")
 	world_scene._close_overlay()
