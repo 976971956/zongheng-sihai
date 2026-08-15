@@ -1,19 +1,19 @@
 extends Node2D
 
-const DEFAULT_WORLD_SIZE = Vector2(3200, 2900)
-const DEFAULT_ORIGIN_POSITION = Vector2(860, 585)
-const DEFAULT_DESTINATION_POSITION = Vector2(980, 650)
-const DEFAULT_TREASURE_POSITION = Vector2(1200, 1100)
-const DEFAULT_STORM_POSITION = Vector2(1550, 1700)
+const DEFAULT_WORLD_SIZE = Vector2(5200, 4300)
+const DEFAULT_ORIGIN_POSITION = Vector2(1320, 820)
+const DEFAULT_DESTINATION_POSITION = Vector2(1820, 1120)
+const DEFAULT_TREASURE_POSITION = Vector2(2100, 1700)
+const DEFAULT_STORM_POSITION = Vector2(3100, 2550)
 const DEFAULT_STORM_RADIUS = 145.0
 
 const ZONE_AREAS = {
-	"north_sea": {"center": Vector2(620, 380), "radius": Vector2(510, 330), "color": Color("38596c")},
-	"mediterranean": {"center": Vector2(1010, 810), "radius": Vector2(720, 430), "color": Color("126078")},
-	"atlantic": {"center": Vector2(560, 1580), "radius": Vector2(520, 980), "color": Color("103f68")},
-	"africa": {"center": Vector2(1050, 2020), "radius": Vector2(690, 720), "color": Color("176474")},
-	"indian_ocean": {"center": Vector2(2050, 2130), "radius": Vector2(980, 620), "color": Color("243f74")},
-	"east_asia": {"center": Vector2(2730, 950), "radius": Vector2(520, 760), "color": Color("176c69")}
+	"north_sea": {"center": Vector2(850, 470), "radius": Vector2(720, 420), "color": Color("38596c")},
+	"mediterranean": {"center": Vector2(2050, 1400), "radius": Vector2(1450, 900), "color": Color("126078")},
+	"atlantic": {"center": Vector2(850, 2350), "radius": Vector2(760, 1550), "color": Color("103f68")},
+	"africa": {"center": Vector2(1700, 3250), "radius": Vector2(980, 920), "color": Color("176474")},
+	"indian_ocean": {"center": Vector2(3150, 3150), "radius": Vector2(1650, 900), "color": Color("243f74")},
+	"east_asia": {"center": Vector2(4450, 1550), "radius": Vector2(900, 1250), "color": Color("176c69")}
 }
 
 var voyage = {}
@@ -60,6 +60,25 @@ func get_storm_radius():
 func get_port_position(port_id):
 	return GameData.sea_port_position(str(port_id))
 
+func is_in_harbor_safe_zone(point, radius = 155.0):
+	var p = Vector2(point)
+	for port_id in unlocked_ports:
+		if p.distance_to(GameData.sea_port_position(str(port_id))) <= float(radius):
+			return true
+	return false
+
+func update_encounter_position(encounter_id, point):
+	var encounters = Array(voyage.get("encounters", []))
+	for index in range(encounters.size()):
+		var encounter = Dictionary(encounters[index])
+		if str(encounter.get("id", "")) == str(encounter_id):
+			encounter.x = float(Vector2(point).x)
+			encounter.y = float(Vector2(point).y)
+			encounters[index] = encounter
+			voyage.encounters = encounters
+			queue_redraw()
+			return
+
 func _process(delta):
 	wave_time += delta
 	queue_redraw()
@@ -69,9 +88,8 @@ func is_navigable(point):
 	if p.x < 65.0 or p.x > world_size.x - 65.0 or p.y < 65.0 or p.y > world_size.y - 65.0:
 		return false
 	# 港口内湾必须始终保留离港水道，避免地图调整后出生点落入礁区。
-	for port_id in unlocked_ports:
-		if p.distance_to(GameData.sea_port_position(str(port_id))) <= 105.0:
-			return true
+	if is_in_harbor_safe_zone(p, 120.0):
+		return true
 	for reef in _reef_circles():
 		if p.distance_to(Vector2(reef.position)) < float(reef.radius) + 38.0:
 			return false
@@ -79,13 +97,15 @@ func is_navigable(point):
 
 func _reef_circles():
 	return [
-		{"position": Vector2(740, 720), "radius": 88.0},
-		{"position": Vector2(1450, 1160), "radius": 106.0},
-		{"position": Vector2(780, 1440), "radius": 112.0},
-		{"position": Vector2(1430, 2180), "radius": 104.0},
-		{"position": Vector2(2260, 2020), "radius": 118.0},
-		{"position": Vector2(2700, 1360), "radius": 96.0},
-		{"position": Vector2(2760, 1120), "radius": 82.0}
+		{"position": Vector2(1050, 1280), "radius": 110.0},
+		{"position": Vector2(2100, 820), "radius": 126.0},
+		{"position": Vector2(3050, 1380), "radius": 118.0},
+		{"position": Vector2(850, 2350), "radius": 138.0},
+		{"position": Vector2(2050, 2750), "radius": 132.0},
+		{"position": Vector2(3150, 3150), "radius": 148.0},
+		{"position": Vector2(3800, 2600), "radius": 122.0},
+		{"position": Vector2(4100, 930), "radius": 102.0},
+		{"position": Vector2(4750, 2850), "radius": 112.0}
 	]
 
 func _rebuild_map_labels():
@@ -140,17 +160,17 @@ func _draw_zone_waters():
 			draw_line(Vector2(x, y), Vector2(x + 54, y + sin(wave_time + column) * 3.0), Color(0.50, 0.90, 0.94, 0.14), 3.0)
 
 func _draw_coasts():
-	var west_land = PackedVector2Array([Vector2(0, 0), Vector2(500, 0), Vector2(510, 360), Vector2(700, 520), Vector2(610, 930), Vector2(830, 1280), Vector2(730, 1840), Vector2(980, 2490), Vector2(650, 2900), Vector2(0, 2900)])
-	var east_land = PackedVector2Array([Vector2(3200, 0), Vector2(2730, 0), Vector2(2680, 430), Vector2(2860, 760), Vector2(2710, 1150), Vector2(2930, 1520), Vector2(2780, 1880), Vector2(3200, 2050)])
+	var west_land = PackedVector2Array([Vector2(0, 0), Vector2(650, 0), Vector2(720, 340), Vector2(980, 590), Vector2(1080, 980), Vector2(920, 1450), Vector2(1140, 2020), Vector2(940, 2750), Vector2(1280, 3560), Vector2(900, 4300), Vector2(0, 4300)])
+	var east_land = PackedVector2Array([Vector2(5200, 0), Vector2(4480, 0), Vector2(4320, 520), Vector2(4580, 920), Vector2(4400, 1520), Vector2(4880, 1980), Vector2(4620, 2640), Vector2(5200, 2920)])
 	draw_colored_polygon(west_land, Color("725f43"))
 	draw_colored_polygon(east_land, Color("64704d"))
 	draw_polyline(west_land, Color("dec98e"), 7.0)
 	draw_polyline(east_land, Color("dec98e"), 7.0)
 
 func _draw_currents():
-	for index in range(18):
-		var x = 420.0 + float((index * 337) % 2450)
-		var y = 410.0 + float((index * 521) % 2050)
+	for index in range(30):
+		var x = 420.0 + float((index * 337) % int(world_size.x - 780.0))
+		var y = 410.0 + float((index * 521) % int(world_size.y - 760.0))
 		draw_arc(Vector2(x, y), 48.0, 0.2, 2.8, 18, Color(0.20, 0.82, 0.79, 0.20), 5.0)
 
 func _draw_shipping_lanes():
@@ -173,6 +193,9 @@ func _draw_threat_territories():
 			continue
 		var center = Vector2(float(encounter.get("x", 540.0)), float(encounter.get("y", 900.0)))
 		var danger_color = Color("d45f67") if str(encounter.get("kind", "monster")) == "pirate" else Color("bb76d6")
+		var alert_radius = 380.0 if str(encounter.get("kind", "monster")) == "pirate" else 330.0
+		draw_circle(center, alert_radius, Color(danger_color, 0.022))
+		draw_arc(center, alert_radius, 0.0, TAU, 48, Color(danger_color, 0.16), 3.0)
 		draw_circle(center, 112.0, Color(danger_color, 0.08))
 		draw_arc(center, 112.0, 0.0, TAU, 32, Color(danger_color, 0.34), 4.0)
 

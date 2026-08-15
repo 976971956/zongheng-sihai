@@ -27,6 +27,10 @@ const AUTO_BATTLE_READ_DELAY = 0.30
 const NAVIGATION_GRID_SIZE = 42.0
 const NAVIGATION_REACH_DISTANCE = 12.0
 const OVERLAY_DRAG_THRESHOLD = 10.0
+const SEA_PIRATE_AGGRO_RADIUS = 380.0
+const SEA_MONSTER_AGGRO_RADIUS = 330.0
+const SEA_HARBOR_GUARD_RADIUS = 155.0
+const SEA_ENCOUNTER_DISTANCE = 82.0
 
 const ENEMY_SPAWNS = {
 	"drunk_sailor": {"region": "city", "name": "喝醉的水手", "position": Vector2(360, 300), "color": Color("99484c"), "accent": Color("4a3e49"), "location": "venice_north_gate"},
@@ -848,8 +852,9 @@ func _update_sea_voyage(delta):
 		_refresh_hud()
 		_show_message("遭遇风暴", str(storm_result.get("message", "海燕号穿过了风暴。")))
 		return
+	_update_sea_enemy_pursuit(delta)
 	for entry in actors:
-		if str(entry.kind) == "enemy" and player_actor.position.distance_to(entry.node.position) <= 82.0:
+		if str(entry.kind) == "enemy" and player_actor.position.distance_to(entry.node.position) <= SEA_ENCOUNTER_DISTANCE:
 			has_move_target = false
 			player_actor.set_motion(Vector2.ZERO)
 			active_enemy_actor = entry
@@ -860,6 +865,37 @@ func _update_sea_voyage(delta):
 				active_enemy_actor = {}
 				_show_message("无法交战", str(battle.get("message", "海盗已经离开。")))
 			return
+
+func _update_sea_enemy_pursuit(delta):
+	if current_region != "sea" or state.active_voyage.is_empty() or not is_instance_valid(map_node):
+		return
+	var player_in_harbor = map_node.has_method("is_in_harbor_safe_zone") and bool(map_node.is_in_harbor_safe_zone(player_actor.position, SEA_HARBOR_GUARD_RADIUS))
+	for entry in actors:
+		if str(entry.kind) != "enemy" or not is_instance_valid(entry.node):
+			continue
+		var offset = player_actor.position - entry.node.position
+		var distance = offset.length()
+		var aggro_radius = SEA_PIRATE_AGGRO_RADIUS if str(entry.get("encounter_kind", "monster")) == "pirate" else SEA_MONSTER_AGGRO_RADIUS
+		if player_in_harbor or distance <= SEA_ENCOUNTER_DISTANCE or distance > aggro_radius:
+			entry.node.set_motion(Vector2.ZERO)
+			continue
+		var enemy_level = int(GameData.ENEMIES[str(entry.id)].level)
+		var chase_speed = clamp(42.0 + float(enemy_level) * 0.55, 45.0, 72.0)
+		var chase_direction = offset.normalized()
+		var movement = chase_direction * chase_speed * float(delta)
+		var candidates = [entry.node.position + movement, entry.node.position + movement.rotated(0.58), entry.node.position + movement.rotated(-0.58)]
+		for candidate in candidates:
+			if not _is_walkable(Vector2(candidate)):
+				continue
+			if map_node.has_method("is_in_harbor_safe_zone") and bool(map_node.is_in_harbor_safe_zone(Vector2(candidate), SEA_HARBOR_GUARD_RADIUS)):
+				continue
+			entry.node.position = Vector2(candidate)
+			entry.node.set_motion(chase_direction)
+			var encounter_id = str(entry.get("encounter_id", ""))
+			state.update_sea_encounter_position(encounter_id, entry.node.position)
+			if map_node.has_method("update_encounter_position"):
+				map_node.update_encounter_position(encounter_id, entry.node.position)
+			break
 
 func _complete_sea_voyage(port_id = ""):
 	if current_region != "sea" or state.active_voyage.is_empty():
@@ -967,7 +1003,7 @@ func _enter_active_voyage():
 	AudioDirector.set_region("sea")
 	_refresh_hud()
 	_refresh_waypoint()
-	hint_label.text = "九港大地图已打通 · 可沿金色航线前进，也能中途改靠其他已发现港口"
+	hint_label.text = "港湾内受守卫保护 · 离港后海盗与海怪会从警戒圈主动追击"
 
 func _leave_sea_to_port(port_id):
 	current_region = "city"
@@ -2443,7 +2479,7 @@ func _select_sailing_destination(port_id):
 	var stamina_cost = int(plan.stamina_cost)
 	var hp_after = int(state.player.hp) - stamina_cost
 	var storm_loss = 2 if str(plan.tier) == "oceanic" else 1
-	sailing_route_label.text = "%s → %s｜九港大地图 · %s｜%d海里 · 预计%d日｜风险%d%%\n%s · 帆装Lv.%d · %.1f节 · %d海里/日｜货舱%d格 · 船甲%d\n航经：%s｜威胁情报：%s｜建议Lv.%d；出航后可自由改靠其他港口\n正常出航免费：消耗%d体力（%d→%d）｜潜水寻宝%d%%｜无护航遇风暴最多损失%d单位货物\n付费传送：%d银币 · 1日直达 · 无海战/打捞｜特产：%s" % [GameData.TRADE_PORTS[str(state.player.location)].name, destination.name, str(plan.tier_name), int(plan.distance_nm), days, risk, str(state.ship.name), int(plan.ship_level), float(plan.speed_knots), int(plan.nm_per_day), state.cargo_capacity(), state.ship_armor(), str(plan.waters_text), "、".join(threats), int(plan.recommended_level), stamina_cost, int(state.player.hp), max(0, hp_after), int(plan.dive_chance), storm_loss, int(route.fee), destination.specialty]
+	sailing_route_label.text = "%s → %s｜九港大地图 · %s｜%d海里 · 预计%d日｜风险%d%%\n%s · 帆装Lv.%d · %.1f节 · %d海里/日｜货舱%d格 · 船甲%d\n航经：%s｜威胁情报：%s｜建议Lv.%d；离港后附近敌人会主动追击，快船可甩开\n正常出航免费：消耗%d体力（%d→%d）｜潜水寻宝%d%%｜无护航遇风暴最多损失%d单位货物\n付费传送：%d银币 · 1日直达 · 无海战/打捞｜特产：%s" % [GameData.TRADE_PORTS[str(state.player.location)].name, destination.name, str(plan.tier_name), int(plan.distance_nm), days, risk, str(state.ship.name), int(plan.ship_level), float(plan.speed_knots), int(plan.nm_per_day), state.cargo_capacity(), state.ship_armor(), str(plan.waters_text), "、".join(threats), int(plan.recommended_level), stamina_cost, int(state.player.hp), max(0, hp_after), int(plan.dive_chance), storm_loss, int(route.fee), destination.specialty]
 	if int(state.player.level) + 5 < int(plan.recommended_level):
 		sailing_route_label.text += "\n⚠ 当前等级偏低：建议手动绕开强敌、强化装备，或使用付费传送。"
 	elif state.voyage_protection > 0:

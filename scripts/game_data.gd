@@ -367,11 +367,22 @@ const SHIP_SPEED_LEVELS = {
 	4: {"name": "飞剪帆组", "knots_bonus": 4.5}
 }
 
-# 真实海里决定连续航海地图的纵向长度。为保证手机操作节奏，洲际航线
-# 采用统一比例压缩并封顶，但港口之间仍保持明确、单调的距离差异。
+# 真实海里决定航行日数；大地图采用人工校准坐标，让九港在手机竖屏下也有
+# 足够的驾驶距离，同时保留大致的地理方位。
 const SEA_WORLD_WIDTH = 1080.0
 const SEA_WORLD_MARGIN = 260.0
-const SEA_GLOBAL_WORLD_SIZE = Vector2(3200, 2900)
+const SEA_GLOBAL_WORLD_SIZE = Vector2(5200, 4300)
+const SEA_PORT_POSITIONS = {
+	"amsterdam_dock": Vector2(700, 420),
+	"venice_dock": Vector2(1320, 820),
+	"ragusa_dock": Vector2(1820, 1120),
+	"athens_dock": Vector2(2350, 1380),
+	"malta_dock": Vector2(1500, 1740),
+	"alexandria_dock": Vector2(2700, 1840),
+	"cape_town_dock": Vector2(1600, 3650),
+	"quanzhou_dock": Vector2(4400, 2050),
+	"yangzhou_dock": Vector2(4750, 1320)
+}
 
 static func ship_speed_profile(level, hull_id = "sea_swallow"):
 	var sail = Dictionary(SHIP_SPEED_LEVELS.get(clamp(int(level), 1, 4), SHIP_SPEED_LEVELS[1]))
@@ -384,6 +395,8 @@ static func voyage_days(distance_nm, ship_level, hull_id = "sea_swallow"):
 	return max(1, int(ceil(float(max(1, int(distance_nm))) / float(profile.nm_per_day))))
 
 static func sea_port_position(port_id):
+	if SEA_PORT_POSITIONS.has(str(port_id)):
+		return Vector2(SEA_PORT_POSITIONS[str(port_id)])
 	var navigation = PORT_NAVIGATION.get(str(port_id), PORT_NAVIGATION.venice_dock)
 	var x = 220.0 + (float(navigation.longitude) + 20.0) * 20.0
 	var y = 220.0 + (60.0 - float(navigation.latitude)) * 25.0

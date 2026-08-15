@@ -1314,12 +1314,14 @@ func voyage_plan(port_id, origin_override = ""):
 	var dive_tier_bonus = {"coastal": 0, "regional": 10, "oceanic": 20}.get(tier_id, 0)
 	var dive_chance = clamp(35 + int(dive_tier_bonus) + int(round(float(get_stats().drop_bonus) * 100.0)), 35, 75)
 	var risk = _voyage_risk_for_route(route)
-	var threat_count = 2
+	var threat_count = 4
 	if distance_nm > int(GameData.SEA_VOYAGE_TIERS.coastal.max_distance_nm):
-		threat_count = 4
+		threat_count = 7
+	if tier_id == "oceanic":
+		threat_count = 9
 	if distance_nm >= 4800:
-		threat_count = 6
-	if threat_count >= 4 and (ship_armor() >= 3 or voyage_protection > 0):
+		threat_count = 12
+	if threat_count >= 7 and (ship_armor() >= 3 or voyage_protection > 0):
 		threat_count -= 1
 	var zone_ids = Array(route.get("zone_ids", GameData.sea_zones_for_route(origin, destination)))
 	var enemy_plan = _voyage_enemy_roster(zone_ids, tier_id, threat_count)
@@ -1416,7 +1418,7 @@ func _build_sea_encounters(plan):
 	var enemy_ids = Array(plan.get("enemy_ids", []))
 	var enemy_zones = Array(plan.get("enemy_zones", []))
 	var zone_ids = Array(plan.get("zone_ids", []))
-	var lateral_offsets = [-210.0, 190.0, -120.0, 250.0, -260.0, 95.0]
+	var lateral_offsets = [-260.0, 230.0, -150.0, 310.0, -330.0, 120.0, 360.0, -210.0, 180.0, -390.0, 285.0, -95.0]
 	var origin_position = GameData.sea_port_position(str(plan.origin))
 	var destination_position = GameData.sea_port_position(str(plan.destination))
 	var direction = destination_position - origin_position
@@ -1515,6 +1517,20 @@ func update_voyage_position(position, persist = false):
 	active_voyage.y = float(point.y)
 	if persist:
 		save_game()
+
+func update_sea_encounter_position(encounter_id, position):
+	if active_voyage.is_empty():
+		return
+	var point = Vector2(position)
+	var encounters = Array(active_voyage.get("encounters", []))
+	for index in range(encounters.size()):
+		var encounter = Dictionary(encounters[index])
+		if str(encounter.get("id", "")) == str(encounter_id):
+			encounter.x = point.x
+			encounter.y = point.y
+			encounters[index] = encounter
+			active_voyage.encounters = encounters
+			return
 
 func voyage_position():
 	if active_voyage.is_empty():
@@ -1889,13 +1905,19 @@ func _normalize_active_voyage():
 			if is_port_unlocked(str(port_id)):
 				migrated_ports.append(str(port_id))
 		active_voyage.unlocked_ports = migrated_ports
-	var had_dynamic_layout = active_voyage.has("world_width") and is_equal_approx(float(active_voyage.get("world_width", 0.0)), GameData.SEA_GLOBAL_WORLD_SIZE.x)
+	var had_dynamic_layout = active_voyage.has("world_width") and is_equal_approx(float(active_voyage.get("world_width", 0.0)), GameData.SEA_GLOBAL_WORLD_SIZE.x) and is_equal_approx(float(active_voyage.get("world_height", 0.0)), GameData.SEA_GLOBAL_WORLD_SIZE.y)
 	var legacy_progress = clamp((LEGACY_VOYAGE_ORIGIN_Y - float(active_voyage.get("y", LEGACY_VOYAGE_ORIGIN_Y))) / (LEGACY_VOYAGE_ORIGIN_Y - LEGACY_VOYAGE_DESTINATION_Y), 0.0, 1.0)
+	var old_origin = Vector2(float(active_voyage.get("origin_x", 0.0)), float(active_voyage.get("origin_y", 0.0)))
+	var old_destination = Vector2(float(active_voyage.get("destination_x", 0.0)), float(active_voyage.get("destination_y", 0.0)))
+	var old_route = old_destination - old_origin
+	if old_route.length_squared() >= 1.0:
+		var old_position = Vector2(float(active_voyage.get("x", old_origin.x)), float(active_voyage.get("y", old_origin.y)))
+		legacy_progress = clamp((old_position - old_origin).dot(old_route) / old_route.length_squared(), 0.0, 1.0)
 	var layout = _voyage_layout(plan)
 	for layout_key in layout:
 		active_voyage[layout_key] = layout[layout_key]
 	active_voyage.ship_level = int(plan.ship_level)
-	active_voyage.speed_knots = int(plan.speed_knots)
+	active_voyage.speed_knots = float(plan.speed_knots)
 	active_voyage.nm_per_day = int(plan.nm_per_day)
 	active_voyage.world_speed = float(plan.world_speed)
 	active_voyage.days = int(plan.days)
@@ -1904,7 +1926,7 @@ func _normalize_active_voyage():
 		active_voyage.x = migrated_position.x
 		active_voyage.y = migrated_position.y
 	var saved_encounters = active_voyage.get("encounters", [])
-	var needs_encounter_migration = typeof(saved_encounters) != TYPE_ARRAY or Array(saved_encounters).is_empty()
+	var needs_encounter_migration = not had_dynamic_layout or typeof(saved_encounters) != TYPE_ARRAY or Array(saved_encounters).is_empty()
 	if not needs_encounter_migration:
 		for saved_encounter in Array(saved_encounters):
 			if not Dictionary(saved_encounter).has("progress"):

@@ -470,6 +470,18 @@ func _run():
 			break
 	_check(not retreat_enemy.is_empty(), "海域必须存在可用于撤退测试的威胁")
 	if not retreat_enemy.is_empty():
+		var harbor_enemy_position = scene._sea_origin_position() + Vector2(260, 0)
+		scene.player_actor.position = scene._sea_origin_position()
+		retreat_enemy.node.position = harbor_enemy_position
+		scene._update_sea_enemy_pursuit(0.5)
+		_check(retreat_enemy.node.position == harbor_enemy_position, "船停在港湾守卫圈内时，附近敌人不能闯港追击")
+		var open_sea_position = Vector2(3300, 2500)
+		scene.player_actor.position = open_sea_position
+		retreat_enemy.node.position = open_sea_position + Vector2(280, 0)
+		var pursuit_distance_before = scene.player_actor.position.distance_to(retreat_enemy.node.position)
+		scene._update_sea_enemy_pursuit(0.5)
+		var persisted_enemy = scene.state.sea_encounter(str(retreat_enemy.get("encounter_id", "")))
+		_check(scene.player_actor.position.distance_to(retreat_enemy.node.position) < pursuit_distance_before and Vector2(float(persisted_enemy.x), float(persisted_enemy.y)) == retreat_enemy.node.position, "船进入警戒圈后敌人必须主动靠近，并同步保存移动后的位置")
 		scene.player_actor.position = retreat_enemy.node.position + Vector2(0, 70)
 		scene.active_enemy_actor = retreat_enemy
 		scene.state.active_voyage.current_encounter_id = str(retreat_enemy.get("encounter_id", ""))
