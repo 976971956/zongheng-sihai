@@ -1,5 +1,7 @@
 extends SceneTree
 
+const ActorScript = preload("res://scripts/actor_2d.gd")
+
 class TestState extends GameState:
 	func has_save():
 		return false
@@ -35,6 +37,16 @@ func _run():
 	_check(scene.actors.size() >= 4, "地图必须包含NPC和可见敌人")
 	_check(_has_actor(scene, "guard_captain") and _has_actor(scene, "jeweler") and _has_actor(scene, "venice_shipwright"), "威尼斯必须生成守卫、珠宝商与船匠，不能只存在于数据配置中")
 	_check(_actor_has_art(scene, "guard_captain") and _actor_has_art(scene, "jeweler") and _actor_has_art(scene, "venice_shipwright"), "威尼斯补充NPC也必须使用完整人物精灵，不能回退到通用占位模型")
+	var enemy_art_signatures = {}
+	for enemy_id in GameData.ENEMIES:
+		var enemy_model = ActorScript.new()
+		root.add_child(enemy_model)
+		enemy_model.configure("monster", Color("7aa6a1"), Color("f2c66d"), enemy_id)
+		_check(is_instance_valid(enemy_model.art_sprite) and enemy_model.art_sprite.texture != null, "%s 必须拥有完整敌人精灵，不能回退到程序占位模型" % enemy_id)
+		var signature = _actor_art_signature(enemy_model)
+		_check(signature != "" and not enemy_art_signatures.has(signature), "%s 必须使用独立敌人造型，不能复用其他敌人模型" % enemy_id)
+		enemy_art_signatures[signature] = enemy_id
+		enemy_model.free()
 	_check(scene.player_actor.position.x > 0 and scene.player_actor.position.y > 0, "玩家必须出生在可行走地图内")
 	var saved_respawn_key = scene._enemy_spawn_key("drunk_sailor")
 	scene.state.enemy_respawns[saved_respawn_key] = scene._world_time_seconds() + 60.0
@@ -530,6 +542,14 @@ func _actor_has_art(scene, actor_id):
 		if str(entry.id) == str(actor_id):
 			return is_instance_valid(entry.node.art_sprite) and entry.node.art_sprite.texture != null
 	return false
+
+func _actor_art_signature(actor):
+	if not is_instance_valid(actor.art_sprite) or actor.art_sprite.texture == null:
+		return ""
+	var texture = actor.art_sprite.texture
+	if texture is AtlasTexture:
+		return "%s@%s" % [texture.atlas.resource_path, texture.region]
+	return str(texture.resource_path)
 
 func _actor_position(scene, actor_id):
 	for entry in scene.actors:

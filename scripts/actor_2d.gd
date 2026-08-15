@@ -2,10 +2,15 @@ extends Node2D
 
 const CHARACTER_ATLAS = preload("res://assets/art/characters/character_atlas_v1.png")
 const HARBOR_NPC_ATLAS = preload("res://assets/art/characters/harbor_npc_atlas_v1.png")
+const ENEMY_ATLAS = preload("res://assets/art/characters/enemy_atlas_v2.png")
+const LEGACY_BOSS_ATLAS_A = preload("res://assets/art/characters/legacy_boss_atlas_a_v1.png")
+const LEGACY_BOSS_ATLAS_B = preload("res://assets/art/characters/legacy_boss_atlas_b_v1.png")
 const PLAYER_WALK = preload("res://assets/art/characters/player_walk_v1.png")
 const PLAYER_WALK_BACK = preload("res://assets/art/characters/player_walk_back_v1.png")
 const ATLAS_CELL_SIZE = Vector2(362, 362)
 const HARBOR_NPC_CELL_SIZE = Vector2(197, 197)
+const ENEMY_ATLAS_CELL_SIZE = Vector2(384, 256)
+const LEGACY_BOSS_ATLAS_CELL_SIZE = Vector2(384, 384)
 const ATLAS_CELLS = {
 	"player": Vector2i(0, 0),
 	"alisa": Vector2i(1, 0),
@@ -21,11 +26,37 @@ const ATLAS_CELLS = {
 	"stone_puppet": Vector2i(2, 2),
 	"vermilion_phantom": Vector2i(3, 2),
 	"ragusa_broker": Vector2i(3, 0),
-	"alexandria_merchant": Vector2i(2, 0),
-	"corsair_deckhand": Vector2i(0, 1),
-	"corsair_raider": Vector2i(1, 1),
-	"corsair_guard": Vector2i(2, 1),
-	"corsair_captain": Vector2i(3, 0)
+	"alexandria_merchant": Vector2i(2, 0)
+}
+const ENEMY_ATLAS_CELLS = {
+	"tide_beast": Vector2i(0, 0),
+	"corsair_deckhand": Vector2i(1, 0),
+	"corsair_raider": Vector2i(2, 0),
+	"corsair_guard": Vector2i(3, 0),
+	"corsair_captain": Vector2i(0, 1),
+	"coastal_pirate": Vector2i(1, 1),
+	"reef_serpent": Vector2i(2, 1),
+	"ocean_raider": Vector2i(3, 1),
+	"abyss_kraken": Vector2i(0, 2),
+	"black_flag_privateer": Vector2i(1, 2),
+	"wreck_crab": Vector2i(2, 2),
+	"drowned_sailor": Vector2i(3, 2),
+	"fog_siren": Vector2i(0, 3),
+	"abyss_siren": Vector2i(1, 3)
+}
+const LEGACY_BOSS_ATLAS_A_CELLS = {
+	"basin_leviathan": Vector2i(0, 0),
+	"nine_tail_fox": Vector2i(1, 0),
+	"earth_demon_king": Vector2i(2, 0),
+	"tira_guardian": Vector2i(0, 1),
+	"celestial_demon_general": Vector2i(1, 1)
+}
+const LEGACY_BOSS_ATLAS_B_CELLS = {
+	"jade_dream_queen": Vector2i(0, 0),
+	"black_furnace_lord": Vector2i(1, 0),
+	"returned_demon_king": Vector2i(2, 0),
+	"clockwork_tailor": Vector2i(0, 1),
+	"tide_void_emperor": Vector2i(1, 1)
 }
 const HARBOR_NPC_CELLS = {
 	"venice_quartermaster": Vector2i(0, 0),
@@ -130,11 +161,27 @@ func _refresh_art_sprite():
 		art_sprite.z_index = 1
 		add_child(art_sprite)
 		return
-	if not ATLAS_CELLS.has(display_id) and not HARBOR_NPC_CELLS.has(display_id):
+	if not _has_raster_art(display_id):
 		return
-	var atlas = HARBOR_NPC_ATLAS if HARBOR_NPC_CELLS.has(display_id) else CHARACTER_ATLAS
-	var cell_size = HARBOR_NPC_CELL_SIZE if HARBOR_NPC_CELLS.has(display_id) else ATLAS_CELL_SIZE
-	var cell = HARBOR_NPC_CELLS[display_id] if HARBOR_NPC_CELLS.has(display_id) else ATLAS_CELLS[display_id]
+	var atlas = CHARACTER_ATLAS
+	var cell_size = ATLAS_CELL_SIZE
+	var cell = ATLAS_CELLS.get(display_id, Vector2i.ZERO)
+	if HARBOR_NPC_CELLS.has(display_id):
+		atlas = HARBOR_NPC_ATLAS
+		cell_size = HARBOR_NPC_CELL_SIZE
+		cell = HARBOR_NPC_CELLS[display_id]
+	elif ENEMY_ATLAS_CELLS.has(display_id):
+		atlas = ENEMY_ATLAS
+		cell_size = ENEMY_ATLAS_CELL_SIZE
+		cell = ENEMY_ATLAS_CELLS[display_id]
+	elif LEGACY_BOSS_ATLAS_A_CELLS.has(display_id):
+		atlas = LEGACY_BOSS_ATLAS_A
+		cell_size = LEGACY_BOSS_ATLAS_CELL_SIZE
+		cell = LEGACY_BOSS_ATLAS_A_CELLS[display_id]
+	elif LEGACY_BOSS_ATLAS_B_CELLS.has(display_id):
+		atlas = LEGACY_BOSS_ATLAS_B
+		cell_size = LEGACY_BOSS_ATLAS_CELL_SIZE
+		cell = LEGACY_BOSS_ATLAS_B_CELLS[display_id]
 	var atlas_texture = AtlasTexture.new()
 	atlas_texture.atlas = atlas
 	atlas_texture.region = Rect2(Vector2(cell.x, cell.y) * cell_size, cell_size)
@@ -143,6 +190,9 @@ func _refresh_art_sprite():
 	art_sprite.scale = Vector2.ONE * _art_scale()
 	art_sprite.z_index = 1
 	add_child(art_sprite)
+
+func _has_raster_art(identity):
+	return ATLAS_CELLS.has(identity) or HARBOR_NPC_CELLS.has(identity) or ENEMY_ATLAS_CELLS.has(identity) or LEGACY_BOSS_ATLAS_A_CELLS.has(identity) or LEGACY_BOSS_ATLAS_B_CELLS.has(identity)
 
 func _update_player_walk_sprite(moving):
 	if not is_instance_valid(art_sprite):
@@ -171,6 +221,14 @@ func _update_player_walk_sprite(moving):
 func _art_scale():
 	if HARBOR_NPC_CELLS.has(display_id):
 		return 0.45
+	if ENEMY_ATLAS_CELLS.has(display_id):
+		match display_id:
+			"abyss_kraken": return 0.26
+			"coastal_pirate", "ocean_raider", "black_flag_privateer": return 0.32
+			"tide_beast", "reef_serpent", "wreck_crab": return 0.34
+			_: return 0.37
+	if LEGACY_BOSS_ATLAS_A_CELLS.has(display_id) or LEGACY_BOSS_ATLAS_B_CELLS.has(display_id):
+		return 0.29
 	match display_id:
 		"tavern_keeper": return 0.25
 		"giant_bear": return 0.32
@@ -182,7 +240,7 @@ func _art_scale():
 		_: return 0.27
 
 func _draw():
-	if display_id == "player_ship" or display_id in SEA_PIRATE_IDS:
+	if display_id == "player_ship" or (display_id in SEA_PIRATE_IDS and not _has_raster_art(display_id)):
 		_draw_ship()
 		return
 	var bob = sin(bob_time * 2.7) * 1.35
@@ -195,7 +253,7 @@ func _draw():
 		var sparkle = Vector2.RIGHT.rotated(bob_time * 1.6) * ring_radius + Vector2(0, 5)
 		draw_circle(sparkle, 4, Color("fff1ad"))
 	draw_set_transform(Vector2(0, bob))
-	if not ATLAS_CELLS.has(display_id) and not HARBOR_NPC_CELLS.has(display_id):
+	if not _has_raster_art(display_id):
 		if actor_kind in ["travel", "sea_port", "sea_return"]:
 			_draw_travel_marker()
 		elif actor_kind in ["discovery", "sea_treasure"]:
