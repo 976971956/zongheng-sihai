@@ -346,6 +346,41 @@ const SEA_VOYAGE_TIERS = {
 	"oceanic": {"name": "远洋航线", "max_distance_nm": 99999, "minimum_threats": 2, "description": "连续数日看不到陆地，至少有两段高危海区。"}
 }
 
+# 船帆等级同时决定贸易日历与2D驾驶速度。按每天24小时连续航行换算，
+# 15节约为360海里/日；高等级船帆提升的是节速，而不是简单固定减一天。
+const SHIP_SPEED_LEVELS = {
+	1: {"name": "沿岸帆装", "knots": 15, "nm_per_day": 360, "world_speed": 300.0},
+	2: {"name": "双桅帆装", "knots": 18, "nm_per_day": 432, "world_speed": 350.0},
+	3: {"name": "远洋帆装", "knots": 22, "nm_per_day": 528, "world_speed": 415.0},
+	4: {"name": "飞剪帆装", "knots": 27, "nm_per_day": 648, "world_speed": 490.0}
+}
+
+# 真实海里决定连续航海地图的纵向长度。为保证手机操作节奏，洲际航线
+# 采用统一比例压缩并封顶，但港口之间仍保持明确、单调的距离差异。
+const SEA_WORLD_WIDTH = 1080.0
+const SEA_WORLD_MARGIN = 260.0
+
+static func ship_speed_profile(level):
+	return Dictionary(SHIP_SPEED_LEVELS.get(clamp(int(level), 1, 4), SHIP_SPEED_LEVELS[1])).duplicate(true)
+
+static func voyage_days(distance_nm, ship_level):
+	var profile = ship_speed_profile(ship_level)
+	return max(1, int(ceil(float(max(1, int(distance_nm))) / float(profile.nm_per_day))))
+
+static func sea_route_span(distance_nm):
+	return clamp(760.0 + float(max(1, int(distance_nm))) * 0.52, 900.0, 6500.0)
+
+static func sea_world_height(distance_nm):
+	return sea_route_span(distance_nm) + SEA_WORLD_MARGIN * 2.0
+
+static func sea_route_position(distance_nm, progress, lateral_offset = 0.0):
+	var route_progress = clamp(float(progress), 0.0, 1.0)
+	var height = sea_world_height(distance_nm)
+	var origin_y = height - SEA_WORLD_MARGIN
+	var destination_y = SEA_WORLD_MARGIN
+	var bend = sin(route_progress * PI * 2.0) * 54.0 + sin(route_progress * PI * 5.0) * 22.0
+	return Vector2(SEA_WORLD_WIDTH * 0.5 + bend + float(lateral_offset), lerp(origin_y, destination_y, route_progress))
+
 static func sea_voyage_tier(distance_nm):
 	var distance = int(distance_nm)
 	if distance <= int(SEA_VOYAGE_TIERS.coastal.max_distance_nm):

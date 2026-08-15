@@ -1900,7 +1900,7 @@ func _open_harbor():
 		var plan = state.voyage_plan(destination)
 		var route_row = HBoxContainer.new()
 		route_row.add_theme_constant_override("separation", 8)
-		var sail = _button("出航%s · %d海里/%d日 · 体力%d · 风险%d%%" % [GameData.TRADE_PORTS[destination].name, int(plan.distance_nm), int(plan.days), int(plan.stamina_cost), int(plan.risk)], "primary")
+		var sail = _button("出航%s · %d海里/%d日 · %d节 · 体力%d · 风险%d%%" % [GameData.TRADE_PORTS[destination].name, int(plan.distance_nm), int(plan.days), int(plan.speed_knots), int(plan.stamina_cost), int(plan.risk)], "primary")
 		sail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		sail.disabled = int(state.player.hp) <= int(plan.stamina_cost)
 		sail.tooltip_text = "潜水寻宝%d%%｜侦测到%d处威胁" % [int(plan.dive_chance), int(plan.threat_count)]
@@ -1920,7 +1920,8 @@ func _open_harbor():
 	hold.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hold.pressed.connect(_trade_upgrade.bind("hold"))
 	upgrades.add_child(hold)
-	var speed = _button("升级船帆 -1日", "ghost")
+	var speed_profile = state.ship_speed_profile()
+	var speed = _button("船帆Lv.%d · %d节｜升级节速" % [int(state.ship.speed), int(speed_profile.knots)], "ghost")
 	speed.disabled = int(state.ship.speed) >= 4
 	speed.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	speed.pressed.connect(_trade_upgrade.bind("speed"))

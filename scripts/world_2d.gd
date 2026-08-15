@@ -283,6 +283,26 @@ func _world_point(point):
 func _world_rect(rect):
 	return Rect2(rect.position * WORLD_SCALE, rect.size * WORLD_SCALE)
 
+func _active_world_size():
+	if current_region == "sea" and is_instance_valid(map_node) and map_node.has_method("get_world_size"):
+		return Vector2(map_node.get_world_size())
+	return WORLD_SIZE
+
+func _sea_origin_position():
+	return Vector2(map_node.get_origin_position()) if is_instance_valid(map_node) and map_node.has_method("get_origin_position") else SeaWorldMapScript.DEFAULT_ORIGIN_POSITION
+
+func _sea_destination_position():
+	return Vector2(map_node.get_destination_position()) if is_instance_valid(map_node) and map_node.has_method("get_destination_position") else SeaWorldMapScript.DEFAULT_DESTINATION_POSITION
+
+func _sea_treasure_position():
+	return Vector2(map_node.get_treasure_position()) if is_instance_valid(map_node) and map_node.has_method("get_treasure_position") else SeaWorldMapScript.DEFAULT_TREASURE_POSITION
+
+func _sea_storm_position():
+	return Vector2(map_node.get_storm_position()) if is_instance_valid(map_node) and map_node.has_method("get_storm_position") else SeaWorldMapScript.DEFAULT_STORM_POSITION
+
+func _sea_storm_radius():
+	return float(map_node.get_storm_radius()) if is_instance_valid(map_node) and map_node.has_method("get_storm_radius") else SeaWorldMapScript.DEFAULT_STORM_RADIUS
+
 func _spawn_world_actors():
 	for entry in actors:
 		if is_instance_valid(entry.node):
@@ -294,18 +314,18 @@ func _spawn_world_actors():
 			return
 		var destination_id = str(state.active_voyage.destination)
 		var origin_id = str(state.active_voyage.origin)
-		_add_actor("sea_port", destination_id, "抵达 · %s" % GameData.TRADE_PORTS[destination_id].name, SeaWorldMapScript.DESTINATION_POSITION / WORLD_SCALE, Color("4b806d"), GOLD, destination_id)
-		_add_actor("sea_return", origin_id, "返航航标 · %s" % GameData.TRADE_PORTS[origin_id].name, Vector2(300, 1450) / WORLD_SCALE, Color("4c6871"), TEAL, origin_id)
+		_add_actor("sea_port", destination_id, "抵达 · %s" % GameData.TRADE_PORTS[destination_id].name, _sea_destination_position() / WORLD_SCALE, Color("4b806d"), GOLD, destination_id)
+		_add_actor("sea_return", origin_id, "返航航标 · %s" % GameData.TRADE_PORTS[origin_id].name, (_sea_origin_position() + Vector2(-235, -105)) / WORLD_SCALE, Color("4c6871"), TEAL, origin_id)
 		for encounter in Array(state.active_voyage.get("encounters", [])):
 			if bool(encounter.get("defeated", false)):
 				continue
 			var enemy_id = str(encounter.get("enemy_id", "coastal_pirate"))
 			var spawn = ENEMY_SPAWNS.get(enemy_id, ENEMY_SPAWNS.coastal_pirate)
-			var sea_position = Vector2(float(encounter.get("x", SeaWorldMapScript.PIRATE_POSITION.x)), float(encounter.get("y", SeaWorldMapScript.PIRATE_POSITION.y)))
+			var sea_position = Vector2(float(encounter.get("x", GameData.SEA_WORLD_WIDTH * 0.5)), float(encounter.get("y", GameData.sea_route_position(int(state.active_voyage.get("distance_nm", 1000)), 0.5).y)))
 			var enemy_label = "%s · Lv.%d" % [str(GameData.ENEMIES[enemy_id].name), int(GameData.ENEMIES[enemy_id].level)]
 			_add_actor("enemy", enemy_id, enemy_label, sea_position / WORLD_SCALE, spawn.color, spawn.accent, "", {"encounter_id": str(encounter.get("id", "")), "encounter_kind": str(encounter.get("kind", "pirate"))})
 		if not bool(state.active_voyage.get("treasure_claimed", false)):
-			_add_actor("sea_treasure", "drifting_cargo", "漂流货箱", SeaWorldMapScript.TREASURE_POSITION / WORLD_SCALE, Color("735a2f"), GOLD, "")
+			_add_actor("sea_treasure", "drifting_cargo", "漂流货箱", _sea_treasure_position() / WORLD_SCALE, Color("735a2f"), GOLD, "")
 	elif current_region == "city":
 		var active_port = str(state.player.location)
 		if active_port in GameData.TRADE_PORTS and active_port != "venice_dock":
@@ -535,7 +555,7 @@ func _add_actor(kind, id, display_name, position, color, accent, location_id = "
 func _spawn_for_location(location_id):
 	if current_region == "sea" and not state.active_voyage.is_empty():
 		var saved_position = state.voyage_position()
-		return saved_position if saved_position != Vector2.ZERO else SeaWorldMapScript.ORIGIN_POSITION
+		return saved_position if saved_position != Vector2.ZERO else _sea_origin_position()
 	var overrides = {
 		"alisa_hut": Vector2(250, 365), "venice_tavern": Vector2(250, 690),
 		"venice_square": Vector2(360, 790), "venice_market": Vector2(450, 700),
@@ -682,17 +702,18 @@ func _process(delta):
 		_cancel_task_navigation()
 	var previous_position = player_actor.position
 	if direction.length() > 0.05:
-		var movement_speed = 285.0 + float(state.ship.get("speed", 1)) * 15.0 if current_region == "sea" else 245.0
+		var movement_speed = float(state.ship_speed_profile().world_speed) if current_region == "sea" else 245.0
 		var movement = direction.normalized() * movement_speed * delta
 		var next_position = player_actor.position + movement
-		next_position.x = clamp(next_position.x, 28.0 * WORLD_SCALE, 692.0 * WORLD_SCALE)
-		next_position.y = clamp(next_position.y, 210.0 * WORLD_SCALE, 1080.0 * WORLD_SCALE)
+		var active_size = _active_world_size()
+		next_position.x = clamp(next_position.x, 28.0 * WORLD_SCALE, active_size.x - 28.0 * WORLD_SCALE)
+		next_position.y = clamp(next_position.y, 210.0 * WORLD_SCALE, active_size.y - 200.0)
 		if _is_walkable(next_position):
 			player_actor.position = next_position
 		else:
 			# Slide along building edges instead of feeling stuck on a corner.
-			var horizontal = Vector2(clamp(player_actor.position.x + movement.x, 28.0 * WORLD_SCALE, 692.0 * WORLD_SCALE), player_actor.position.y)
-			var vertical = Vector2(player_actor.position.x, clamp(player_actor.position.y + movement.y, 210.0 * WORLD_SCALE, 1080.0 * WORLD_SCALE))
+			var horizontal = Vector2(clamp(player_actor.position.x + movement.x, 28.0 * WORLD_SCALE, active_size.x - 28.0 * WORLD_SCALE), player_actor.position.y)
+			var vertical = Vector2(player_actor.position.x, clamp(player_actor.position.y + movement.y, 210.0 * WORLD_SCALE, active_size.y - 200.0))
 			if abs(movement.x) >= abs(movement.y) and _is_walkable(horizontal):
 				player_actor.position = horizontal
 			elif _is_walkable(vertical):
@@ -745,8 +766,9 @@ func _update_camera(delta, snap = false):
 	if not is_instance_valid(world_layer) or not is_instance_valid(player_actor):
 		return
 	var desired = CAMERA_FOCUS - player_actor.position
-	desired.x = clamp(desired.x, MAP_SIZE.x - WORLD_SIZE.x, 0.0)
-	desired.y = clamp(desired.y, MAP_SIZE.y - WORLD_SIZE.y, 0.0)
+	var active_size = _active_world_size()
+	desired.x = clamp(desired.x, MAP_SIZE.x - active_size.x, 0.0)
+	desired.y = clamp(desired.y, MAP_SIZE.y - active_size.y, 0.0)
 	if snap or delta <= 0.0:
 		world_layer.position = desired
 	else:
@@ -811,12 +833,12 @@ func _update_sea_voyage(delta):
 	state.update_voyage_position(player_actor.position, sea_save_timer >= 1.5)
 	if sea_save_timer >= 1.5:
 		sea_save_timer = 0.0
-	if player_actor.position.distance_to(SeaWorldMapScript.DESTINATION_POSITION) <= 82.0:
+	if player_actor.position.distance_to(_sea_destination_position()) <= 82.0:
 		has_move_target = false
 		player_actor.set_motion(Vector2.ZERO)
 		_complete_sea_voyage()
 		return
-	if not bool(state.active_voyage.get("storm_resolved", false)) and player_actor.position.distance_to(SeaWorldMapScript.STORM_POSITION) <= SeaWorldMapScript.STORM_RADIUS:
+	if not bool(state.active_voyage.get("storm_resolved", false)) and player_actor.position.distance_to(_sea_storm_position()) <= _sea_storm_radius():
 		has_move_target = false
 		player_actor.set_motion(Vector2.ZERO)
 		var storm_result = state.resolve_sea_storm()
@@ -1013,7 +1035,8 @@ func _refresh_hud():
 	if current_region == "sea" and not state.active_voyage.is_empty():
 		var voyage = state.active_voyage
 		location_label.text = "◆ %s" % GameData.SEA_REGIONS[str(voyage.region)].name
-		stats_label.text = "%s  航程%d%% · 剩余%d海里" % [str(state.ship.name), int(round(state.voyage_progress() * 100.0)), state.voyage_remaining_distance()]
+		var speed_profile = state.ship_speed_profile()
+		stats_label.text = "%s Lv.%d · %d节｜航程%d%% · 剩余%d海里" % [str(state.ship.name), int(state.ship.speed), int(speed_profile.knots), int(round(state.voyage_progress() * 100.0)), state.voyage_remaining_distance()]
 		currency_label.text = "银币 %d" % int(state.player.silver)
 		var salvage_status = "已打捞" if bool(voyage.get("treasure_claimed", false)) else "可潜水"
 		quest_label.text = "%s → %s｜%s · %d日｜威胁%d/%d｜%s｜货舱%d/%d" % [GameData.TRADE_PORTS[str(voyage.origin)].name, GameData.TRADE_PORTS[str(voyage.destination)].name, str(voyage.get("tier_name", "航行")), int(voyage.days), state.sea_encounters_remaining(), Array(voyage.get("encounters", [])).size(), salvage_status, state.cargo_used(), state.cargo_capacity()]
@@ -1498,8 +1521,9 @@ func _retreat_from_sea_encounter():
 	var retreat_position = player_actor.position
 	for angle in [0.0, 0.72, -0.72, PI]:
 		var candidate = player_actor.position + away.rotated(float(angle)) * 155.0
-		candidate.x = clamp(candidate.x, 70.0, WORLD_SIZE.x - 70.0)
-		candidate.y = clamp(candidate.y, 330.0, 1610.0)
+		var active_size = _active_world_size()
+		candidate.x = clamp(candidate.x, 70.0, active_size.x - 70.0)
+		candidate.y = clamp(candidate.y, 210.0, active_size.y - 110.0)
 		if map_node.has_method("is_navigable") and map_node.is_navigable(candidate) and candidate.distance_to(enemy_position) >= 125.0:
 			retreat_position = candidate
 			break
@@ -2029,7 +2053,7 @@ func _refresh_waypoint():
 		navigation_button.text = "◆ 自动航行 · %s" % GameData.TRADE_PORTS[destination].name
 		waypoint_label.visible = true
 		waypoint_label.text = "◆ %s港" % GameData.TRADE_PORTS[destination].name
-		waypoint_world_target = SeaWorldMapScript.DESTINATION_POSITION
+		waypoint_world_target = _sea_destination_position()
 		_update_waypoint_screen_position()
 		return
 	var target = _quest_navigation_target()
@@ -2068,7 +2092,7 @@ func _update_waypoint_screen_position():
 func _navigate_to_quest():
 	if current_region == "sea" and not state.active_voyage.is_empty():
 		_cancel_task_navigation()
-		move_target = SeaWorldMapScript.DESTINATION_POSITION
+		move_target = _sea_destination_position()
 		has_move_target = true
 		hint_label.text = "自动航行沿主航道前进并迎战挡路威胁；想避战请拖动摇杆绕行。"
 		return
@@ -2412,7 +2436,7 @@ func _select_sailing_destination(port_id):
 	var stamina_cost = int(plan.stamina_cost)
 	var hp_after = int(state.player.hp) - stamina_cost
 	var storm_loss = 2 if str(plan.tier) == "oceanic" else 1
-	sailing_route_label.text = "%s → %s｜全港直航 · %s｜%d海里 · 预计%d日｜风险%d%%\n航经：%s｜威胁情报：%s｜建议Lv.%d；敌人可绕行\n正常出航免费：消耗%d体力（%d→%d）｜潜水寻宝%d%%｜无护航遇风暴最多损失%d单位货物\n付费传送：%d银币 · 1日直达 · 无海战/打捞｜特产：%s" % [GameData.TRADE_PORTS[str(state.player.location)].name, destination.name, str(plan.tier_name), int(plan.distance_nm), days, risk, str(plan.waters_text), "、".join(threats), int(plan.recommended_level), stamina_cost, int(state.player.hp), max(0, hp_after), int(plan.dive_chance), storm_loss, int(route.fee), destination.specialty]
+	sailing_route_label.text = "%s → %s｜全港直航 · %s｜%d海里 · 预计%d日｜风险%d%%\n海燕号 Lv.%d · %d节 · %d海里/日｜连续大地图航道 %.1f屏\n航经：%s｜威胁情报：%s｜建议Lv.%d；敌人可绕行\n正常出航免费：消耗%d体力（%d→%d）｜潜水寻宝%d%%｜无护航遇风暴最多损失%d单位货物\n付费传送：%d银币 · 1日直达 · 无海战/打捞｜特产：%s" % [GameData.TRADE_PORTS[str(state.player.location)].name, destination.name, str(plan.tier_name), int(plan.distance_nm), days, risk, int(plan.ship_level), int(plan.speed_knots), int(plan.nm_per_day), GameData.sea_route_span(int(plan.distance_nm)) / MAP_SIZE.y, str(plan.waters_text), "、".join(threats), int(plan.recommended_level), stamina_cost, int(state.player.hp), max(0, hp_after), int(plan.dive_chance), storm_loss, int(route.fee), destination.specialty]
 	if int(state.player.level) + 5 < int(plan.recommended_level):
 		sailing_route_label.text += "\n⚠ 当前等级偏低：建议手动绕开强敌、强化装备，或使用付费传送。"
 	elif state.voyage_protection > 0:
@@ -2680,7 +2704,7 @@ func _open_trade_2d():
 	list.add_child(_label("船只改造", 16, GOLD))
 	for upgrade_entry in [
 		{"id": "hold", "text": "扩建货舱 +6"},
-		{"id": "speed", "text": "升级船帆 -1日"},
+		{"id": "speed", "text": "升级船帆 · 提升节速"},
 		{"id": "armor", "text": "加固船体 -6%风险"}
 	]:
 		var upgrade_button = _button(upgrade_entry.text, "ghost")
@@ -2812,7 +2836,7 @@ func _best_trade_destination_2d(good_id):
 		var route = GameData.trade_route(str(state.player.location), destination_id)
 		if route.is_empty():
 			continue
-		var days = max(1, int(route.days) - (int(state.ship.get("speed", 1)) - 1))
+		var days = state.voyage_days_for_distance(int(route.get("distance_nm", 1)))
 		var destination_sell_price = state.trade_sell_price_at(destination_id, good_id, int(state.trade_day) + days)
 		var profit = destination_sell_price - buy_price
 		if best.is_empty() or profit > int(best.profit):
