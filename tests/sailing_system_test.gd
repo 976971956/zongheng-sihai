@@ -38,6 +38,12 @@ func _run():
 	_check(str(regional_plan.tier) == "regional" and int(regional_plan.threat_count) == 2 and "reef_serpent" in regional_plan.enemy_ids, "跨海航线必须同时规划海盗与礁海怪物")
 	_check(str(oceanic_plan.tier) == "oceanic" and int(oceanic_plan.threat_count) == 2 and not ("black_flag_privateer" in oceanic_plan.enemy_ids), "中低等级玩家的远洋航线不能过早出现Lv.52黑旗私掠舰")
 	_check(int(coastal_plan.distance_nm) < int(regional_plan.distance_nm) and int(regional_plan.distance_nm) < int(oceanic_plan.distance_nm), "近海、跨海与远洋距离必须按真实港口跨度递增")
+	_check(int(coastal_plan.stamina_cost) < int(oceanic_plan.stamina_cost) and int(coastal_plan.dive_chance) < int(oceanic_plan.dive_chance), "远洋必须消耗更多出航体力，同时提供更高的潜水寻宝概率")
+	var tired_state = TestState.new()
+	tired_state.quest_index = GameData.QUESTS.size()
+	tired_state.player.location = "venice_dock"
+	tired_state.player.hp = int(tired_state.voyage_plan("ragusa_dock").stamina_cost)
+	_check(not bool(tired_state.begin_voyage("ragusa_dock").get("ok", true)) and tired_state.active_voyage.is_empty(), "体力不足时不能以0体力离港，必须先休息或使用补给")
 	state.player.level = 55
 	var veteran_oceanic_plan = state.voyage_plan("cape_town_dock")
 	_check(int(veteran_oceanic_plan.threat_count) == 3 and "black_flag_privateer" in veteran_oceanic_plan.enemy_ids, "高等级玩家进入高风险远洋时必须出现第三段私掠舰威胁")
@@ -56,16 +62,18 @@ func _run():
 	state.player.level = 8
 	var initial_silver = int(state.player.silver)
 	var initial_day = int(state.trade_day)
+	var initial_hp = int(state.player.hp)
 	var departure = state.begin_voyage("ragusa_dock")
 	_check(bool(departure.get("ok", false)), "正常出航必须能创建进行中的航程")
 	_check(str(state.player.location) == "venice_dock" and int(state.player.silver) == initial_silver, "出航后、靠港前必须保留启航港且不收传送费")
+	_check(int(state.player.hp) == initial_hp - int(coastal_plan.stamina_cost) and int(state.active_voyage.stamina_cost) == int(coastal_plan.stamina_cost), "正常出航必须按航程消耗体力并把消耗记录进航程")
 	_check(str(state.active_voyage.get("region", "")) == "mediterranean" and state.voyage_position() == Vector2(540, 1580), "威尼斯至拉古萨必须进入地中海并保存船位")
 	state.update_voyage_position(Vector2(610, 1240))
 	_check(state.voyage_position() == Vector2(610, 1240), "进行中的船位必须可以写入存档状态")
 	state.update_voyage_position(Vector2(540, 972.5))
 	_check(is_equal_approx(state.voyage_progress(), 0.5) and state.voyage_remaining_distance() == 210, "船位必须换算为真实航程进度与剩余海里")
 	var treasure = state.claim_sea_treasure()
-	_check(bool(treasure.get("ok", false)) and int(state.player.silver) > initial_silver and not bool(state.claim_sea_treasure().get("ok", true)), "每段航程的漂流货箱只能领取一次")
+	_check(bool(treasure.get("ok", false)) and str(treasure.get("mode", "")) == "salvage" and int(state.player.silver) > initial_silver and not bool(state.claim_sea_treasure().get("ok", true)), "每段航程可选择稳妥打捞，且漂流货箱只能领取一次")
 	state.cargo["venetian_glass"] = 2
 	state.cargo_costs["venetian_glass"] = 48
 	var storm = state.resolve_sea_storm()
@@ -79,6 +87,15 @@ func _run():
 	var transfer_silver = int(state.player.silver)
 	var transfer = state.transfer_to("venice_dock")
 	_check(bool(transfer.get("ok", false)) and str(state.player.location) == "venice_dock" and int(state.player.silver) < transfer_silver and state.active_voyage.is_empty(), "付费传送必须直接抵港、扣费且不进入海域")
+
+	var dive_state = TestState.new()
+	dive_state.quest_index = GameData.QUESTS.size()
+	dive_state.player.location = "venice_dock"
+	dive_state.player.level = 30
+	dive_state.rng.seed = 7
+	dive_state.begin_voyage("alexandria_dock")
+	var dive_result = dive_state.claim_sea_treasure("dive")
+	_check(bool(dive_result.get("ok", false)) and str(dive_result.get("mode", "")) == "dive" and dive_result.has("found") and not bool(dive_state.claim_sea_treasure("salvage").get("ok", true)), "航海潜水必须结算成功率或安慰奖励，并与稳妥打捞共享每航程一次机会")
 
 	var battle_state = TestState.new()
 	battle_state.quest_index = GameData.QUESTS.size()
@@ -148,7 +165,7 @@ func _run():
 	_check(int(legacy_state.active_voyage.get("distance_nm", 0)) == 420 and Array(legacy_state.active_voyage.get("encounters", [])).size() == 1 and bool(legacy_state.active_voyage.get("escorted", false)) and legacy_state.voyage_protection == 0, "旧版进行中航程必须迁移距离、遭遇和已准备的护航物资")
 
 	if failures.is_empty():
-		print("SAILING_OK: 出航、海域状态、风暴、打捞、靠港、返航与付费传送全部通过")
+		print("SAILING_OK: 体力出航、海域状态、风暴、打捞/潜水、靠港、返航与付费传送全部通过")
 		quit(0)
 	else:
 		for failure in failures:

@@ -1299,6 +1299,11 @@ func voyage_plan(port_id, origin_override = ""):
 	var distance_nm = max(1, int(route.get("distance_nm", int(route.get("days", 1)) * 420)))
 	var tier_id = GameData.sea_voyage_tier(distance_nm)
 	var tier = GameData.SEA_VOYAGE_TIERS[tier_id]
+	var days = max(1, int(route.days) - (int(ship.get("speed", 1)) - 1))
+	# 原版正常出航会消耗体力；按航程分段收费，避免远洋和近海只差一张地图。
+	var stamina_cost = max(3, int(ceil(float(distance_nm) / 900.0)) + 1)
+	var dive_tier_bonus = {"coastal": 0, "regional": 10, "oceanic": 20}.get(tier_id, 0)
+	var dive_chance = clamp(35 + int(dive_tier_bonus) + int(round(float(get_stats().drop_bonus) * 100.0)), 35, 75)
 	var risk = _voyage_risk_for_route(route)
 	var threat_count = 1
 	if distance_nm > int(GameData.SEA_VOYAGE_TIERS.coastal.max_distance_nm):
@@ -1316,7 +1321,7 @@ func voyage_plan(port_id, origin_override = ""):
 	return {
 		"origin": origin, "destination": destination,
 		"distance_nm": distance_nm, "tier": tier_id, "tier_name": str(tier.name),
-		"days": max(1, int(route.days) - (int(ship.get("speed", 1)) - 1)),
+		"days": days, "stamina_cost": stamina_cost, "dive_chance": dive_chance,
 		"risk": risk, "threat_count": enemy_ids.size(), "enemy_ids": enemy_ids,
 		"enemy_zones": Array(enemy_plan.enemy_zones), "zone_ids": zone_ids,
 		"waters_text": str(route.get("waters_text", GameData.sea_waters_text(zone_ids))),
@@ -1422,7 +1427,10 @@ func begin_voyage(port_id):
 	var plan = voyage_plan(destination)
 	if plan.is_empty():
 		return {"ok": false, "message": "无法计算两座港口之间的航海距离。"}
+	if int(player.hp) <= int(plan.stamina_cost):
+		return {"ok": false, "message": "本航程需要%d体力，当前只有%d。请先在酒馆休息或使用补给，至少保留1点体力再出航。" % [int(plan.stamina_cost), int(player.hp)]}
 	var escorted = voyage_protection > 0
+	player.hp -= int(plan.stamina_cost)
 	active_voyage = {
 		"origin": str(player.location), "destination": destination,
 		"region": GameData.sea_region_for_route(str(player.location), destination),
@@ -1430,6 +1438,7 @@ func begin_voyage(port_id):
 		"distance_nm": int(plan.distance_nm), "tier": str(plan.tier), "tier_name": str(plan.tier_name),
 		"zone_ids": Array(plan.zone_ids), "waters_text": str(plan.waters_text),
 		"recommended_level": int(plan.recommended_level),
+		"stamina_cost": int(plan.stamina_cost), "dive_chance": int(plan.dive_chance),
 		"x": 540.0, "y": 1580.0, "pirate_defeated": false,
 		"treasure_claimed": false, "storm_resolved": false,
 		"encounters": _build_sea_encounters(plan), "current_encounter_id": "",
@@ -1437,10 +1446,10 @@ func begin_voyage(port_id):
 	}
 	if escorted:
 		voyage_protection = 0
-	message_history.push_front("海燕号从%s正常出航，航经%s：%d海里，预计%d日。" % [GameData.TRADE_PORTS[str(player.location)].name, str(active_voyage.waters_text), int(active_voyage.distance_nm), int(active_voyage.days)])
+	message_history.push_front("海燕号从%s正常出航，消耗%d体力，航经%s：%d海里，预计%d日。" % [GameData.TRADE_PORTS[str(player.location)].name, int(plan.stamina_cost), str(active_voyage.waters_text), int(active_voyage.distance_nm), int(active_voyage.days)])
 	_trim_history()
 	save_game()
-	return {"ok": true, "message": "自由航线已启航：航经%s，%s，共%d海里，侦测到%d处威胁。驾驶海燕号抵达%s。" % [str(plan.waters_text), str(plan.tier_name), int(plan.distance_nm), int(plan.threat_count), GameData.TRADE_PORTS[destination].name], "voyage": active_voyage.duplicate(true)}
+	return {"ok": true, "message": "自由航线已启航：消耗%d体力，航经%s，%s，共%d海里，侦测到%d处威胁。驾驶海燕号抵达%s。" % [int(plan.stamina_cost), str(plan.waters_text), str(plan.tier_name), int(plan.distance_nm), int(plan.threat_count), GameData.TRADE_PORTS[destination].name], "voyage": active_voyage.duplicate(true)}
 
 func update_voyage_position(position, persist = false):
 	if active_voyage.is_empty():
@@ -1517,18 +1526,42 @@ func mark_sea_encounter_defeated(encounter_id = ""):
 func mark_sea_pirate_defeated():
 	mark_sea_encounter_defeated()
 
-func claim_sea_treasure():
+func claim_sea_treasure(mode = "salvage"):
 	if active_voyage.is_empty():
 		return {"ok": false, "message": "这里没有正在进行的航程。"}
 	if bool(active_voyage.get("treasure_claimed", false)):
 		return {"ok": false, "message": "漂流货箱已经打捞过了。"}
+	var resolved_mode = "dive" if str(mode) == "dive" else "salvage"
 	var silver = 18 + int(active_voyage.get("days", 1)) * 5 + int(active_voyage.get("distance_nm", 0)) / 240
 	active_voyage.treasure_claimed = true
+	if resolved_mode == "dive":
+		var chance = int(active_voyage.get("dive_chance", 35))
+		var found = rng.randi_range(1, 100) <= chance
+		if found:
+			var tier_id = str(active_voyage.get("tier", "coastal"))
+			var pools = {
+				"coastal": ["coral_ring", "universal_medicine"],
+				"regional": ["aquamarine_pendant", "corsair_card"],
+				"oceanic": ["corsair_card", "unknown_equipment"]
+			}
+			var pool = Array(pools.get(tier_id, pools.coastal))
+			var item_id = str(pool[rng.randi_range(0, pool.size() - 1)])
+			_add_item(item_id, 1)
+			message_history.push_front("航途中潜水寻宝，找到%s。" % GameData.ITEMS[item_id].name)
+			_trim_history()
+			save_game()
+			return {"ok": true, "mode": resolved_mode, "found": true, "item": item_id, "message": "潜入旧货箱下方的沉船舱，找到%s×1。" % GameData.ITEMS[item_id].name}
+		silver = max(6, int(silver / 3))
+		player.silver += silver
+		message_history.push_front("航途中潜水寻宝未发现遗物，回收%d银币。" % silver)
+		_trim_history()
+		save_game()
+		return {"ok": true, "mode": resolved_mode, "found": false, "silver": silver, "message": "沉船舱已经被潮水冲空，只回收了%d银币。" % silver}
 	player.silver += silver
-	message_history.push_front("航途中打捞漂流货箱，获得%d银币。" % silver)
+	message_history.push_front("航途中稳妥打捞漂流货箱，获得%d银币。" % silver)
 	_trim_history()
 	save_game()
-	return {"ok": true, "message": "水手从漂流货箱里找到%d银币。" % silver, "silver": silver}
+	return {"ok": true, "mode": resolved_mode, "message": "水手从漂流货箱里找到%d银币。" % silver, "silver": silver}
 
 func resolve_sea_storm():
 	if active_voyage.is_empty():
@@ -1747,6 +1780,10 @@ func _normalize_active_voyage():
 		active_voyage.waters_text = str(plan.waters_text)
 	if not active_voyage.has("recommended_level"):
 		active_voyage.recommended_level = int(plan.recommended_level)
+	if not active_voyage.has("stamina_cost"):
+		active_voyage.stamina_cost = int(plan.stamina_cost)
+	if not active_voyage.has("dive_chance"):
+		active_voyage.dive_chance = int(plan.dive_chance)
 	var saved_encounters = active_voyage.get("encounters", [])
 	if typeof(saved_encounters) != TYPE_ARRAY or Array(saved_encounters).is_empty():
 		active_voyage.encounters = _build_sea_encounters(plan)

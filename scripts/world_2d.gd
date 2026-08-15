@@ -26,6 +26,7 @@ const AUTO_BATTLE_HIT_DELAY = 0.16
 const AUTO_BATTLE_READ_DELAY = 0.30
 const NAVIGATION_GRID_SIZE = 42.0
 const NAVIGATION_REACH_DISTANCE = 12.0
+const OVERLAY_DRAG_THRESHOLD = 10.0
 
 const ENEMY_SPAWNS = {
 	"drunk_sailor": {"region": "city", "name": "喝醉的水手", "position": Vector2(360, 300), "color": Color("99484c"), "accent": Color("4a3e49"), "location": "venice_north_gate"},
@@ -122,6 +123,10 @@ var sailing_route_label
 var sailing_confirm_button
 var sailing_transfer_button
 var sea_save_timer = 0.0
+var overlay_scroll
+var overlay_drag_pointer = -99
+var overlay_drag_distance = 0.0
+var overlay_dragging = false
 
 var region_by_location = {
 	"alisa_hut": "city", "venice_tavern": "city", "venice_square": "city",
@@ -864,6 +869,37 @@ func _show_sea_return_prompt():
 	content.add_child(cancel)
 	_open_overlay(content)
 
+func _show_sea_treasure_prompt():
+	if state.active_voyage.is_empty() or bool(state.active_voyage.get("treasure_claimed", false)):
+		_show_message("海上打捞", "这片水域已经没有可打捞的货箱。")
+		return
+	var content = VBoxContainer.new()
+	content.add_theme_constant_override("separation", 14)
+	content.add_child(_label("漂流货箱 · 选择打捞方式", 25, GOLD))
+	var chance = int(state.active_voyage.get("dive_chance", 35))
+	var copy = _label("稳妥打捞可直接获得银币；潜水寻宝有%d%%概率找到本海域的珠宝、卡片或未知装备，失败只带回少量银币。每段航程只能选择一次。" % chance, 16, INK)
+	copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(copy)
+	var salvage = _button("稳妥打捞 · 保证获得银币", "gold")
+	salvage.pressed.connect(_claim_sea_treasure_2d.bind("salvage"))
+	content.add_child(salvage)
+	var dive = _button("潜水寻宝 · %d%%发现遗物" % chance, "primary")
+	dive.pressed.connect(_claim_sea_treasure_2d.bind("dive"))
+	content.add_child(dive)
+	var leave = _button("暂时离开", "ghost")
+	leave.pressed.connect(_close_overlay)
+	content.add_child(leave)
+	_open_overlay(content)
+
+func _claim_sea_treasure_2d(mode):
+	var result = state.claim_sea_treasure(str(mode))
+	_close_overlay()
+	_spawn_world_actors()
+	_refresh_hud()
+	if bool(result.get("ok", false)):
+		AudioDirector.play_sfx("reward")
+	_show_message("潜水寻宝" if str(mode) == "dive" else "海上打捞", str(result.get("message", "货箱已经空了。")))
+
 func _abort_sea_voyage():
 	var result = state.abort_voyage()
 	_close_overlay()
@@ -979,7 +1015,8 @@ func _refresh_hud():
 		location_label.text = "◆ %s" % GameData.SEA_REGIONS[str(voyage.region)].name
 		stats_label.text = "%s  航程%d%% · 剩余%d海里" % [str(state.ship.name), int(round(state.voyage_progress() * 100.0)), state.voyage_remaining_distance()]
 		currency_label.text = "银币 %d" % int(state.player.silver)
-		quest_label.text = "%s → %s｜%s · %d日｜威胁%d/%d｜货舱%d/%d" % [GameData.TRADE_PORTS[str(voyage.origin)].name, GameData.TRADE_PORTS[str(voyage.destination)].name, str(voyage.get("tier_name", "航行")), int(voyage.days), state.sea_encounters_remaining(), Array(voyage.get("encounters", [])).size(), state.cargo_used(), state.cargo_capacity()]
+		var salvage_status = "已打捞" if bool(voyage.get("treasure_claimed", false)) else "可潜水"
+		quest_label.text = "%s → %s｜%s · %d日｜威胁%d/%d｜%s｜货舱%d/%d" % [GameData.TRADE_PORTS[str(voyage.origin)].name, GameData.TRADE_PORTS[str(voyage.destination)].name, str(voyage.get("tier_name", "航行")), int(voyage.days), state.sea_encounters_remaining(), Array(voyage.get("encounters", [])).size(), salvage_status, state.cargo_used(), state.cargo_capacity()]
 		if is_instance_valid(waypoint_label):
 			_refresh_waypoint()
 		return
@@ -1009,10 +1046,7 @@ func _interact():
 		_show_sea_return_prompt()
 		return
 	if nearest_actor.kind == "sea_treasure":
-		var treasure_result = state.claim_sea_treasure()
-		_spawn_world_actors()
-		_refresh_hud()
-		_show_message("海上打捞", str(treasure_result.get("message", "货箱已经空了。")))
+		_show_sea_treasure_prompt()
 		return
 	if nearest_actor.kind == "travel":
 		_switch_region(str(nearest_actor.id), str(nearest_actor.location))
@@ -2320,7 +2354,7 @@ func _open_sailing_map(preselect = ""):
 	content.add_child(_label("九港航海图", 26, GOLD))
 	var at_port = GameData.TRADE_PORTS.has(str(state.player.location))
 	var current_name = GameData.TRADE_PORTS[str(state.player.location)].name if at_port else GameData.LOCATIONS.get(str(state.player.location), GameData.LOCATIONS.venice_square).name
-	var guide_text = "当前停泊：%s · 正常出航进入海域驾驶；付费传送可以直接抵港。" % current_name if at_port else "你正在%s。可以查看海图，但启航前需要先走到港口。" % current_name
+	var guide_text = "①选择已发现港口　②检查体力、风险与货舱　③正常出航进入海域驾驶；付费传送直接抵港。\n当前停泊：%s" % current_name if at_port else "你正在%s。可以查看海图，但启航前需要先走到港口。" % current_name
 	var guide = _label(guide_text, 14, MUTED)
 	guide.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.add_child(guide)
@@ -2375,13 +2409,18 @@ func _select_sailing_destination(port_id):
 	var threats = []
 	for enemy_id in Array(plan.enemy_ids):
 		threats.append("%sLv.%d" % [GameData.ENEMIES[str(enemy_id)].name, int(GameData.ENEMIES[str(enemy_id)].level)])
-	sailing_route_label.text = "%s → %s｜全港直航 · %s｜%d海里 · 预计%d日｜风险%d%%\n航经：%s｜威胁情报：%s｜建议角色Lv.%d；敌人均可绕行\n正常出航免费｜付费传送%d银币｜特产：%s" % [GameData.TRADE_PORTS[str(state.player.location)].name, destination.name, str(plan.tier_name), int(plan.distance_nm), days, risk, str(plan.waters_text), "、".join(threats), int(plan.recommended_level), int(route.fee), destination.specialty]
+	var stamina_cost = int(plan.stamina_cost)
+	var hp_after = int(state.player.hp) - stamina_cost
+	var storm_loss = 2 if str(plan.tier) == "oceanic" else 1
+	sailing_route_label.text = "%s → %s｜全港直航 · %s｜%d海里 · 预计%d日｜风险%d%%\n航经：%s｜威胁情报：%s｜建议Lv.%d；敌人可绕行\n正常出航免费：消耗%d体力（%d→%d）｜潜水寻宝%d%%｜无护航遇风暴最多损失%d单位货物\n付费传送：%d银币 · 1日直达 · 无海战/打捞｜特产：%s" % [GameData.TRADE_PORTS[str(state.player.location)].name, destination.name, str(plan.tier_name), int(plan.distance_nm), days, risk, str(plan.waters_text), "、".join(threats), int(plan.recommended_level), stamina_cost, int(state.player.hp), max(0, hp_after), int(plan.dive_chance), storm_loss, int(route.fee), destination.specialty]
 	if int(state.player.level) + 5 < int(plan.recommended_level):
 		sailing_route_label.text += "\n⚠ 当前等级偏低：建议手动绕开强敌、强化装备，或使用付费传送。"
 	elif state.voyage_protection > 0:
 		sailing_route_label.text += "\n护航物资将在本次启航时消耗，并保护一次风暴。"
-	sailing_confirm_button.text = "正常出航 · 驾驶海燕号前往%s" % destination.name
-	sailing_confirm_button.disabled = false
+	sailing_confirm_button.text = "正常出航 · %d体力 · 前往%s" % [stamina_cost, destination.name]
+	sailing_confirm_button.disabled = int(state.player.hp) <= stamina_cost
+	if sailing_confirm_button.disabled:
+		sailing_route_label.text += "\n⚠ 体力不足：先住宿或使用补给；不能以0体力离港。"
 	sailing_transfer_button.text = "付费传送至%s · %d银币" % [destination.name, int(route.fee)]
 	sailing_transfer_button.disabled = int(state.player.silver) < int(route.fee)
 	if sailing_transfer_button.disabled:
@@ -2894,6 +2933,7 @@ func _open_overlay(content, allow_close = true, panel_size = Vector2(660, 760)):
 	panel.add_theme_stylebox_override("panel", _style(PANEL, 20, Color(TEAL, 0.7), 2, 20))
 	center.add_child(panel)
 	var box = VBoxContainer.new()
+	box.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	box.add_theme_constant_override("separation", 14)
 	panel.add_child(box)
 	if allow_close:
@@ -2905,13 +2945,82 @@ func _open_overlay(content, allow_close = true, panel_size = Vector2(660, 760)):
 		var close = _button("关闭", "ghost")
 		close.pressed.connect(_close_overlay)
 		close_row.add_child(close)
-	box.add_child(content)
+	overlay_scroll = ScrollContainer.new()
+	overlay_scroll.name = "OverlayScroll"
+	overlay_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	overlay_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	overlay_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	overlay_scroll.mouse_filter = Control.MOUSE_FILTER_PASS
+	box.add_child(overlay_scroll)
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	overlay_scroll.add_child(content)
+	_reset_overlay_drag()
+
+func _input(event):
+	if not is_instance_valid(overlay):
+		_reset_overlay_drag()
+		return
+	var target = _overlay_scroll_target()
+	if not is_instance_valid(target):
+		return
+	if event is InputEventMouseButton:
+		if event.pressed and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+			var wheel_direction = -1 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1
+			target.scroll_vertical += wheel_direction * max(36, int(round(58.0 * event.factor)))
+			get_viewport().set_input_as_handled()
+		elif event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed:
+				overlay_drag_pointer = -1
+				overlay_drag_distance = 0.0
+				overlay_dragging = false
+			else:
+				if overlay_drag_pointer == -1 and overlay_dragging:
+					get_viewport().set_input_as_handled()
+				_reset_overlay_drag()
+	elif event is InputEventMouseMotion and overlay_drag_pointer == -1 and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
+		_scroll_overlay_drag(target, event.relative)
+	elif event is InputEventScreenTouch:
+		if event.pressed:
+			overlay_drag_pointer = int(event.index)
+			overlay_drag_distance = 0.0
+			overlay_dragging = false
+		elif overlay_drag_pointer == int(event.index):
+			if overlay_dragging:
+				get_viewport().set_input_as_handled()
+			_reset_overlay_drag()
+	elif event is InputEventScreenDrag and overlay_drag_pointer == int(event.index):
+		_scroll_overlay_drag(target, event.relative)
+
+func _scroll_overlay_drag(target, relative):
+	overlay_drag_distance += abs(float(relative.y))
+	if overlay_drag_distance >= OVERLAY_DRAG_THRESHOLD:
+		overlay_dragging = true
+		target.scroll_vertical -= int(round(float(relative.y)))
+		get_viewport().set_input_as_handled()
+
+func _overlay_scroll_target():
+	if not is_instance_valid(overlay):
+		return null
+	for node in overlay.find_children("*", "ScrollContainer", true, false):
+		if node == overlay_scroll or not node.visible:
+			continue
+		var bar = node.get_v_scroll_bar()
+		if is_instance_valid(bar) and bar.max_value > bar.page + 1.0:
+			return node
+	return overlay_scroll if is_instance_valid(overlay_scroll) else null
+
+func _reset_overlay_drag():
+	overlay_drag_pointer = -99
+	overlay_drag_distance = 0.0
+	overlay_dragging = false
 
 func _close_overlay():
 	auto_battle_running = false
 	if is_instance_valid(overlay):
 		overlay.queue_free()
 	overlay = null
+	overlay_scroll = null
+	_reset_overlay_drag()
 	battle_stage = null
 	battle_log_label = null
 	battle_action_button = null

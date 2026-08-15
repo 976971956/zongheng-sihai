@@ -80,9 +80,29 @@ func _run():
 	_check(world_scene.sailing_map.port_buttons.size() == 9, "手机航海图必须显示九座可点击港口")
 	world_scene.sailing_map.select_port("ragusa_dock")
 	_check(is_instance_valid(world_scene.sailing_transfer_button) and "正常出航" in world_scene.sailing_confirm_button.text and "付费传送" in world_scene.sailing_transfer_button.text, "手机航海图必须把正常出航与付费传送显示为两个独立触控按钮")
+	_check("消耗" in world_scene.sailing_route_label.text and "潜水寻宝" in world_scene.sailing_route_label.text and "风暴" in world_scene.sailing_route_label.text, "手机航线详情必须显示体力成本、潜水收益与风暴货损")
+	world_scene._close_overlay()
+	for item_id in GameData.ITEMS:
+		world_scene.state.inventory[str(item_id)] = 1
+	world_scene._open_inventory()
+	await process_frame
+	await process_frame
+	var bag_scroll = world_scene._overlay_scroll_target()
+	var scroll_before = bag_scroll.scroll_vertical
+	var touch = InputEventScreenTouch.new()
+	touch.index = 0
+	touch.pressed = true
+	touch.position = Vector2(40, 180)
+	world_scene._input(touch)
+	var drag = InputEventScreenDrag.new()
+	drag.index = 0
+	drag.position = Vector2(40, 80)
+	drag.relative = Vector2(0, -120)
+	world_scene._input(drag)
+	_check(bag_scroll.scroll_vertical > scroll_before, "弹窗必须允许从标题、卡片或按钮等任意位置上划滚动，不再要求按住窄小列表区域")
 
 	if failures.is_empty():
-		print("MOBILE_OK: 竖屏单栏、任务领奖弹窗、触控战斗、出航/传送双入口与货物贸易页面全部通过")
+		print("MOBILE_OK: 竖屏单栏、全窗拖动滚动、任务领奖、触控战斗、航海决策与贸易页面全部通过")
 		quit(0)
 	else:
 		for failure in failures:
