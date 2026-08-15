@@ -26,13 +26,17 @@ func _run():
 	var oceanic_plan = state.voyage_plan("cape_town_dock")
 	_check(int(coastal_plan.distance_nm) == 420 and str(coastal_plan.tier) == "coastal" and int(coastal_plan.threat_count) == 1, "威尼斯至拉古萨必须是420海里的单威胁近海航程")
 	_check(str(regional_plan.tier) == "regional" and int(regional_plan.threat_count) == 2 and "reef_serpent" in regional_plan.enemy_ids, "跨海航线必须同时规划海盗与礁海怪物")
-	_check(str(oceanic_plan.tier) == "oceanic" and int(oceanic_plan.threat_count) == 3 and "black_flag_privateer" in oceanic_plan.enemy_ids, "高风险远洋航线必须规划三段分级威胁")
+	_check(str(oceanic_plan.tier) == "oceanic" and int(oceanic_plan.threat_count) == 2 and not ("black_flag_privateer" in oceanic_plan.enemy_ids), "中低等级玩家的远洋航线不能过早出现Lv.52黑旗私掠舰")
+	state.player.level = 55
+	var veteran_oceanic_plan = state.voyage_plan("cape_town_dock")
+	_check(int(veteran_oceanic_plan.threat_count) == 3 and "black_flag_privateer" in veteran_oceanic_plan.enemy_ids, "高等级玩家进入高风险远洋时必须出现第三段私掠舰威胁")
 	state.ship.armor = 3
 	state.voyage_protection = 1
 	var protected_oceanic_plan = state.voyage_plan("cape_town_dock")
-	_check(int(protected_oceanic_plan.threat_count) == 2 and int(protected_oceanic_plan.risk) < int(oceanic_plan.risk), "船体护甲和护航物资必须降低远洋风险与遭遇数量")
+	_check(int(protected_oceanic_plan.threat_count) == 2 and int(protected_oceanic_plan.risk) < int(veteran_oceanic_plan.risk), "船体护甲和护航物资必须降低远洋风险与遭遇数量")
 	state.ship.armor = 0
 	state.voyage_protection = 0
+	state.player.level = 8
 	var initial_silver = int(state.player.silver)
 	var initial_day = int(state.trade_day)
 	var departure = state.begin_voyage("ragusa_dock")
@@ -77,11 +81,30 @@ func _run():
 	state.player.location = "venice_dock"
 	state.voyage_protection = 1
 	state.begin_voyage("ragusa_dock")
+	_check(state.voyage_protection == 0 and bool(state.active_voyage.get("escorted", false)), "护航物资必须在启航时绑定并消耗，不能绕开风暴后无限复用")
 	var protected_storm = state.resolve_sea_storm()
-	_check(bool(protected_storm.get("protected", false)) and state.voyage_protection == 0, "护航物资必须在真实穿越风暴时消耗并免除损失")
+	_check(bool(protected_storm.get("protected", false)) and not bool(state.active_voyage.get("escorted", true)), "本航程护航必须免除一次风暴损失且随后失效")
 	var origin = str(state.active_voyage.origin)
 	var abort = state.abort_voyage()
 	_check(bool(abort.get("ok", false)) and str(state.player.location) == origin and state.active_voyage.is_empty(), "玩家必须能放弃航程并返回启航港")
+	_check(int(state.voyage_plan("ragusa_dock").risk) > 4, "返航后的下一次航程不能继续沿用已经消耗的护航减险")
+
+	for milestone in [
+		{"origin": "malta_dock", "destination": "cape_town_dock", "level": 30},
+		{"origin": "cape_town_dock", "destination": "quanzhou_dock", "level": 37},
+		{"origin": "quanzhou_dock", "destination": "athens_dock", "level": 44},
+		{"origin": "athens_dock", "destination": "venice_dock", "level": 51},
+		{"origin": "venice_dock", "destination": "yangzhou_dock", "level": 58},
+		{"origin": "yangzhou_dock", "destination": "amsterdam_dock", "level": 65}
+	]:
+		var story_state = TestState.new()
+		story_state.quest_index = GameData.QUESTS.size()
+		story_state.player.location = str(milestone.origin)
+		story_state.player.level = int(milestone.level)
+		story_state.ship.armor = 1
+		var story_plan = story_state.voyage_plan(str(milestone.destination))
+		_check(not story_plan.is_empty() and int(story_plan.recommended_level) <= int(milestone.level) + 8, "主线航程%s→%s不能生成跨度过大的必经敌人" % [milestone.origin, milestone.destination])
+		_check(not ("black_flag_privateer" in Array(story_plan.enemy_ids)) or int(milestone.level) >= 45, "Lv.45前的主线航程不能出现黑旗私掠舰")
 
 	var long_state = TestState.new()
 	long_state.quest_index = GameData.QUESTS.size()
@@ -101,9 +124,10 @@ func _run():
 	var legacy_state = TestState.new()
 	legacy_state.quest_index = GameData.QUESTS.size()
 	legacy_state.player.location = "venice_dock"
+	legacy_state.voyage_protection = 1
 	legacy_state.active_voyage = {"origin": "venice_dock", "destination": "ragusa_dock", "days": 2, "risk": 14, "x": 540.0, "y": 1200.0, "pirate_defeated": false}
 	legacy_state._normalize_active_voyage()
-	_check(int(legacy_state.active_voyage.get("distance_nm", 0)) == 420 and Array(legacy_state.active_voyage.get("encounters", [])).size() == 1, "旧版进行中航程必须自动补齐距离、分级和遭遇清单")
+	_check(int(legacy_state.active_voyage.get("distance_nm", 0)) == 420 and Array(legacy_state.active_voyage.get("encounters", [])).size() == 1 and bool(legacy_state.active_voyage.get("escorted", false)) and legacy_state.voyage_protection == 0, "旧版进行中航程必须迁移距离、遭遇和已准备的护航物资")
 
 	if failures.is_empty():
 		print("SAILING_OK: 出航、海域状态、风暴、打捞、靠港、返航与付费传送全部通过")

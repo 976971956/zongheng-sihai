@@ -366,17 +366,32 @@ func _run():
 
 	# 航海必须把原作的“出航”和“传送”分开；正常出航进入可驾驶海域，靠港后才改写位置。
 	scene.state.player.silver = 1000
+	scene.state.player.level = 1
+	scene.state.ship.armor = 0
+	scene.state.voyage_protection = 0
 	scene._open_sailing_map()
 	_check(is_instance_valid(scene.sailing_map) and scene.sailing_map.port_buttons.size() == GameData.TRADE_PORTS.size(), "航海图必须显示全部九座港口节点")
 	_check(not scene.sailing_map.port_buttons["amsterdam_dock"].disabled, "主线完成后九座港口必须全部在海图上解锁")
 	scene.sailing_map.select_port("venice_dock")
-	_check("亚历山大" in scene.sailing_route_label.text and "威尼斯" in scene.sailing_route_label.text and "1680海里" in scene.sailing_route_label.text and "威胁情报" in scene.sailing_route_label.text and "正常出航免费" in scene.sailing_route_label.text and "付费传送" in scene.sailing_route_label.text and not scene.sailing_confirm_button.disabled, "选择港口后必须显示距离、威胁以及免费出航/付费传送")
+	_check("亚历山大" in scene.sailing_route_label.text and "威尼斯" in scene.sailing_route_label.text and "1680海里" in scene.sailing_route_label.text and "威胁情报" in scene.sailing_route_label.text and "当前等级偏低" in scene.sailing_route_label.text and "正常出航免费" in scene.sailing_route_label.text and "付费传送" in scene.sailing_route_label.text and not scene.sailing_confirm_button.disabled, "选择港口后必须显示距离、威胁、低等级警告以及免费出航/付费传送")
 	var origin_before_departure = str(scene.state.player.location)
 	var silver_before_departure = int(scene.state.player.silver)
 	scene._start_sailing_voyage()
 	_check(scene.current_region == "sea" and not scene.state.active_voyage.is_empty(), "确认正常出航后必须进入可驾驶2D海域")
 	_check(str(scene.state.player.location) == origin_before_departure and int(scene.state.player.silver) == silver_before_departure, "海上航行未靠港前不能提前改写位置或扣传送费")
 	_check(scene.player_actor.display_id == "player_ship" and _has_actor(scene, scene.state.sea_enemy_id()) and _has_actor(scene, "drifting_cargo"), "海域必须生成可驾驶船只、航路海盗和漂流货箱")
+	var retreat_enemy = {}
+	for sea_actor in scene.actors:
+		if str(sea_actor.kind) == "enemy":
+			retreat_enemy = sea_actor
+			break
+	_check(not retreat_enemy.is_empty(), "海域必须存在可用于撤退测试的威胁")
+	if not retreat_enemy.is_empty():
+		scene.player_actor.position = retreat_enemy.node.position + Vector2(0, 70)
+		scene.active_enemy_actor = retreat_enemy
+		scene.state.active_voyage.current_encounter_id = str(retreat_enemy.get("encounter_id", ""))
+		scene._retreat_from_sea_encounter()
+		_check(scene.map_node.is_navigable(scene.player_actor.position) and scene.player_actor.position.distance_to(retreat_enemy.node.position) >= 125.0 and scene.active_enemy_actor.is_empty() and str(scene.state.active_voyage.current_encounter_id) == "", "海战撤退必须把船放到可航行且不会立即重新触敌的安全水域")
 	scene.state.active_voyage.pirate_defeated = true
 	scene._spawn_world_actors()
 	scene.player_actor.position = Vector2(540, 365)

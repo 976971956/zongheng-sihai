@@ -1443,13 +1443,38 @@ func _finish_battle_overlay():
 	if lost:
 		_return_to_tavern_after_defeat(enemy_name, finished_result)
 	elif bool(finished_result.get("fled", false)) and current_region == "sea":
-		player_actor.position += Vector2(125, 95)
-		state.update_voyage_position(player_actor.position, true)
-		hint_label.text = "已经脱离接舷范围，转动船头即可绕开海盗。"
+		_retreat_from_sea_encounter()
 	elif should_claim:
 		call_deferred("_show_quest_claim")
 	elif should_claim_bounty:
 		call_deferred("_show_bounty_claim")
+
+func _retreat_from_sea_encounter():
+	var enemy_position = player_actor.position - Vector2(0, 82)
+	if not active_enemy_actor.is_empty() and is_instance_valid(active_enemy_actor.get("node")):
+		enemy_position = active_enemy_actor.node.position
+	var away = player_actor.position - enemy_position
+	if away.length() < 0.1:
+		away = Vector2.DOWN
+	away = away.normalized()
+	var retreat_position = player_actor.position
+	for angle in [0.0, 0.72, -0.72, PI]:
+		var candidate = player_actor.position + away.rotated(float(angle)) * 155.0
+		candidate.x = clamp(candidate.x, 70.0, WORLD_SIZE.x - 70.0)
+		candidate.y = clamp(candidate.y, 330.0, 1610.0)
+		if map_node.has_method("is_navigable") and map_node.is_navigable(candidate) and candidate.distance_to(enemy_position) >= 125.0:
+			retreat_position = candidate
+			break
+	player_actor.position = retreat_position
+	player_actor.set_motion(Vector2.ZERO)
+	has_move_target = false
+	joystick_direction = Vector2.ZERO
+	active_enemy_actor = {}
+	nearest_actor = {}
+	if not state.active_voyage.is_empty():
+		state.active_voyage.current_encounter_id = ""
+	state.update_voyage_position(player_actor.position, true)
+	hint_label.text = "已经撤到安全水域。海盗和海怪不会消失，可转动船头绕行。"
 
 func _show_bounty_claim():
 	if not state.bounty_can_claim():
@@ -1819,7 +1844,7 @@ func _navigate_to_quest():
 		_cancel_task_navigation()
 		move_target = SeaWorldMapScript.DESTINATION_POSITION
 		has_move_target = true
-		hint_label.text = "自动航行已开启；遇到海盗会交战，也可拖动摇杆接管航向。"
+		hint_label.text = "自动航行沿主航道前进并迎战挡路威胁；想避战请拖动摇杆绕行。"
 		return
 	var quest = state.get_current_quest()
 	if not quest.is_empty() and str(quest.objective.type) == "upgrade_equipment":
@@ -2148,6 +2173,10 @@ func _select_sailing_destination(port_id):
 	for enemy_id in Array(plan.enemy_ids):
 		threats.append("%sLv.%d" % [GameData.ENEMIES[str(enemy_id)].name, int(GameData.ENEMIES[str(enemy_id)].level)])
 	sailing_route_label.text = "%s → %s｜%s · %s｜%d海里 · 预计%d日｜风险%d%%\n威胁情报：%s｜建议角色Lv.%d；敌人均可绕行\n正常出航免费｜付费传送%d银币｜特产：%s" % [GameData.TRADE_PORTS[str(state.player.location)].name, destination.name, GameData.SEA_REGIONS[region_id].name, str(plan.tier_name), int(plan.distance_nm), days, risk, "、".join(threats), int(plan.recommended_level), int(route.fee), destination.specialty]
+	if int(state.player.level) + 5 < int(plan.recommended_level):
+		sailing_route_label.text += "\n⚠ 当前等级偏低：建议手动绕开强敌、强化装备，或使用付费传送。"
+	elif state.voyage_protection > 0:
+		sailing_route_label.text += "\n护航物资将在本次启航时消耗，并保护一次风暴。"
 	sailing_confirm_button.text = "正常出航 · 驾驶海燕号前往%s" % destination.name
 	sailing_confirm_button.disabled = false
 	sailing_transfer_button.text = "付费传送至%s · %d银币" % [destination.name, int(route.fee)]

@@ -687,6 +687,8 @@ func flee_battle():
 	if rng.randf() <= 0.72:
 		active_battle = {}
 		statuses = {}
+		if not active_voyage.is_empty():
+			active_voyage.current_encounter_id = ""
 		save_game()
 		return {"ok": true, "battle_over": true, "won": false, "fled": true, "enemy_name": enemy.name, "enemy_rank": enemy.rank, "logs": ["你抓住空隙撤出了战斗。"]}
 	var result = attack_once()
@@ -1297,11 +1299,10 @@ func voyage_plan(port_id, origin_override = ""):
 	var tier = GameData.SEA_VOYAGE_TIERS[tier_id]
 	var risk = _voyage_risk_for_route(route)
 	var threat_count = int(tier.minimum_threats)
-	if risk >= 22:
-		threat_count += 1
-	if risk >= 36:
-		threat_count += 1
-	threat_count = clamp(threat_count, 1, 3)
+	if tier_id == "regional" and risk >= 22:
+		threat_count = 2
+	elif tier_id == "oceanic" and risk >= 36 and int(player.level) >= 45:
+		threat_count = 3
 	var roster = ["coastal_pirate"]
 	if tier_id == "regional":
 		roster = ["coastal_pirate", "reef_serpent"]
@@ -1349,6 +1350,7 @@ func begin_voyage(port_id):
 	var plan = voyage_plan(destination)
 	if plan.is_empty():
 		return {"ok": false, "message": "两座港口之间没有直达航线，需要中转。"}
+	var escorted = voyage_protection > 0
 	active_voyage = {
 		"origin": str(player.location), "destination": destination,
 		"region": GameData.sea_region_for_route(str(player.location), destination),
@@ -1357,8 +1359,11 @@ func begin_voyage(port_id):
 		"recommended_level": int(plan.recommended_level),
 		"x": 540.0, "y": 1580.0, "pirate_defeated": false,
 		"treasure_claimed": false, "storm_resolved": false,
-		"encounters": _build_sea_encounters(plan), "current_encounter_id": ""
+		"encounters": _build_sea_encounters(plan), "current_encounter_id": "",
+		"escorted": escorted
 	}
+	if escorted:
+		voyage_protection = 0
 	message_history.push_front("海燕号从%s正常出航，驶入%s：%d海里，预计%d日。" % [GameData.TRADE_PORTS[str(player.location)].name, GameData.SEA_REGIONS[str(active_voyage.region)].name, int(active_voyage.distance_nm), int(active_voyage.days)])
 	_trim_history()
 	save_game()
@@ -1458,10 +1463,10 @@ func resolve_sea_storm():
 	if bool(active_voyage.get("storm_resolved", false)):
 		return {"ok": false, "message": "这片风暴已经穿过。"}
 	active_voyage.storm_resolved = true
-	if voyage_protection > 0:
-		voyage_protection = 0
+	if bool(active_voyage.get("escorted", false)):
+		active_voyage.escorted = false
 		save_game()
-		return {"ok": true, "message": "风暴袭来，护航物资固定住桅杆和货舱，没有损失。", "protected": true}
+		return {"ok": true, "message": "风暴袭来，本航程的护航物资固定住桅杆和货舱，没有损失。", "protected": true}
 	var cargo_ids = cargo.keys()
 	cargo_ids.sort()
 	if not cargo_ids.is_empty():
@@ -1677,6 +1682,10 @@ func _normalize_active_voyage():
 			active_voyage.encounters = cleared
 	if not active_voyage.has("current_encounter_id"):
 		active_voyage.current_encounter_id = ""
+	if not active_voyage.has("escorted"):
+		active_voyage.escorted = voyage_protection > 0
+		if bool(active_voyage.escorted):
+			voyage_protection = 0
 
 func save_game():
 	var payload = {
