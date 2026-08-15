@@ -7,11 +7,28 @@ const BASE_MAP_SIZE = Vector2(720, 1280)
 const WORLD_SCALE = 1.5
 const WORLD_SIZE = BASE_MAP_SIZE * WORLD_SCALE
 
+const CITY_THEMES = {
+	"venice": {"water": Color("17627a"), "ground": Color("b9a77d"), "road": Color("d7c9a5"), "wall": Color("725346"), "roof": Color("bd704d"), "accent": Color("e3bd62"), "green": Color("376e55")},
+	"ragusa": {"water": Color("175b72"), "ground": Color("c4b38b"), "road": Color("dfd0aa"), "wall": Color("81786b"), "roof": Color("b85d43"), "accent": Color("e8c16c"), "green": Color("416d4f")},
+	"alexandria": {"water": Color("19768b"), "ground": Color("d5b979"), "road": Color("ead59b"), "wall": Color("b27c4f"), "roof": Color("49869a"), "accent": Color("f1d272"), "green": Color("4e8053")},
+	"malta": {"water": Color("135f7a"), "ground": Color("c9ad72"), "road": Color("e0ca94"), "wall": Color("947249"), "roof": Color("b76b4d"), "accent": Color("edc15e"), "green": Color("4f7550")},
+	"cape_town": {"water": Color("174f67"), "ground": Color("bda77b"), "road": Color("d8c79d"), "wall": Color("8b6650"), "roof": Color("526d70"), "accent": Color("e6b957"), "green": Color("3f7655")},
+	"quanzhou": {"water": Color("176a75"), "ground": Color("bca879"), "road": Color("d9c795"), "wall": Color("8a5541"), "roof": Color("9f3e37"), "accent": Color("e6bd55"), "green": Color("376e4d")},
+	"athens": {"water": Color("1b7088"), "ground": Color("cfc7a6"), "road": Color("e4dcc0"), "wall": Color("a6a18f"), "roof": Color("557e95"), "accent": Color("d6b95e"), "green": Color("55764c")},
+	"yangzhou": {"water": Color("185f69"), "ground": Color("ad9d73"), "road": Color("d2c293"), "wall": Color("71564b"), "roof": Color("365f5a"), "accent": Color("e6c56a"), "green": Color("35664f")},
+	"amsterdam": {"water": Color("245c70"), "ground": Color("aa9675"), "road": Color("c9b994"), "wall": Color("7f493d"), "roof": Color("3f5261"), "accent": Color("e8b85b"), "green": Color("487150")}
+}
+
 var wave_time = 0.0
 var region_mode = "city"
+var city_port_id = "venice_dock"
 
 func set_region(value):
 	region_mode = value
+	queue_redraw()
+
+func set_city_port(value):
+	city_port_id = str(value) if GameData.PORT_CITY_MAPS.has(str(value)) else "venice_dock"
 	queue_redraw()
 
 func _process(delta):
@@ -19,6 +36,12 @@ func _process(delta):
 	queue_redraw()
 
 func _draw():
+	if region_mode == "city":
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * WORLD_SCALE)
+		_draw_port_city()
+		_draw_art_overlays()
+		draw_set_transform(Vector2.ZERO)
+		return
 	var texture = CITY_ART
 	if region_mode == "field":
 		texture = FIELD_ART
@@ -28,6 +51,162 @@ func _draw():
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * WORLD_SCALE)
 	_draw_art_overlays()
 	draw_set_transform(Vector2.ZERO)
+
+func _draw_port_city():
+	if city_port_id == "venice_dock":
+		_draw_city()
+		return
+	var city_data = GameData.PORT_CITY_MAPS.get(city_port_id, GameData.PORT_CITY_MAPS.venice_dock)
+	var style = str(city_data.style)
+	var theme = CITY_THEMES.get(style, CITY_THEMES.venice)
+	# 每座城市共用清晰可行走的主路骨架，但水岸、街区、建筑颜色与地标都不同。
+	draw_rect(Rect2(0, 0, 720, 1280), theme.water)
+	draw_polygon(PackedVector2Array([Vector2(0, 0), Vector2(720, 0), Vector2(720, 900), Vector2(620, 970), Vector2(470, 930), Vector2(330, 980), Vector2(180, 925), Vector2(0, 960)]), PackedColorArray([theme.ground]))
+	_draw_city_horizon(style, theme)
+
+	# 十字主街连接上城地标、市场、旅店和两座码头，不会出现无路可走的死角。
+	draw_polygon(PackedVector2Array([Vector2(315, 125), Vector2(415, 125), Vector2(445, 930), Vector2(280, 930)]), PackedColorArray([theme.road]))
+	draw_polygon(PackedVector2Array([Vector2(65, 500), Vector2(655, 470), Vector2(675, 650), Vector2(45, 675)]), PackedColorArray([theme.road.darkened(0.04)]))
+	if style in ["venice", "amsterdam", "yangzhou"]:
+		_draw_city_canals(style, theme)
+	_draw_port_building(Rect2(28, 355, 205, 165), theme, 3)
+	_draw_port_building(Rect2(490, 335, 200, 175), theme, 4)
+	_draw_port_building(Rect2(28, 650, 205, 165), theme, 3)
+	_draw_port_building(Rect2(490, 645, 200, 170), theme, 4)
+	_draw_city_landmark(style, theme)
+	_draw_port_market(theme)
+	_draw_port_square(theme)
+	_draw_port_docks(style, theme)
+	_draw_city_details(style, theme)
+
+func _draw_city_horizon(style, theme):
+	if style == "cape_town":
+		draw_polygon(PackedVector2Array([Vector2(0, 250), Vector2(115, 145), Vector2(245, 165), Vector2(315, 95), Vector2(505, 120), Vector2(610, 215), Vector2(720, 175), Vector2(720, 360), Vector2(0, 360)]), PackedColorArray([Color("405961")]))
+		draw_line(Vector2(265, 122), Vector2(500, 122), Color("9aa69d"), 8)
+	elif style in ["ragusa", "malta"]:
+		draw_rect(Rect2(25, 110, 670, 125), theme.wall.darkened(0.04))
+		for x in range(35, 690, 55):
+			draw_rect(Rect2(x, 88, 32, 34), theme.wall)
+	elif style == "alexandria":
+		for pos in [Vector2(65, 250), Vector2(640, 265), Vector2(560, 180)]:
+			draw_line(pos + Vector2(0, 35), pos + Vector2(0, -10), Color("6b4a31"), 7)
+			for leaf in range(6):
+				draw_line(pos, pos + Vector2.from_angle(float(leaf) * TAU / 6.0) * 30.0, theme.green, 8)
+	elif style in ["quanzhou", "yangzhou"]:
+		for x in [75.0, 645.0]:
+			draw_rect(Rect2(x - 21, 150, 42, 105), theme.wall)
+			for level in range(3):
+				var y = 145.0 + level * 34.0
+				draw_polygon(PackedVector2Array([Vector2(x - 38, y), Vector2(x + 38, y), Vector2(x + 24, y - 13), Vector2(x - 24, y - 13)]), PackedColorArray([theme.roof]))
+	elif style == "athens":
+		for x in range(100, 650, 70):
+			draw_rect(Rect2(x, 155, 20, 105), Color("d9d4bc"))
+		draw_polygon(PackedVector2Array([Vector2(75, 155), Vector2(655, 155), Vector2(585, 105), Vector2(145, 105)]), PackedColorArray([Color("c9c2a9")]))
+	elif style == "amsterdam":
+		for x in [105.0, 615.0]:
+			draw_line(Vector2(x, 230), Vector2(x, 115), Color("604935"), 8)
+			for angle in [0.0, PI * 0.5, PI, PI * 1.5]:
+				draw_line(Vector2(x, 150), Vector2(x, 150) + Vector2.from_angle(angle + wave_time * 0.08) * 58.0, Color("ddd1b2"), 7)
+
+func _draw_city_canals(style, theme):
+	var canal = theme.water.lightened(0.05)
+	if style == "venice":
+		draw_polygon(PackedVector2Array([Vector2(0, 690), Vector2(250, 725), Vector2(720, 680), Vector2(720, 745), Vector2(250, 790), Vector2(0, 755)]), PackedColorArray([canal]))
+	elif style == "yangzhou":
+		draw_polygon(PackedVector2Array([Vector2(0, 720), Vector2(225, 700), Vector2(480, 740), Vector2(720, 705), Vector2(720, 770), Vector2(480, 805), Vector2(225, 765), Vector2(0, 785)]), PackedColorArray([canal]))
+	else:
+		draw_polygon(PackedVector2Array([Vector2(70, 275), Vector2(155, 275), Vector2(230, 900), Vector2(145, 920)]), PackedColorArray([canal]))
+		draw_polygon(PackedVector2Array([Vector2(500, 250), Vector2(580, 250), Vector2(640, 900), Vector2(555, 910)]), PackedColorArray([canal]))
+	# 石桥保证主街在视觉上连续。
+	for bridge_x in [315.0, 385.0]:
+		draw_rect(Rect2(bridge_x, 688, 48, 92), theme.road)
+
+func _draw_port_building(rect, theme, windows):
+	draw_rect(rect, theme.wall)
+	draw_polygon(PackedVector2Array([Vector2(rect.position.x - 12, rect.position.y + 18), Vector2(rect.end.x + 12, rect.position.y + 18), Vector2(rect.end.x - 22, rect.position.y - 26), Vector2(rect.position.x + 22, rect.position.y - 26)]), PackedColorArray([theme.roof]))
+	for index in range(windows):
+		var wx = rect.position.x + 22.0 + index * ((rect.size.x - 62.0) / max(1, windows - 1))
+		draw_rect(Rect2(wx, rect.position.y + 60, 18, 27), theme.water.lightened(0.28))
+	var door = Rect2(rect.get_center().x - 18, rect.end.y - 52, 36, 52)
+	draw_rect(door, theme.wall.darkened(0.35))
+	draw_circle(Vector2(door.end.x - 7, door.get_center().y), 3, theme.accent)
+
+func _draw_city_landmark(style, theme):
+	match style:
+		"alexandria":
+			draw_rect(Rect2(325, 175, 72, 230), Color("d8c89e"))
+			draw_polygon(PackedVector2Array([Vector2(315, 175), Vector2(407, 175), Vector2(380, 135), Vector2(342, 135)]), PackedColorArray([theme.accent]))
+			draw_circle(Vector2(361, 145), 13, Color("fff0b0"))
+		"quanzhou":
+			for level in range(4):
+				var width = 150.0 - level * 24.0
+				var y = 340.0 - level * 48.0
+				draw_rect(Rect2(360 - width * 0.35, y, width * 0.7, 48), theme.wall)
+				draw_polygon(PackedVector2Array([Vector2(360 - width * 0.5, y), Vector2(360 + width * 0.5, y), Vector2(360 + width * 0.35, y - 15), Vector2(360 - width * 0.35, y - 15)]), PackedColorArray([theme.roof]))
+		"athens":
+			draw_polygon(PackedVector2Array([Vector2(275, 330), Vector2(445, 330), Vector2(415, 290), Vector2(305, 290)]), PackedColorArray([Color("ded8bd")]))
+			for x in range(300, 435, 32):
+				draw_rect(Rect2(x, 330, 17, 85), Color("d5d0b9"))
+		"yangzhou":
+			draw_arc(Vector2(360, 390), 92, PI, TAU, 30, theme.accent, 14)
+			draw_line(Vector2(268, 390), Vector2(452, 390), theme.road.lightened(0.1), 12)
+		"amsterdam":
+			draw_rect(Rect2(330, 190, 62, 220), theme.wall)
+			draw_polygon(PackedVector2Array([Vector2(315, 190), Vector2(407, 190), Vector2(361, 130)]), PackedColorArray([theme.roof]))
+			draw_circle(Vector2(361, 230), 22, theme.accent)
+		"cape_town":
+			draw_rect(Rect2(325, 245, 70, 165), Color("d7c7a1"))
+			draw_circle(Vector2(360, 245), 34, Color("e7ddbc"))
+		_:
+			draw_rect(Rect2(330, 190, 62, 220), theme.wall.lightened(0.08))
+			draw_polygon(PackedVector2Array([Vector2(318, 190), Vector2(404, 190), Vector2(361, 125)]), PackedColorArray([theme.roof]))
+			draw_circle(Vector2(361, 235), 22, theme.accent)
+
+func _draw_port_market(theme):
+	for index in range(3):
+		var x = 505.0 + index * 58.0
+		draw_rect(Rect2(x, 555, 48, 65), theme.wall.darkened(0.18))
+		draw_polygon(PackedVector2Array([Vector2(x - 5, 555), Vector2(x + 53, 555), Vector2(x + 43, 530), Vector2(x + 5, 530)]), PackedColorArray([theme.accent if index % 2 == 0 else theme.roof]))
+
+func _draw_port_square(theme):
+	draw_circle(Vector2(360, 585), 105, theme.road.lightened(0.04))
+	draw_circle(Vector2(360, 585), 36, theme.wall.lightened(0.08))
+	draw_circle(Vector2(360, 577), 25, theme.water.lightened(0.22))
+	draw_rect(Rect2(354, 525, 12, 52), theme.wall.darkened(0.15))
+	draw_circle(Vector2(360, 518), 12, theme.accent)
+
+func _draw_port_docks(style, theme):
+	for index in range(6):
+		var x = 160.0 + index * 72.0
+		draw_rect(Rect2(x, 850, 48, 270), theme.wall.darkened(0.22))
+		for y in range(865, 1110, 36):
+			draw_line(Vector2(x, y), Vector2(x + 48, y), theme.wall.lightened(0.12), 3)
+	# 船坞吊架与停泊帆船让港务区和市场区一眼可分。
+	draw_line(Vector2(500, 885), Vector2(500, 785), theme.wall.darkened(0.35), 8)
+	draw_line(Vector2(500, 795), Vector2(575, 850), theme.wall.darkened(0.25), 6)
+	draw_polygon(PackedVector2Array([Vector2(505, 1075), Vector2(665, 1100), Vector2(620, 1170), Vector2(480, 1135)]), PackedColorArray([theme.wall.darkened(0.16)]))
+	draw_line(Vector2(565, 1090), Vector2(565, 980), theme.wall.darkened(0.35), 7)
+	draw_polygon(PackedVector2Array([Vector2(572, 990), Vector2(572, 1075), Vector2(638, 1055)]), PackedColorArray([theme.accent.lightened(0.2)]))
+
+func _draw_city_details(style, theme):
+	var tree_positions = [Vector2(55, 285), Vector2(665, 290), Vector2(60, 845), Vector2(660, 835)]
+	for pos in tree_positions:
+		draw_rect(Rect2(pos.x - 4, pos.y + 10, 8, 25), theme.wall.darkened(0.28))
+		draw_circle(pos, 21, theme.green)
+		draw_circle(pos + Vector2(-10, -6), 12, theme.green.lightened(0.12))
+	if style == "malta":
+		draw_circle(Vector2(360, 440), 24, theme.accent)
+		draw_line(Vector2(360, 440), Vector2(360, 480), theme.wall.darkened(0.3), 6)
+	if style == "cape_town":
+		for index in range(5):
+			draw_circle(Vector2(515 + index * 28, 600), 7, Color("d6ad3f"))
+	if style == "quanzhou":
+		for pos in [Vector2(90, 560), Vector2(460, 570), Vector2(635, 535)]:
+			draw_circle(pos, 7, Color("e04b42"))
+			draw_line(pos, pos + Vector2(0, 22), theme.accent, 2)
+	if style == "athens":
+		for pos in [Vector2(80, 590), Vector2(465, 560), Vector2(640, 575)]:
+			draw_circle(pos, 16, theme.green)
 
 func _draw_art_overlays():
 	# Soft edge shading keeps the detailed art readable under portrait HUD controls.

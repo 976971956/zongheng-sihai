@@ -75,7 +75,7 @@ func _run():
 	await process_frame
 	world_scene._open_sailing_map()
 	await process_frame
-	_check(is_instance_valid(world_scene.overlay) and is_instance_valid(world_scene.sailing_map), "手机2D模式必须能打开九港可视化航海图")
+	_check(is_instance_valid(world_scene.overlay) and is_instance_valid(world_scene.sailing_map), "手机模式必须能打开九港可视化航海图")
 	_check(world_scene.sailing_map.custom_minimum_size.x <= 620.0 and world_scene.sailing_map.custom_minimum_size.y <= 520.0, "九港航海图必须保持在竖屏触控区域内")
 	_check(world_scene.sailing_map.port_buttons.size() == 9, "手机航海图必须显示九座可点击港口")
 	_check(world_scene.sailing_map.port_buttons["ragusa_dock"].size.x >= 110.0 and world_scene.sailing_map.port_buttons["ragusa_dock"].size.y >= 48.0, "港名按钮必须达到手机稳定触控尺寸")

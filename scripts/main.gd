@@ -316,9 +316,9 @@ func _build_mobile_topbar():
 	top_wallet_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	top_wallet_label.add_theme_stylebox_override("normal", _style(Color(0.18, 0.13, 0.03, 0.88), 9, Color(GOLD, 0.52), 1, 6))
 	row.add_child(top_wallet_label)
-	var world_button = _button("2D", "active")
+	var world_button = _button("世界", "active")
 	world_button.custom_minimum_size = Vector2(58, 48)
-	world_button.tooltip_text = "返回2D世界"
+	world_button.tooltip_text = "返回探索世界"
 	world_button.pressed.connect(_open_2d_world)
 	row.add_child(world_button)
 	var guide_button = _button("?", "ghost")
@@ -602,8 +602,8 @@ func _build_navigation():
 	row.add_theme_constant_override("separation", 10)
 	margin.add_child(row)
 
-	var location_button = _button("◎ 2D世界", "active")
-	location_button.tooltip_text = "返回2D探索地图"
+	var location_button = _button("◎ 探索世界", "active")
+	location_button.tooltip_text = "返回探索地图"
 	location_button.pressed.connect(_open_2d_world)
 	row.add_child(location_button)
 	nav_inventory_button = _button("□  背包  [I]", "ghost")
@@ -699,7 +699,7 @@ func _refresh_actions(location):
 	if not state.active_voyage.is_empty():
 		var voyage = state.active_voyage
 		action_list.add_child(_small_caption("海燕号正在%s航行" % GameData.SEA_REGIONS[str(voyage.region)].name))
-		action_list.add_child(_wide_action("返回2D海域继续驾驶", "%s → %s · 船位与海上事件均已保存" % [GameData.TRADE_PORTS[str(voyage.origin)].name, GameData.TRADE_PORTS[str(voyage.destination)].name], "sea"))
+		action_list.add_child(_wide_action("返回航海大地图继续驾驶", "%s → %s · 船位与海上事件均已保存" % [GameData.TRADE_PORTS[str(voyage.origin)].name, GameData.TRADE_PORTS[str(voyage.destination)].name], "sea"))
 		return
 
 	if not location.npcs.is_empty():
@@ -711,6 +711,10 @@ func _refresh_actions(location):
 		action_list.add_child(_small_caption("附近的敌人"))
 		for enemy_id in location.enemies:
 			action_list.add_child(_enemy_action_card(enemy_id))
+
+	if str(state.player.location) in GameData.TRADE_PORTS and "city_map" not in location.services:
+		action_list.add_child(_small_caption("城市导览"))
+		action_list.add_child(_wide_action("查看城内地图", "%s地标与人物职能一览" % GameData.TRADE_PORTS[str(state.player.location)].name, "city_map"))
 
 	if not location.services.is_empty():
 		action_list.add_child(_small_caption("地点服务"))
@@ -1051,7 +1055,7 @@ func _show_next_quest_prompt():
 		unlock.add_theme_stylebox_override("normal", _style(Color(0.04, 0.18, 0.18, 0.86), 11, Color(TEAL, 0.55), 1, 14))
 		content.add_child(unlock)
 		content.add_child(_label("九座港口各有独立商人与特色货单。前往产地低价采购，再根据航期、风险与行情运往需求城市出售。", 13, Color("b7cfd5")))
-		var go_trade = _button("返回2D地图，步行前往码头", "gold")
+		var go_trade = _button("返回世界地图，步行前往码头", "gold")
 		go_trade.pressed.connect(_go_to_unlocked_trade)
 		content.add_child(go_trade)
 		_open_modal("新玩法解锁", content, Vector2(650, 430))
@@ -1681,7 +1685,7 @@ func _claim_bounty_from_journal():
 
 func _quest_route_hint(index):
 	if index < 0 or index >= GameData.QUESTS.size():
-		return "打开2D世界的任务导航寻找当前目标。"
+		return "打开世界地图的任务导航寻找当前目标。"
 	var quest_id = str(GameData.QUESTS[index].id)
 	var routes = {
 		"scale_memory": "海边小屋 → 与艾丽莎交谈",
@@ -1723,7 +1727,7 @@ func _quest_route_hint(index):
 		"heir_testimony": "返回马耳他港 → 与伊莎贝拉交谈",
 		"keeper_return": "威尼斯码头 → 步行老海鸥酒馆 → 解读星图"
 	}
-	return str(routes.get(quest_id, "打开2D世界的任务导航寻找当前目标。"))
+	return str(routes.get(quest_id, "打开世界地图的任务导航寻找当前目标。"))
 
 func _objective_text(objective):
 	var target_name = GameData.objective_name(objective)
@@ -1777,17 +1781,26 @@ func _party_leave():
 func _open_city_map():
 	var content = VBoxContainer.new()
 	content.add_theme_constant_override("separation", 12)
-	content.add_child(_label("威尼斯城内地图", 20, GOLD))
-	content.add_child(_label("地点依靠方向链接相连，这种逐页移动方式保留了 WAP 文字游戏的核心操作感。", 12, MUTED))
-	var map_text = "　　　　　　　　　北城门\n　　　　　　　　　练级 / 经验副本\n　　　　　　　　　　　↑\n老海鸥酒馆　←　城市广场　→　海风市场\n休息 / 组队　　　　│　　　　　补给 / 鉴定\n　　　　　　　　　　　↓\n　　　　　　　　　威尼斯码头\n　　　　　　　　　船只 / 航行"
-	var map_label = _label(map_text, 14, Color("9fd6d7"))
-	map_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	map_label.add_theme_stylebox_override("normal", _style(Color(0.035, 0.13, 0.17, 0.92), 13, Color(TEAL, 0.4), 1, 18))
-	content.add_child(map_label)
-	var close = _button("按方向链接继续探索", "primary")
+	var port_id = str(state.player.location) if str(state.player.location) in GameData.TRADE_PORTS else "venice_dock"
+	var port = GameData.TRADE_PORTS[port_id]
+	var city = GameData.PORT_CITY_MAPS[port_id]
+	content.add_child(_label("%s · 城内地图" % str(port.name), 20, GOLD))
+	var identity = _label("%s｜%s" % [str(city.title), str(city.landmark)], 13, Color("9fd6d7"))
+	identity.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	identity.add_theme_stylebox_override("normal", _style(Color(0.035, 0.13, 0.17, 0.92), 13, Color(TEAL, 0.4), 1, 14))
+	content.add_child(identity)
+	content.add_child(_label("街区地标", 13, TEAL))
+	var district_copy = _label("◆ %s" % "　◆ ".join(Array(city.districts)), 12, Color("b7cfd5"))
+	district_copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(district_copy)
+	content.add_child(_label("城内人物与职能", 13, TEAL))
+	for npc_id in Dictionary(city.npc_positions):
+		if GameData.NPCS.has(str(npc_id)):
+			content.add_child(_label("• %s｜%s" % [str(GameData.NPCS[str(npc_id)].name), GameData.npc_service_label(str(npc_id))], 12, INK))
+	var close = _button("返回地点", "primary")
 	close.pressed.connect(_close_modal)
 	content.add_child(close)
-	_open_modal("城市地图", content, Vector2(700, 520))
+	_open_modal("城市地图", content, Vector2(700, 650))
 
 func _open_harbor():
 	var content = VBoxContainer.new()
@@ -1795,7 +1808,7 @@ func _open_harbor():
 	if not state.active_voyage.is_empty():
 		var voyage = state.active_voyage
 		content.add_child(_label("海燕号正在航行", 20, GOLD))
-		var sailing_copy = _label("当前位于%s：%s → %s。航行中不能在启航港买卖货物，请返回2D海域继续驾驶。" % [GameData.SEA_REGIONS[str(voyage.region)].name, GameData.TRADE_PORTS[str(voyage.origin)].name, GameData.TRADE_PORTS[str(voyage.destination)].name], 13, Color("b7cfd5"))
+		var sailing_copy = _label("当前位于%s：%s → %s。航行中不能在启航港买卖货物，请返回航海大地图继续驾驶。" % [GameData.SEA_REGIONS[str(voyage.region)].name, GameData.TRADE_PORTS[str(voyage.origin)].name, GameData.TRADE_PORTS[str(voyage.destination)].name], 13, Color("b7cfd5"))
 		sailing_copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		content.add_child(sailing_copy)
 		var resume = _button("返回海域继续航行", "primary")
@@ -1818,11 +1831,11 @@ func _open_harbor():
 	var port_id = str(state.player.location)
 	if not GameData.TRADE_PORTS.has(port_id):
 		content.add_child(_label("这里不是港口", 20, GOLD))
-		var travel_guide = _label("贸易必须在真实港口进行，不能从日志界面直接跳到码头。返回2D地图后，请通过区域地图或任务导航步行前往威尼斯码头。", 13, Color("b7cfd5"))
+		var travel_guide = _label("贸易必须在真实港口进行，不能从日志界面直接跳到码头。返回世界地图后，请通过城内地图或任务导航步行前往威尼斯码头。", 13, Color("b7cfd5"))
 		travel_guide.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		travel_guide.add_theme_stylebox_override("normal", _style(Color(0.18, 0.13, 0.04, 0.45), 11, Color(GOLD, 0.45), 1, 14))
 		content.add_child(travel_guide)
-		var return_to_world = _button("返回2D地图，步行前往码头", "primary")
+		var return_to_world = _button("返回世界地图，步行前往码头", "primary")
 		return_to_world.pressed.connect(_open_2d_world)
 		content.add_child(return_to_world)
 		_open_modal("港口贸易", content, Vector2(650, 390))

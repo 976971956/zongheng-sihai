@@ -270,9 +270,9 @@ const NPCS = {
 	"alexandria_merchant": {"name": "香料商萨米尔", "role": "灯塔货栈 · 香料买卖", "service": "market", "dialogue": "季风改变的不只是航期，也会改变香料的价格。低买高卖，但出港手续要去找法里德。"},
 	"malta_keeper": {"name": "伊莎贝拉", "role": "金岛货栈 · 柑橘买卖", "service": "market", "dialogue": "我守着这口船钟，也替岛上的果农经营柑橘货栈。远航餐请找特蕾莎，船务请找马尔科。"},
 	"cape_keeper": {"name": "阿曼达", "role": "北河向导", "service": "harbor", "dialogue": "风暴角不相信传说，只相信能从北河活着回来的人。"},
-	"quanzhou_scholar": {"name": "沈砚", "role": "封妖录守卷人", "service": "harbor", "dialogue": "海上的妖气与长安旧案来自同一道裂隙，我一直在等星盘的持有者。"},
+	"quanzhou_scholar": {"name": "沈砚", "role": "封妖录守卷人", "dialogue": "海上的妖气与长安旧案来自同一道裂隙，我一直在等星盘的持有者。"},
 	"athens_oracle": {"name": "卡珊德拉", "role": "银帆货栈 · 葡萄酒买卖", "service": "market", "dialogue": "石柱记得海水尚未来临前的战争，神庙坡地的葡萄园也仍沿用古老的酿造法。"},
-	"yangzhou_weaver": {"name": "苏绫", "role": "玉纱织师", "service": "harbor", "dialogue": "丝线会说谎，但断口不会。让我看看你从潮门带回的历史。"},
+	"yangzhou_weaver": {"name": "苏绫", "role": "玉纱织师", "dialogue": "丝线会说谎，但断口不会。让我看看你从潮门带回的历史。"},
 	"amsterdam_cartographer": {"name": "范德海", "role": "七海制图师", "service": "harbor", "dialogue": "基德的藏宝图从来不是指向黄金，而是指向天魔舰队的补给航线。"}
 	,"venice_quartermaster": {"name": "蕾娜", "role": "翼狮货栈 · 威尼斯玻璃买卖", "service": "market", "dialogue": "货物要按占舱大小算，不要只看单件差价。买卖玻璃和交商会订单找我，航线请找船老板。"}
 	,"venice_shipwright": {"name": "洛伦佐", "role": "海燕号船匠", "service": "shipyard", "dialogue": "货舱、船帆和装甲各有用处。想跑远洋，先决定这条船要成为商船还是快船。"}
@@ -324,6 +324,60 @@ const PORT_SERVICE_NPCS = {
 	"athens_dock": {"market": "athens_oracle", "harbor": "athens_harbormaster", "shipyard": "athens_smith", "rest": "athens_innkeeper"},
 	"yangzhou_dock": {"market": "yangzhou_merchant", "harbor": "yangzhou_pilot", "shipyard": "yangzhou_shipwright"},
 	"amsterdam_dock": {"market": "amsterdam_auctioneer", "harbor": "amsterdam_cartographer", "shipyard": "amsterdam_shipwright"}
+}
+
+# 九座城市使用各自的城内主题、地标与人物站位。港口地点仍然是存档中的
+# 城市标识，但地图表现和步行导航不再复用威尼斯码头。
+const PORT_CITY_MAPS = {
+	"venice_dock": {
+		"style": "venice", "title": "水都翼狮城", "landmark": "圣马可钟楼与大运河",
+		"districts": ["海边小屋", "老海鸥酒馆", "翼狮广场", "海风市场", "造船码头"],
+		"npc_positions": {
+			"alisa": Vector2(150, 365), "tavern_keeper": Vector2(180, 675), "guard_captain": Vector2(360, 690),
+			"jeweler": Vector2(555, 665), "venice_quartermaster": Vector2(510, 870),
+			"ship_owner": Vector2(225, 870), "venice_shipwright": Vector2(410, 900)
+		}
+	},
+	"ragusa_dock": {
+		"style": "ragusa", "title": "亚得里亚石墙城", "landmark": "海崖城墙与圆形堡垒",
+		"districts": ["石门商街", "橄榄仓栈", "风墙旅店", "柯克船坞"],
+		"npc_positions": {"ragusa_broker": Vector2(510, 600), "ragusa_harbormaster": Vector2(220, 890), "ragusa_shipwright": Vector2(475, 900), "ragusa_innkeeper": Vector2(270, 700)}
+	},
+	"alexandria_dock": {
+		"style": "alexandria", "title": "灯塔与香料之城", "landmark": "法罗斯灯塔与沙金货栈",
+		"districts": ["灯塔广场", "香料长街", "商会庭院", "三角帆船坞"],
+		"npc_positions": {"alexandria_merchant": Vector2(510, 600), "alex_harbormaster": Vector2(215, 895), "alex_lighthouse_keeper": Vector2(350, 650), "alex_shipwright": Vector2(480, 900)}
+	},
+	"malta_dock": {
+		"style": "malta", "title": "蜂蜜石要塞", "landmark": "圣钟堡与金色海湾",
+		"districts": ["船钟广场", "柑橘货栈", "远航厨房", "桨帆船坞"],
+		"npc_positions": {"malta_keeper": Vector2(510, 600), "malta_harbormaster": Vector2(215, 900), "malta_shipwright": Vector2(480, 900), "malta_cook": Vector2(270, 700), "malta_diver": Vector2(350, 650)}
+	},
+	"cape_town_dock": {
+		"style": "cape_town", "title": "风暴角山港", "landmark": "桌山云墙与双洋流灯塔",
+		"districts": ["桌山瞭望台", "北河金砂栈", "远征营地", "大帆船坞"],
+		"npc_positions": {"cape_keeper": Vector2(350, 650), "cape_shipwright": Vector2(475, 900), "cape_quartermaster": Vector2(510, 600)}
+	},
+	"quanzhou_dock": {
+		"style": "quanzhou", "title": "刺桐海丝城", "landmark": "东西塔与万国蕃坊",
+		"districts": ["封妖书院", "青瓷市舶司", "季风码头", "福船船坞"],
+		"npc_positions": {"quanzhou_scholar": Vector2(350, 650), "quanzhou_navigator": Vector2(215, 895), "quanzhou_merchant": Vector2(510, 600), "quanzhou_shipwright": Vector2(480, 900)}
+	},
+	"athens_dock": {
+		"style": "athens", "title": "银帆神庙港", "landmark": "海岬神殿与银帆柱廊",
+		"districts": ["潮汐神殿", "葡萄酒市集", "橄榄枝旅店", "银帆船坞"],
+		"npc_positions": {"athens_oracle": Vector2(510, 600), "athens_harbormaster": Vector2(215, 895), "athens_smith": Vector2(480, 900), "athens_innkeeper": Vector2(270, 700)}
+	},
+	"yangzhou_dock": {
+		"style": "yangzhou", "title": "运河月港", "landmark": "月桥、玉纱坊与大运河",
+		"districts": ["月桥织坊", "玉纱东市", "运河港务", "宝船船坞"],
+		"npc_positions": {"yangzhou_weaver": Vector2(350, 650), "yangzhou_pilot": Vector2(215, 895), "yangzhou_merchant": Vector2(510, 600), "yangzhou_shipwright": Vector2(480, 900)}
+	},
+	"amsterdam_dock": {
+		"style": "amsterdam", "title": "北海风车港", "landmark": "环形运河与七海拍卖塔",
+		"districts": ["制图师塔楼", "航海仪拍卖街", "风车仓区", "飞剪船坞"],
+		"npc_positions": {"amsterdam_cartographer": Vector2(215, 895), "amsterdam_auctioneer": Vector2(510, 600), "amsterdam_shipwright": Vector2(480, 900)}
+	}
 }
 
 const NPC_SERVICE_LABELS = {
@@ -389,7 +443,7 @@ const SEA_VOYAGE_TIERS = {
 	"oceanic": {"name": "远洋航线", "max_distance_nm": 99999, "minimum_threats": 2, "description": "连续数日看不到陆地，至少有两段高危海区。"}
 }
 
-# 船帆等级同时决定贸易日历与2D驾驶速度。实际节速由船体基础速度与帆装加成组成，
+# 船帆等级同时决定贸易日历与地图驾驶速度。实际节速由船体基础速度与帆装加成组成，
 # 日航程按24小时连续航行换算；强化帆装提升的是节速，而不是简单固定减一天。
 const SHIP_SPEED_LEVELS = {
 	1: {"name": "旧麻帆", "knots_bonus": 0.0},
@@ -455,7 +509,7 @@ static func sea_voyage_tier(distance_nm):
 		return "regional"
 	return "oceanic"
 
-# 旧版码头把世界先分成海域，再在海域内选择城市。2D版保留九港剧情，
+# 旧版码头把世界先分成海域，再在海域内选择城市。当前版本保留九港剧情，
 # 但把每条现有航线放回对应海域，让“出航”进入可驾驶地图而非抵港动画。
 const SEA_REGIONS = {
 	"mediterranean": {"name": "地中海", "ports": ["venice_dock", "ragusa_dock", "athens_dock", "malta_dock", "alexandria_dock"]},

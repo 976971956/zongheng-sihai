@@ -58,7 +58,7 @@ func _run():
 	var level_one_days = int(oceanic_plan.days)
 	state.ship.speed = 4
 	var fast_oceanic_plan = state.voyage_plan("cape_town_dock")
-	_check(is_equal_approx(float(fast_oceanic_plan.speed_knots), 12.5) and int(fast_oceanic_plan.nm_per_day) == 300 and float(fast_oceanic_plan.world_speed) > float(oceanic_plan.world_speed) and int(fast_oceanic_plan.days) < level_one_days, "船型基础速度与帆装等级必须共同缩短贸易日历并提高2D驾驶速度")
+	_check(is_equal_approx(float(fast_oceanic_plan.speed_knots), 12.5) and int(fast_oceanic_plan.nm_per_day) == 300 and float(fast_oceanic_plan.world_speed) > float(oceanic_plan.world_speed) and int(fast_oceanic_plan.days) < level_one_days, "船型基础速度与帆装等级必须共同缩短贸易日历并提高地图驾驶速度")
 	state.ship.speed = 1
 	_check(int(coastal_plan.stamina_cost) < int(oceanic_plan.stamina_cost) and int(coastal_plan.dive_chance) < int(oceanic_plan.dive_chance), "远洋必须消耗更多出航体力，同时提供更高的潜水寻宝概率")
 	var tired_state = TestState.new()

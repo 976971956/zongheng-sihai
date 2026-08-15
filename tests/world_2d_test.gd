@@ -21,10 +21,10 @@ func _run():
 	await process_frame
 	await process_frame
 
-	_check(is_instance_valid(scene.world_layer), "2D世界地图必须成功创建")
-	_check(is_instance_valid(scene.player_actor), "2D玩家角色必须成功创建")
+	_check(is_instance_valid(scene.world_layer), "世界地图必须成功创建")
+	_check(is_instance_valid(scene.player_actor), "玩家角色必须成功创建")
 	_check(scene.player_actor.display_id == "player", "主角必须使用独立的新版角色模型")
-	_check(scene.player_actor.art_sprite.hframes == 4 and scene.player_actor.art_sprite.vframes == 2, "主角必须使用多帧2D行走图集")
+	_check(scene.player_actor.art_sprite.hframes == 4 and scene.player_actor.art_sprite.vframes == 2, "主角必须使用多帧行走图集")
 	scene.player_actor.set_motion(Vector2.RIGHT)
 	scene.player_actor._process(0.16)
 	var first_walk_frame = scene.player_actor.art_sprite.frame
@@ -86,19 +86,19 @@ func _run():
 	scene._update_nearest_actor()
 	_check(not scene.nearest_actor.is_empty() and scene.nearest_actor.id == "alisa", "开局应能靠近艾丽莎互动")
 	scene._interact()
-	_check(scene.state.quest_progress == 1, "2D NPC交谈必须推进原有任务状态")
-	_check(is_instance_valid(scene.overlay), "NPC交谈必须显示2D对话面板")
+	_check(scene.state.quest_progress == 1, "NPC交谈必须推进原有任务状态")
+	_check(is_instance_valid(scene.overlay), "NPC交谈必须显示对话面板")
 	scene._close_then_claim()
 	await process_frame
 	_check(scene.state.quest_can_claim(), "结束任务对话后必须弹出领奖流程")
 	scene._claim_quest_2d()
-	_check(scene.state.quest_index == 1, "2D领奖必须进入下一任务")
+	_check(scene.state.quest_index == 1, "领奖必须进入下一任务")
 	scene._close_overlay()
 
 	# The 2D backpack must expose and execute real item actions.
 	scene.state.inventory["warrior_blade"] = 1
 	scene._open_inventory()
-	_check(_has_button_text(scene.overlay, "装备") and _has_button_text(scene.overlay, "使用"), "2D背包必须显示装备与使用按钮")
+	_check(_has_button_text(scene.overlay, "装备") and _has_button_text(scene.overlay, "使用"), "背包必须显示装备与使用按钮")
 	_check(_has_label_text(scene.overlay, "物品背包") and _has_label_text(scene.overlay, "背包物品") and not _has_label_text(scene.overlay, "当前已装备") and _count_visuals(scene.overlay, "equipment") >= 1 and _count_visuals(scene.overlay, "consumable") >= 1, "物品背包必须只展示带模型的未装备物品，不能继续混入角色装备槽")
 	scene._open_character()
 	_check(_has_label_text(scene.overlay, "角色信息 · 已装备") and _has_label_text(scene.overlay, "当前已装备") and _has_named_node(scene.overlay, "CharacterPortrait") and _count_visuals(scene.overlay, "equipment") == 6 and not _has_label_text(scene.overlay, "背包物品"), "角色页必须独立展示人物立绘、属性和六个已装备槽，不能与背包混成同一列表")
@@ -118,7 +118,7 @@ func _run():
 	scene._close_overlay()
 	scene.state.inventory["ghost_card"] = 1
 	scene._open_inventory()
-	_check(_has_button_text(scene.overlay, "启用"), "2D背包必须允许启用怪物卡")
+	_check(_has_button_text(scene.overlay, "启用"), "背包必须允许启用怪物卡")
 	scene._equip_card_2d("ghost_card")
 	await process_frame
 	_check(scene.state.active_card == "ghost_card" and _has_button_text(scene.overlay, "已启用"), "怪物卡启用后必须更新实际状态和背包显示")
@@ -157,7 +157,7 @@ func _run():
 	await _walk_task_navigation(scene)
 	_check(scene.current_region == "field" and scene.state.player.location == "venice_mine", "失窃矿石任务导航必须进入城外废矿山")
 	_check(not scene.has_move_target and scene.player_actor.motion_direction == Vector2.ZERO, "任务导航抵达目的地后必须清除目标并停止走路动画")
-	_check(_has_actor(scene, "mine_thief"), "城外2D地图必须实际生成偷矿者")
+	_check(_has_actor(scene, "mine_thief"), "城外地图必须实际生成偷矿者")
 	_check(_actor_model_id(scene, "mine_thief") == "mine_thief", "不同敌人必须绑定各自的新版人物或怪物模型")
 	scene._update_nearest_actor()
 	_check(not scene.nearest_actor.is_empty() and scene.nearest_actor.id == "mine_thief", "导航抵达矿山后必须能直接找到任务敌人")
@@ -177,7 +177,7 @@ func _run():
 	_check(_has_actor(scene, "stone_puppet") and not _has_actor(scene, "dungeon_guard"), "击败一层后必须只生成二层石傀儡")
 	_check(scene._dungeon_floor_lock("training_dungeon_2") == "", "击败一层守卫后二层必须开放")
 	scene._switch_region("field", "residential_quarter")
-	_check(scene.state.dungeon_cleared.is_empty(), "离开2D副本后必须重置逐层解锁状态")
+	_check(scene.state.dungeon_cleared.is_empty(), "离开副本后必须重置逐层解锁状态")
 
 	scene.state.quest_index = 12
 	scene.state.quest_progress = 0
@@ -253,7 +253,7 @@ func _run():
 	scene._update_nearest_actor()
 	_check(scene.nearest_actor.id == "drunk_sailor", "靠近地图敌人后必须出现挑战交互")
 	scene._interact()
-	_check(is_instance_valid(scene.battle_stage), "地图遇敌后必须切换到2D战斗舞台")
+	_check(is_instance_valid(scene.battle_stage), "地图遇敌后必须切换到战斗舞台")
 	_check(is_instance_valid(scene.battle_stage.enemy_model) and scene.battle_stage.enemy_model.display_id == "drunk_sailor", "战斗舞台必须沿用地图中的对应敌人模型")
 	_check(_has_label_text(scene.overlay, "喝醉的水手 Lv.1") and _has_label_text(scene.overlay, "体力 42 / 42"), "战斗界面必须显示怪物等级与具体血量")
 	scene._set_battle_stance_2d("assault")
@@ -266,9 +266,9 @@ func _run():
 	scene._battle_auto()
 	_check(scene.auto_battle_running and scene.battle_result.is_empty(), "自动战斗必须逐回合播放，不能点击后瞬间跳到结算")
 	await _wait_for_auto_battle(scene)
-	_check(not scene.battle_result.is_empty() and bool(scene.battle_result.get("won", false)), "2D自动战斗必须正常结算胜利")
+	_check(not scene.battle_result.is_empty() and bool(scene.battle_result.get("won", false)), "自动战斗必须正常结算胜利")
 	_check(bool(scene.battle_result.get("quest_completed", false)), "最后一名任务敌人必须触发领奖引导")
-	_check(not _has_actor(scene, "drunk_sailor"), "怪物被击败后必须立即从2D地图消失")
+	_check(not _has_actor(scene, "drunk_sailor"), "怪物被击败后必须立即从地图消失")
 	var respawn_key = scene._enemy_spawn_key("drunk_sailor")
 	_check(float(scene.state.enemy_respawns.get(respawn_key, 0.0)) > scene._world_time_seconds(), "怪物消失后必须把刷新倒计时写入存档状态")
 	var early_retry = scene.state.start_battle("drunk_sailor")
@@ -311,7 +311,7 @@ func _run():
 	var equipment_upgrade = scene.state.upgrade_equipped("weapon")
 	_check(bool(equipment_upgrade.get("ok", false)) and scene.state.equipment_upgrade_level("warrior_blade") == 1 and int(scene.state.get_stats().attack) > attack_before_upgrade, "贸易银币必须可以用于强化已装备武器并提升属性")
 	scene._open_trade_2d()
-	_check(is_instance_valid(scene.overlay), "主线完成后必须能从2D地图打开港口市场")
+	_check(is_instance_valid(scene.overlay), "主线完成后必须能从地图打开港口市场")
 	_check(_has_button_text(scene.overlay, "买1") and _has_button_text(scene.overlay, "买满") and _has_button_text(scene.overlay, "全卖") and _has_button_text(scene.overlay, "打开商会订单柜台") and _has_label_text(scene.overlay, "银币") and _has_label_text(scene.overlay, "今日行情") and not _has_button_text(scene.overlay, "出航拉古萨") and not _has_button_text(scene.overlay, "强化舱板"), "货栈NPC必须只展示货物买卖和订单入口，不能混入航线或船只改造")
 	_check(_has_named_node(scene.overlay, "CargoCapacityBar") and _count_visuals(scene.overlay, "trade") >= 1 and _has_label_text(scene.overlay, "货舱装载") and _has_label_text(scene.overlay, "推荐销往"), "市场必须以货舱容量条、货物图标和销地利润提示呈现，不能只有价格文字")
 	_check(_has_label_text(scene.overlay, "蕾娜｜翼狮货栈") and _has_label_text(scene.overlay, "本港产地货栈 · 仅出售威尼斯玻璃") and not _has_label_text(scene.overlay, "石墙羊毛布"), "威尼斯必须由专属货栈NPC只出售本地货单，不能展示全球商品总目录")
@@ -325,7 +325,7 @@ func _run():
 	scene._open_trade_2d()
 	var silver_before = int(scene.state.player.silver)
 	scene._trade_buy_2d("venetian_glass")
-	_check(int(scene.state.cargo.get("venetian_glass", 0)) == 1 and int(scene.state.player.silver) < silver_before, "2D市场买货必须同步货舱和银币")
+	_check(int(scene.state.cargo.get("venetian_glass", 0)) == 1 and int(scene.state.player.silver) < silver_before, "市场买货必须同步货舱和银币")
 	scene.state.player.silver = 1000
 	var armor_upgrade = scene.state.upgrade_ship("armor")
 	_check(bool(armor_upgrade.get("ok", false)) and int(scene.state.ship.get("armor", 0)) == 1, "船只必须可以加固护甲并降低航线风险")
@@ -345,7 +345,19 @@ func _run():
 	_check(scene.state.trade_contract_count == 1 and scene.state.trade_contract_target() == 180 and scene.state.trade_contract_progress() == 0, "商会委托领取后必须自动开启更高目标的下一轮")
 	_check(not scene.state.best_trade_opportunity().is_empty(), "港口必须能计算一条可见的动态商路推荐")
 
-	# 九港复用同一港区地图，但重新加载或走入码头视觉区域时不能篡改真实所在港口。
+	# 九座城市必须拥有独立主题、地标与人物站位，不能继续复用同一张码头背景。
+	_check(GameData.PORT_CITY_MAPS.size() == GameData.TRADE_PORTS.size(), "每座贸易城市都必须配置完整城内地图")
+	var city_styles = {}
+	for city_port_id in GameData.TRADE_PORTS:
+		var city_layout = GameData.PORT_CITY_MAPS.get(str(city_port_id), {})
+		_check(not city_layout.is_empty() and str(city_layout.get("title", "")) != "" and str(city_layout.get("landmark", "")) != "" and Array(city_layout.get("districts", [])).size() >= 4, "%s必须拥有城市主题、地标和至少四个街区" % GameData.TRADE_PORTS[str(city_port_id)].name)
+		city_styles[str(city_layout.get("style", ""))] = true
+		var configured_positions = Dictionary(city_layout.get("npc_positions", {}))
+		for city_npc_id in GameData.LOCATIONS[str(city_port_id)].npcs:
+			_check(configured_positions.has(str(city_npc_id)), "%s的%s必须在城内地图配置独立站位" % [GameData.TRADE_PORTS[str(city_port_id)].name, GameData.NPCS[str(city_npc_id)].name])
+	_check(city_styles.size() == GameData.TRADE_PORTS.size(), "九座城市必须使用九种可区分的美术主题")
+
+	# 重新加载或走入远洋城市的视觉街区时不能篡改真实所在港口。
 	scene.state.quest_index = GameData.QUESTS.size()
 	scene.state.player.location = "alexandria_dock"
 	scene.state.cargo["venetian_glass"] = 1
@@ -355,7 +367,7 @@ func _run():
 	scene.player_actor.position = scene._spawn_for_location("alexandria_dock")
 	scene._spawn_world_actors()
 	scene._update_zone(true)
-	_check(str(scene.state.player.location) == "alexandria_dock" and _has_actor(scene, "alexandria_merchant"), "亚历山大港重新进入2D地图后必须保留港口位置和当地商人")
+	_check(str(scene.state.player.location) == "alexandria_dock" and _has_actor(scene, "alexandria_merchant"), "亚历山大重新进入世界地图后必须保留城市位置和当地商人")
 	_check(_has_actor(scene, "alex_harbormaster") and _has_actor(scene, "alex_lighthouse_keeper") and _has_actor(scene, "alex_shipwright"), "远洋港口必须同时生成货栈、港务、商会和船匠，不能把服务合并给一名NPC")
 	_check(_actor_has_label_text(scene, "alexandria_merchant", "货栈 · 买卖特产") and _actor_has_label_text(scene, "alex_harbormaster", "航务 · 航线出港") and _actor_has_label_text(scene, "alex_shipwright", "船坞 · 买船改造") and _actor_has_label_text(scene, "alex_lighthouse_keeper", "商会 · 订单交付"), "港区地图上的每名NPC名牌必须直接显示职能")
 	scene.player_actor.position = _actor_position(scene, "alexandria_merchant")
@@ -446,12 +458,23 @@ func _run():
 	recipe_target = scene._quest_navigation_target()
 	_check(str(recipe_target.location) == "malta_dock" and str(recipe_target.actor_id) == "malta_cook" and "厨房" in str(recipe_target.name), "全部配料备齐后导航必须切换到马耳他厨师")
 
-	# 九港每名可见NPC都必须使用精灵模型，不能回退成同一套通用线框小人。
+	# 九城地图、NPC位置与碰撞要逐城切换，每名人物都必须使用精灵模型。
 	scene.state.quest_index = GameData.QUESTS.size()
 	for modeled_port_id in GameData.TRADE_PORTS:
 		scene._switch_region("city", str(modeled_port_id))
+		_check(str(scene.map_node.city_port_id) == str(modeled_port_id), "%s必须加载自己的城内地图主题" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
 		for modeled_npc_id in GameData.LOCATIONS[str(modeled_port_id)].npcs:
-			_check(_actor_has_art(scene, str(modeled_npc_id)), "%s的%s必须拥有可见2D人物精灵" % [GameData.TRADE_PORTS[str(modeled_port_id)].name, GameData.NPCS[str(modeled_npc_id)].name])
+			var expected_position = scene._world_point(Vector2(GameData.PORT_CITY_MAPS[str(modeled_port_id)].npc_positions[str(modeled_npc_id)]))
+			_check(_actor_has_art(scene, str(modeled_npc_id)), "%s的%s必须拥有可见人物精灵" % [GameData.TRADE_PORTS[str(modeled_port_id)].name, GameData.NPCS[str(modeled_npc_id)].name])
+			var position_is_reachable = true if str(modeled_port_id) == "venice_dock" else scene._is_walkable(expected_position)
+			_check(_actor_position(scene, str(modeled_npc_id)).distance_to(expected_position) < 1.0 and position_is_reachable, "%s的%s必须生成在地图配置的可行走街区" % [GameData.TRADE_PORTS[str(modeled_port_id)].name, GameData.NPCS[str(modeled_npc_id)].name])
+	scene._switch_region("city", "athens_dock")
+	scene._open_world_map()
+	_check(_has_label_text(scene.overlay, "雅典 · 城内地图") and _has_label_text(scene.overlay, "海岬神殿与银帆柱廊") and _has_button_text(scene.overlay, "卡珊德拉｜货栈 · 买卖特产") and _has_button_text(scene.overlay, "艾琳娜｜旅店 · 恢复补给"), "每座城市的城内地图必须展示本地地标、人物和职能")
+	var athens_map_start = scene.player_actor.position
+	scene._travel_to_city_npc("athens_dock", "athens_oracle")
+	_check(scene.task_navigation_active and scene.player_actor.position.distance_to(athens_map_start) < 1.0, "从城内地图选择NPC必须启动步行导航，不能直接传送")
+	scene._cancel_task_navigation()
 	scene._switch_region("city", "alexandria_dock")
 
 	# 航海必须把原作的“出航”和“传送”分开；正常出航进入可驾驶海域，靠港后才改写位置。
@@ -468,7 +491,7 @@ func _run():
 	var origin_before_departure = str(scene.state.player.location)
 	var silver_before_departure = int(scene.state.player.silver)
 	scene._start_sailing_voyage()
-	_check(scene.current_region == "sea" and not scene.state.active_voyage.is_empty(), "确认正常出航后必须进入可驾驶2D海域")
+	_check(scene.current_region == "sea" and not scene.state.active_voyage.is_empty(), "确认正常出航后必须进入可驾驶海域")
 	_check(scene._active_world_size() == GameData.SEA_GLOBAL_WORLD_SIZE and Vector2(float(scene.state.active_voyage.world_width), float(scene.state.active_voyage.world_height)) == GameData.SEA_GLOBAL_WORLD_SIZE, "跨海航行必须加载同一张固定比例的九港大地图（地图%s / 状态%s / 距离%d）" % [scene._active_world_size(), Vector2(float(scene.state.active_voyage.world_width), float(scene.state.active_voyage.world_height)), selected_voyage_distance])
 	var alexandria_departure_position = scene.player_actor.position
 	scene.joystick_direction = Vector2.RIGHT
@@ -547,7 +570,7 @@ func _run():
 	_check(_has_label_text(scene.overlay, "第十三卷·封印迷阵") and _has_label_text(scene.overlay, "剧情回顾") and _has_button_text(scene.overlay, "领取悬赏奖励"), "主线结束后任务页必须显示第十三卷进度、剧情回顾和可持续领取的悬赏")
 
 	if failures.is_empty():
-		print("WORLD_2D_OK: 移动导航、十三座远征、自动战斗、怪物刷新、九港贸易与厨房全部通过")
+		print("WORLD_MAP_OK: 移动导航、十三座远征、自动战斗、怪物刷新、九港贸易与厨房全部通过")
 		quit(0)
 	else:
 		for failure in failures:
