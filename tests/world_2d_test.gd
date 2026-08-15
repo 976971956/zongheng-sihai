@@ -27,6 +27,7 @@ func _run():
 	for initial_building in scene.city_buildings:
 		_check(initial_building.get_parent() == scene.world_layer and initial_building != scene.map_node and initial_building.z_index < scene.player_actor.z_index, "独立房屋必须位于背景之上、人物之下的专用层级")
 		_check(is_instance_valid(initial_building.art_sprite) and initial_building.art_sprite.texture is AtlasTexture, "每栋独立房屋都必须绑定透明建筑图集模型")
+		_check(initial_building.art_sprite.material is ShaderMaterial and initial_building.rendered_width > 0.0, "独立房屋必须带城市色温校准与落地阴影，不能像悬浮贴纸")
 	_check(scene.player_actor.display_id == "player", "主角必须使用独立的新版角色模型")
 	_check(scene.player_actor.art_sprite.hframes == 4 and scene.player_actor.art_sprite.vframes == 2, "主角必须使用多帧行走图集")
 	scene.player_actor.set_motion(Vector2.RIGHT)
@@ -488,7 +489,7 @@ func _run():
 		scene._switch_region("city", str(modeled_port_id))
 		_check(str(scene.map_node.city_port_id) == str(modeled_port_id), "%s必须加载自己的城内地图主题" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
 		var modeled_city_art_path = str(scene.map_node.city_art_path(str(modeled_port_id)))
-		_check(modeled_city_art_path.ends_with("/%s_city_v%s.png" % [str(modeled_port_id).trim_suffix("_dock"), "2" if str(modeled_port_id) == "venice_dock" else "1"]), "%s必须加载与港口一一对应的独立手绘背景" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
+		_check(modeled_city_art_path.ends_with("/%s_city_v%s.png" % [str(modeled_port_id).trim_suffix("_dock"), "3" if str(modeled_port_id) == "venice_dock" else "2"]), "%s必须加载与港口一一对应的无前景店铺手绘底图" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
 		_check(not modeled_city_art_paths.has(modeled_city_art_path), "%s不能复用其他城市的房屋与背景图" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
 		modeled_city_art_paths[modeled_city_art_path] = true
 		_check(scene.city_buildings.size() == _foreground_building_count(str(modeled_port_id)), "%s必须把配置中的前景房屋生成为独立节点，背景地标不能冒充NPC店铺" % GameData.TRADE_PORTS[str(modeled_port_id)].name)

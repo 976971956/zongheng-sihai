@@ -1,15 +1,15 @@
 extends Node2D
 
 const CITY_ARTS = {
-	"venice_dock": preload("res://assets/art/maps/venice_city_v2.png"),
-	"ragusa_dock": preload("res://assets/art/maps/ragusa_city_v1.png"),
-	"alexandria_dock": preload("res://assets/art/maps/alexandria_city_v1.png"),
-	"malta_dock": preload("res://assets/art/maps/malta_city_v1.png"),
-	"cape_town_dock": preload("res://assets/art/maps/cape_town_city_v1.png"),
-	"quanzhou_dock": preload("res://assets/art/maps/quanzhou_city_v1.png"),
-	"athens_dock": preload("res://assets/art/maps/athens_city_v1.png"),
-	"yangzhou_dock": preload("res://assets/art/maps/yangzhou_city_v1.png"),
-	"amsterdam_dock": preload("res://assets/art/maps/amsterdam_city_v1.png")
+	"venice_dock": preload("res://assets/art/maps/venice_city_v3.png"),
+	"ragusa_dock": preload("res://assets/art/maps/ragusa_city_v2.png"),
+	"alexandria_dock": preload("res://assets/art/maps/alexandria_city_v2.png"),
+	"malta_dock": preload("res://assets/art/maps/malta_city_v2.png"),
+	"cape_town_dock": preload("res://assets/art/maps/cape_town_city_v2.png"),
+	"quanzhou_dock": preload("res://assets/art/maps/quanzhou_city_v2.png"),
+	"athens_dock": preload("res://assets/art/maps/athens_city_v2.png"),
+	"yangzhou_dock": preload("res://assets/art/maps/yangzhou_city_v2.png"),
+	"amsterdam_dock": preload("res://assets/art/maps/amsterdam_city_v2.png")
 }
 const FIELD_ART = preload("res://assets/art/maps/venice_field_v2.png")
 const DUNGEON_ART = preload("res://assets/art/maps/training_dungeon_v2.png")
