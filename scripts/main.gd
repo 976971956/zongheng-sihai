@@ -1184,8 +1184,11 @@ func _show_battle_screen(result = {}):
 		var bars = HBoxContainer.new()
 		bars.add_theme_constant_override("separation", 14)
 		content.add_child(bars)
-		bars.add_child(_battle_health_block("航者 Lv.%d" % int(current.get("player_level", state.player.level)), int(current.player_hp), int(current.player_max_hp), TEAL))
+		var combatant_title = "%s · %s" % [str(current.get("combatant_name", state.ship.name)), str(current.get("ship_role", state.ship_role()))] if bool(current.get("sea_battle", false)) else "航者 Lv.%d" % int(current.get("player_level", state.player.level))
+		bars.add_child(_battle_health_block(combatant_title, int(current.player_hp), int(current.player_max_hp), TEAL))
 		bars.add_child(_battle_health_block("%s Lv.%d" % [current.enemy_name, int(current.get("enemy_level", 1))], int(current.enemy_hp), int(current.enemy_max_hp), RED))
+		if bool(current.get("sea_battle", false)):
+			content.add_child(_label("座舰海战加成｜攻击%d · 防御%d · 舰炮%d" % [int(current.get("player_attack", 0)), int(current.get("player_defense", 0)), int(current.get("ship_cannon_power", 0))], 11, TEAL))
 		var status_text = "状态：正常"
 		if not current.statuses.is_empty():
 			var status_parts = []
@@ -1639,7 +1642,7 @@ func _journal_ship_summary():
 	row.add_theme_constant_override("separation", 10)
 	margin.add_child(row)
 	row.add_child(_journal_ship_visual(hull_id, 72))
-	var copy = _label("座舰系统｜Lv.%d %s\n%.1f节 · %d海里/日｜货舱%d/%d｜船甲%d｜%s船行" % [int(hull.level), str(hull.name), float(profile.knots), int(profile.nm_per_day), state.cargo_used(), state.cargo_capacity(), state.ship_armor(), str(port.name)], 11, GOLD)
+	var copy = _label("座舰系统｜Lv.%d %s · %s\n%.1f节 · %d海里/日｜货舱%d/%d｜船甲%d｜舰炮%d\n船队%d/9艘｜%s船行" % [int(hull.level), str(hull.name), str(hull.role), float(profile.knots), int(profile.nm_per_day), state.cargo_used(), state.cargo_capacity(), state.ship_armor(), state.ship_cannon_power(), state.owned_ship_ids().size(), str(port.name)], 11, GOLD)
 	copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	row.add_child(copy)
@@ -1987,9 +1990,11 @@ func _open_harbor():
 	market.add_child(_small_caption("船只改造"))
 	var offered_hull_id = str(port.get("ship_offer", "sea_swallow"))
 	var offered_hull = Dictionary(GameData.SHIP_HULLS[offered_hull_id])
-	market.add_child(_label("%s船行｜Lv.%d %s · %.1f节 · %d格货舱 · 船甲%d" % [str(port.get("ship_seller", "本港")), int(offered_hull.level), str(offered_hull.name), float(offered_hull.base_knots), int(offered_hull.capacity), int(offered_hull.armor)], 11, TEAL))
-	var purchase_ship = _button("当前船只" if str(state.ship.get("hull_id", "sea_swallow")) == offered_hull_id else "购买%s · %d银" % [str(offered_hull.name), int(offered_hull.price)], "gold")
-	purchase_ship.disabled = str(state.ship.get("hull_id", "sea_swallow")) == offered_hull_id or int(state.player.silver) < int(offered_hull.price) or state.cargo_used() > int(offered_hull.capacity) + int(state.ship.get("hold_level", 0)) * 6
+	market.add_child(_label("%s船行｜Lv.%d %s · %s · %.1f节 · %d格 · 船甲%d · 舰炮%d" % [str(port.get("ship_seller", "本港")), int(offered_hull.level), str(offered_hull.name), str(offered_hull.role), float(offered_hull.base_knots), int(offered_hull.capacity), int(offered_hull.armor), int(offered_hull.cannon)], 11, TEAL))
+	var offered_is_current = str(state.ship.get("hull_id", "sea_swallow")) == offered_hull_id
+	var offered_is_owned = state.owns_ship(offered_hull_id)
+	var purchase_ship = _button("当前船只" if offered_is_current else ("换乘%s · 已拥有" % str(offered_hull.name) if offered_is_owned else "购买%s · %d银" % [str(offered_hull.name), int(offered_hull.price)]), "gold")
+	purchase_ship.disabled = offered_is_current or (not offered_is_owned and int(state.player.silver) < int(offered_hull.price)) or state.cargo_used() > int(offered_hull.capacity) + int(state.ship.get("hold_level", 0)) * 6
 	purchase_ship.pressed.connect(_buy_ship_from_journal.bind(offered_hull_id))
 	market.add_child(purchase_ship)
 	var upgrades = HBoxContainer.new()
@@ -2010,6 +2015,11 @@ func _open_harbor():
 	armor.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	armor.pressed.connect(_trade_upgrade.bind("armor"))
 	upgrades.add_child(armor)
+	var cannon = _button("强化舰炮 +4攻击", "ghost")
+	cannon.disabled = int(state.ship.get("cannon_level", 0)) >= 3
+	cannon.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cannon.pressed.connect(_trade_upgrade.bind("cannon"))
+	upgrades.add_child(cannon)
 	market.add_child(upgrades)
 	market.add_child(_label("本轮商会净收支：%+d银币｜生涯已实现货差：%+d｜累计成交%d件" % [state.trade_profit, state.trade_lifetime_profit, state.trade_volume], 11, MUTED))
 	_open_modal("货物贸易", content, Vector2(720, 1120) if mobile_mode else Vector2(760, 650))

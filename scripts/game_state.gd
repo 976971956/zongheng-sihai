@@ -69,7 +69,7 @@ func new_game():
 	dungeon_cleared = {}
 	cargo = {}
 	cargo_costs = {}
-	ship = {"name": "海燕号", "hull_id": "sea_swallow", "capacity": 12, "speed": 1, "hold_level": 0, "armor": 0}
+	ship = {"name": "海燕号", "hull_id": "sea_swallow", "owned_hulls": ["sea_swallow"], "capacity": 12, "speed": 1, "hold_level": 0, "armor": 0, "cannon_level": 0}
 	trade_day = 1
 	trade_profit = 0
 	trade_volume = 0
@@ -571,7 +571,7 @@ func start_battle(enemy_id):
 	var enemy = GameData.ENEMIES[enemy_id]
 	active_battle = {
 		"enemy_id": enemy_id, "enemy_hp": int(enemy.hp), "enemy_max_hp": int(enemy.hp),
-		"round": 1, "focus": 0, "skill_prepared": false, "log": [enemy.intro]
+		"round": 1, "focus": 0, "skill_prepared": false, "sea_battle": sea_encounter, "log": [enemy.intro]
 	}
 	player.battles += 1
 	save_game()
@@ -583,11 +583,16 @@ func get_battle_view():
 	if active_battle.is_empty():
 		return {"ok": false, "message": "当前没有战斗。"}
 	var enemy = GameData.ENEMIES[active_battle.enemy_id]
+	var combat_stats = get_battle_stats()
+	var sea_battle = bool(active_battle.get("sea_battle", false))
 	return {
 		"ok": true, "battle_over": false, "won": false,
 		"enemy_id": active_battle.enemy_id, "enemy_name": enemy.name, "enemy_rank": enemy.rank, "enemy_level": int(enemy.level),
 		"enemy_hp": int(active_battle.enemy_hp), "enemy_max_hp": int(active_battle.enemy_max_hp),
 		"player_level": int(player.level), "player_hp": int(player.hp), "player_max_hp": int(get_stats().max_hp),
+		"player_attack": int(combat_stats.attack), "player_defense": int(combat_stats.defense),
+		"sea_battle": sea_battle, "combatant_name": str(ship.name) if sea_battle else str(player.name),
+		"ship_role": ship_role(), "ship_hull_id": str(ship.get("hull_id", "sea_swallow")), "ship_cannon_power": ship_cannon_power(),
 		"round": int(active_battle.round), "statuses": statuses.duplicate(), "logs": [],
 		"battle_stance": battle_stance, "enemy_intent": get_enemy_intent(),
 		"auto_heal_threshold": auto_heal_threshold, "auto_cure_status": auto_cure_status,
@@ -647,7 +652,7 @@ func attack_once():
 		return {"ok": false, "message": "当前没有战斗。"}
 	var enemy_id = active_battle.enemy_id
 	var enemy = GameData.ENEMIES[enemy_id]
-	var stats = get_stats()
+	var stats = get_battle_stats()
 	var logs = []
 	var player_attack = int(stats.attack)
 	var player_speed = int(stats.speed)
@@ -686,7 +691,7 @@ func attack_once():
 		var focus_gain = 2 if battle_stance == "guard" else 1
 		active_battle.focus = min(3, battle_focus() + focus_gain)
 		if int(active_battle.focus) >= 3:
-			logs.append("潮势已满｜可发动破浪斩，若敌人正在蓄力可削弱其技能。")
+			logs.append("潮势已满｜可发动舷炮齐射，若敌人正在蓄力可削弱其技能。" if bool(active_battle.get("sea_battle", false)) else "潮势已满｜可发动破浪斩，若敌人正在蓄力可削弱其技能。")
 
 	_apply_status_tick(logs)
 	_tick_statuses()
@@ -725,7 +730,8 @@ func flee_battle():
 	if active_battle.is_empty():
 		return {"ok": false, "message": "当前没有战斗。"}
 	var enemy = GameData.ENEMIES[active_battle.enemy_id]
-	if rng.randf() <= 0.72:
+	var flee_chance = ship_escape_chance() if bool(active_battle.get("sea_battle", false)) else 0.72
+	if rng.randf() <= flee_chance:
 		active_battle = {}
 		statuses = {}
 		if not active_voyage.is_empty():
@@ -739,7 +745,18 @@ func flee_battle():
 func _player_strike(enemy, player_attack, round_number, logs, uses_skill = false):
 	var result = _roll_attack(player_attack, enemy.defense, int(player.level), int(enemy.level))
 	active_battle.enemy_hp = max(0, int(active_battle.enemy_hp) - int(result.damage))
-	if result.miss and uses_skill:
+	var sea_battle = bool(active_battle.get("sea_battle", false))
+	if sea_battle and result.miss and uses_skill:
+		logs.append("第%d回合｜%s舷炮齐射，炮弹落在%s侧舷之外。" % [round_number, str(ship.name), enemy.name])
+	elif sea_battle and result.miss:
+		logs.append("第%d回合｜%s舰炮射击，被%s抢先转向避开。" % [round_number, str(ship.name), enemy.name])
+	elif sea_battle and uses_skill:
+		logs.append("第%d回合｜舷炮齐射！%s命中%s，耐久-%d！" % [round_number, str(ship.name), enemy.name, result.damage])
+	elif sea_battle and result.crit:
+		logs.append("第%d回合｜舰炮命中水线！%s耐久-%d。" % [round_number, enemy.name, result.damage])
+	elif sea_battle:
+		logs.append("第%d回合｜%s开炮命中%s，耐久-%d。" % [round_number, str(ship.name), enemy.name, result.damage])
+	elif result.miss and uses_skill:
 		logs.append("第%d回合｜你发动破浪斩，刀锋擦过%s。" % [round_number, enemy.name])
 	elif result.miss:
 		logs.append("第%d回合｜你的攻击被%s避开。" % [round_number, enemy.name])
@@ -778,7 +795,8 @@ func _enemy_strike(enemy, stats, round_number, logs, special_weakened = false):
 	if result.miss:
 		logs.append("第%d回合｜你避开了%s的攻击。" % [round_number, enemy.name])
 	elif uses_special and special_weakened:
-		logs.append("第%d回合｜破浪斩打乱了%s的%s，你的体力仅-%d。" % [round_number, enemy.name, str(special.get("name", "强力攻击")), result.damage])
+		var counter_name = "舷炮齐射" if bool(active_battle.get("sea_battle", false)) else "破浪斩"
+		logs.append("第%d回合｜%s打乱了%s的%s，你的体力仅-%d。" % [round_number, counter_name, enemy.name, str(special.get("name", "强力攻击")), result.damage])
 	elif uses_special:
 		logs.append("第%d回合｜%s施放%s，你的体力-%d！" % [round_number, enemy.name, str(special.get("name", "强力攻击")), result.damage])
 	elif result.crit:
@@ -813,6 +831,7 @@ func _tick_statuses():
 
 func _finish_battle_win(enemy_id, round_logs):
 	var enemy = GameData.ENEMIES[enemy_id]
+	var was_sea_battle = bool(active_battle.get("sea_battle", false))
 	var finishing_stance = battle_stance
 	player.victories += 1
 	player.hp = max(1, int(player.hp))
@@ -849,6 +868,7 @@ func _finish_battle_win(enemy_id, round_logs):
 		"ok": true, "battle_over": true, "won": true, "fled": false,
 		"enemy_id": enemy_id, "enemy_name": enemy.name, "enemy_rank": enemy.rank, "enemy_level": int(enemy.level),
 		"enemy_hp": 0, "enemy_max_hp": int(enemy.hp), "player_level": int(player.level), "player_hp": int(player.hp), "player_max_hp": int(get_stats().max_hp),
+		"sea_battle": was_sea_battle, "combatant_name": str(ship.name) if was_sea_battle else str(player.name),
 		"round": 0, "statuses": {}, "logs": round_logs,
 		"exp": int(enemy.exp), "silver": silver, "drop": drop_id, "leveled": leveled, "new_level": int(player.level),
 		"quest_completed": quest_completed, "bounty_completed": bounty_completed, "battle_stance": finishing_stance
@@ -856,6 +876,7 @@ func _finish_battle_win(enemy_id, round_logs):
 
 func _finish_battle_loss(enemy_id, round_logs):
 	var enemy = GameData.ENEMIES[enemy_id]
+	var was_sea_battle = bool(active_battle.get("sea_battle", false))
 	var voyage_origin = str(active_voyage.get("origin", ""))
 	var lost_at_sea = voyage_origin in GameData.TRADE_PORTS
 	var remaining_enemy_hp = int(active_battle.get("enemy_hp", enemy.hp))
@@ -878,6 +899,7 @@ func _finish_battle_loss(enemy_id, round_logs):
 		"enemy_id": enemy_id, "enemy_name": enemy.name, "enemy_rank": enemy.rank, "enemy_level": int(enemy.level),
 		"enemy_hp": remaining_enemy_hp, "enemy_max_hp": int(enemy.hp), "player_level": int(player.level),
 		"player_hp": defeated_player_hp, "player_max_hp": int(get_stats().max_hp), "recovered_hp": recovered_hp, "round": 0, "statuses": {},
+		"sea_battle": was_sea_battle, "combatant_name": str(ship.name) if was_sea_battle else str(player.name),
 		"logs": round_logs, "exp": 0, "silver": 0, "drop": "", "leveled": false, "new_level": int(player.level),
 		"return_port": voyage_origin if lost_at_sea else "venice_tavern", "lost_at_sea": lost_at_sea
 	}
@@ -1211,8 +1233,44 @@ func cargo_capacity():
 func current_ship_hull():
 	return Dictionary(GameData.SHIP_HULLS.get(str(ship.get("hull_id", "sea_swallow")), GameData.SHIP_HULLS.sea_swallow))
 
+func owned_ship_ids():
+	var owned = []
+	for hull_id in Array(ship.get("owned_hulls", ["sea_swallow"])):
+		var resolved_id = str(hull_id)
+		if GameData.SHIP_HULLS.has(resolved_id) and not resolved_id in owned:
+			owned.append(resolved_id)
+	if not "sea_swallow" in owned:
+		owned.push_front("sea_swallow")
+	return owned
+
+func owns_ship(hull_id):
+	return str(hull_id) in owned_ship_ids()
+
+func ship_role():
+	return str(current_ship_hull().get("role", "帆船"))
+
 func ship_armor():
 	return int(current_ship_hull().armor) + int(ship.get("armor", 0))
+
+func ship_cannon_power():
+	return int(current_ship_hull().get("cannon", 0)) + int(ship.get("cannon_level", 0)) * 4
+
+func ship_trade_bonus():
+	return int(current_ship_hull().get("trade_bonus", 0))
+
+func ship_dive_bonus():
+	return int(current_ship_hull().get("dive_bonus", 0))
+
+func ship_escape_chance():
+	return clamp(0.72 + float(current_ship_hull().get("escape_bonus", 0)) / 100.0, 0.30, 0.92)
+
+func get_battle_stats():
+	var stats = get_stats().duplicate(true)
+	if not active_battle.is_empty() and bool(active_battle.get("sea_battle", false)):
+		stats.attack = int(stats.attack) + ship_cannon_power()
+		stats.defense = int(stats.defense) + ship_armor() * 2 + int(current_ship_hull().get("sea_defense", 0))
+		stats.speed = int(stats.speed) + int(round(float(ship_speed_profile().knots) * 0.35))
+	return stats
 
 func ship_speed_profile():
 	return GameData.ship_speed_profile(int(ship.get("speed", 1)), str(ship.get("hull_id", "sea_swallow")))
@@ -1265,7 +1323,9 @@ func trade_buy_price_at(port_id, good_id, day):
 func trade_sell_price_at(port_id, good_id, day):
 	var market_price = GameData.trade_market_price(str(port_id), str(good_id), int(day))
 	var sell_rate = 0.90 + min(0.05, float(port_reputation_value(str(port_id))) * 0.0025)
-	return max(1, int(floor(float(market_price) * sell_rate)))
+	var is_export_sale = str(GameData.TRADE_GOODS.get(str(good_id), {}).get("origin", "")) != str(port_id)
+	var hull_bonus = float(ship_trade_bonus()) / 100.0 if is_export_sale else 0.0
+	return max(1, int(floor(float(market_price) * (sell_rate + hull_bonus))))
 
 func buy_cargo(good_id, amount = 1):
 	if not is_trade_unlocked():
@@ -1392,7 +1452,7 @@ func voyage_plan(port_id, origin_override = ""):
 	# 原版正常出航会消耗体力；按航程分段收费，避免远洋和近海只差一张地图。
 	var stamina_cost = max(3, int(ceil(float(distance_nm) / 900.0)) + 1)
 	var dive_tier_bonus = {"coastal": 0, "regional": 10, "oceanic": 20}.get(tier_id, 0)
-	var dive_chance = clamp(35 + int(dive_tier_bonus) + int(round(float(get_stats().drop_bonus) * 100.0)), 35, 75)
+	var dive_chance = clamp(35 + int(dive_tier_bonus) + ship_dive_bonus() + int(round(float(get_stats().drop_bonus) * 100.0)), 35, 85)
 	var risk = _voyage_risk_for_route(route)
 	var threat_count = 4
 	if distance_nm > int(GameData.SEA_VOYAGE_TIERS.coastal.max_distance_nm):
@@ -1895,6 +1955,11 @@ func upgrade_ship(kind):
 			return {"ok": false, "message": "船体护甲已升到最高。"}
 		cost = 240 + int(ship.get("armor", 0)) * 130
 		message = "船体护甲提升至%d级，航行风险降低" % (int(ship.get("armor", 0)) + 1)
+	elif kind == "cannon":
+		if int(ship.get("cannon_level", 0)) >= 3:
+			return {"ok": false, "message": "舰炮已经强化到最高。"}
+		cost = 260 + int(ship.get("cannon_level", 0)) * 160
+		message = "舰炮提升至Lv.%d，海战攻击达到%d" % [int(ship.get("cannon_level", 0)) + 1, ship_cannon_power() + 4]
 	else:
 		return {"ok": false, "message": "未知的船只改造。"}
 	if int(player.silver) < cost:
@@ -1905,8 +1970,10 @@ func upgrade_ship(kind):
 		ship.capacity = cargo_capacity()
 	elif kind == "speed":
 		ship.speed = int(ship.get("speed", 1)) + 1
-	else:
+	elif kind == "armor":
 		ship.armor = int(ship.get("armor", 0)) + 1
+	else:
+		ship.cannon_level = int(ship.get("cannon_level", 0)) + 1
 	var quest_completed = _advance_quest("upgrade_ship", str(kind))
 	message_history.push_front("%s完成改造：%s。" % [str(ship.name), message])
 	_trim_history()
@@ -1924,6 +1991,8 @@ func buy_ship(hull_id):
 		return {"ok": false, "message": "本港船老板不出售这艘船。"}
 	if str(ship.get("hull_id", "sea_swallow")) == resolved_id:
 		return {"ok": false, "message": "这正是你当前使用的船。"}
+	if owns_ship(resolved_id):
+		return switch_ship(resolved_id)
 	var hull = Dictionary(GameData.SHIP_HULLS[resolved_id])
 	var new_capacity = int(hull.capacity) + int(ship.get("hold_level", 0)) * 6
 	if cargo_used() > new_capacity:
@@ -1932,13 +2001,36 @@ func buy_ship(hull_id):
 	if int(player.silver) < price:
 		return {"ok": false, "message": "购买%s还差%d银币。" % [str(hull.name), price - int(player.silver)]}
 	player.silver -= price
+	var owned = owned_ship_ids()
+	owned.append(resolved_id)
+	ship.owned_hulls = owned
 	ship.hull_id = resolved_id
 	ship.name = str(hull.name)
 	ship.capacity = cargo_capacity()
 	message_history.push_front("在%s船行购入%s。" % [GameData.TRADE_PORTS[str(player.location)].name, str(hull.name)])
 	_trim_history()
 	save_game()
-	return {"ok": true, "message": "已购入%s（-%d银币）\n基础%.1f节 · 货舱%d格 · 船甲%d｜帆装和船舱强化已转装。" % [str(hull.name), price, float(hull.base_knots), cargo_capacity(), ship_armor()], "cost": price}
+	return {"ok": true, "message": "已购入并启用%s（-%d银币）\n%s｜基础%.1f节 · 货舱%d格 · 船甲%d · 舰炮%d｜船装已转装，旧船保留在船队。" % [str(hull.name), price, str(hull.role), float(hull.base_knots), cargo_capacity(), ship_armor(), ship_cannon_power()], "cost": price, "purchased": true}
+
+func switch_ship(hull_id):
+	var resolved_id = str(hull_id)
+	if not is_trade_unlocked() or not GameData.TRADE_PORTS.has(str(player.location)) or not active_voyage.is_empty():
+		return {"ok": false, "message": "只能靠港后在船坞换乘船只。"}
+	if not GameData.SHIP_HULLS.has(resolved_id) or not owns_ship(resolved_id):
+		return {"ok": false, "message": "这艘船尚未加入你的船队。"}
+	if str(ship.get("hull_id", "sea_swallow")) == resolved_id:
+		return {"ok": false, "message": "这正是你当前使用的船。"}
+	var hull = Dictionary(GameData.SHIP_HULLS[resolved_id])
+	var new_capacity = int(hull.capacity) + int(ship.get("hold_level", 0)) * 6
+	if cargo_used() > new_capacity:
+		return {"ok": false, "message": "%s只能装%d格，请先卖出%d格货物。" % [str(hull.name), new_capacity, cargo_used() - new_capacity]}
+	ship.hull_id = resolved_id
+	ship.name = str(hull.name)
+	ship.capacity = cargo_capacity()
+	message_history.push_front("在%s船坞换乘%s。" % [GameData.TRADE_PORTS[str(player.location)].name, str(hull.name)])
+	_trim_history()
+	save_game()
+	return {"ok": true, "message": "已换乘%s｜%s\n%.1f节 · 货舱%d格 · 船甲%d · 舰炮%d" % [str(hull.name), str(hull.role), float(ship_speed_profile().knots), cargo_capacity(), ship_armor(), ship_cannon_power()], "switched": true}
 
 func _add_item(item_id, count):
 	inventory[item_id] = int(inventory.get(item_id, 0)) + count
@@ -2099,7 +2191,7 @@ func load_game():
 	cargo_costs = parsed.get("cargo_costs", {})
 	if typeof(cargo_costs) != TYPE_DICTIONARY:
 		cargo_costs = {}
-	ship = parsed.get("ship", {"name": "海燕号", "capacity": 12, "speed": 1, "armor": 0})
+	ship = parsed.get("ship", {"name": "海燕号", "hull_id": "sea_swallow", "owned_hulls": ["sea_swallow"], "capacity": 12, "speed": 1, "hold_level": 0, "armor": 0, "cannon_level": 0})
 	trade_day = max(1, int(parsed.get("trade_day", 1)))
 	trade_profit = int(parsed.get("trade_profit", 0))
 	trade_volume = max(0, int(parsed.get("trade_volume", 0)))
@@ -2158,11 +2250,22 @@ func load_game():
 		ship.name = "海燕号"
 	if not ship.has("hull_id") or not GameData.SHIP_HULLS.has(str(ship.get("hull_id", ""))):
 		ship.hull_id = "sea_swallow"
+	var migrated_owned_hulls = []
+	for owned_hull_id in Array(ship.get("owned_hulls", ["sea_swallow", str(ship.hull_id)])):
+		var resolved_owned_id = str(owned_hull_id)
+		if GameData.SHIP_HULLS.has(resolved_owned_id) and not resolved_owned_id in migrated_owned_hulls:
+			migrated_owned_hulls.append(resolved_owned_id)
+	if not "sea_swallow" in migrated_owned_hulls:
+		migrated_owned_hulls.push_front("sea_swallow")
+	if not str(ship.hull_id) in migrated_owned_hulls:
+		migrated_owned_hulls.append(str(ship.hull_id))
+	ship.owned_hulls = migrated_owned_hulls
 	if not ship.has("hold_level"):
 		ship.hold_level = clamp(int(round(float(max(0, int(ship.get("capacity", 12)) - 12)) / 6.0)), 0, 3)
 	ship.hold_level = clamp(int(ship.get("hold_level", 0)), 0, 3)
 	ship.speed = clamp(int(ship.get("speed", 1)), 1, 4)
 	ship.armor = clamp(int(ship.get("armor", 0)), 0, 3)
+	ship.cannon_level = clamp(int(ship.get("cannon_level", 0)), 0, 3)
 	ship.name = str(current_ship_hull().name)
 	ship.capacity = cargo_capacity()
 	for good_id in cargo.keys():
@@ -2176,6 +2279,8 @@ func load_game():
 		active_battle = {}
 	if not active_battle.is_empty() and not GameData.ENEMIES.has(active_battle.get("enemy_id", "")):
 		active_battle = {}
+	elif not active_battle.is_empty() and not active_battle.has("sea_battle"):
+		active_battle.sea_battle = not active_voyage.is_empty() and bool(GameData.ENEMIES[str(active_battle.enemy_id)].get("sea_enemy", false))
 	if int(player.level) >= GameData.MAX_LEVEL:
 		player.level = GameData.MAX_LEVEL
 		player.xp = 0

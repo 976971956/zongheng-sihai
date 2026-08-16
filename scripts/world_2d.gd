@@ -1437,14 +1437,14 @@ func _open_battle(view):
 	battle_stage.custom_minimum_size = Vector2(640, 410)
 	battle_stage.set_battle_values(view)
 	content.add_child(battle_stage)
-	battle_log_label = _label("双方在港口石路上展开对峙。", 14, MUTED)
+	battle_log_label = _label("两船抢占上风位，舰炮已经装填。" if bool(view.get("sea_battle", false)) else "双方在港口石路上展开对峙。", 14, MUTED)
 	battle_log_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	battle_log_label.custom_minimum_size.y = 70
 	content.add_child(battle_log_label)
 	var actions = HBoxContainer.new()
 	actions.add_theme_constant_override("separation", 10)
 	content.add_child(actions)
-	battle_action_button = _button("挥剑攻击", "primary")
+	battle_action_button = _button("舰炮射击" if bool(view.get("sea_battle", false)) else "挥剑攻击", "primary")
 	battle_action_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	battle_action_button.pressed.connect(_battle_attack)
 	actions.add_child(battle_action_button)
@@ -1452,7 +1452,7 @@ func _open_battle(view):
 	battle_auto_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	battle_auto_button.pressed.connect(_battle_auto)
 	actions.add_child(battle_auto_button)
-	battle_skill_button = _button("破浪斩 0/3", "ghost")
+	battle_skill_button = _button("舷炮齐射 0/3" if bool(view.get("sea_battle", false)) else "破浪斩 0/3", "ghost")
 	battle_skill_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	battle_skill_button.pressed.connect(_battle_skill)
 	actions.add_child(battle_skill_button)
@@ -1471,13 +1471,16 @@ func _refresh_battle_info(view):
 			battle_round_label.text = "战斗胜利" if bool(view.get("won", false)) else ("成功撤退" if bool(view.get("fled", false)) else "战斗失败")
 		else:
 			battle_round_label.text = "遭遇战 · 第%d回合" % int(view.get("round", 1))
-	battle_player_info_label.text = "航者 Lv.%d\n体力 %d / %d" % [int(view.get("player_level", state.player.level)), int(view.get("player_hp", state.player.hp)), int(view.get("player_max_hp", state.get_stats().max_hp))]
+	if bool(view.get("sea_battle", false)):
+		battle_player_info_label.text = "%s · %s\n体力 %d/%d · 攻%d 防%d" % [str(view.get("combatant_name", state.ship.name)), str(view.get("ship_role", state.ship_role())), int(view.get("player_hp", state.player.hp)), int(view.get("player_max_hp", state.get_stats().max_hp)), int(view.get("player_attack", 0)), int(view.get("player_defense", 0))]
+	else:
+		battle_player_info_label.text = "航者 Lv.%d\n体力 %d / %d" % [int(view.get("player_level", state.player.level)), int(view.get("player_hp", state.player.hp)), int(view.get("player_max_hp", state.get_stats().max_hp))]
 	battle_enemy_info_label.text = "%s Lv.%d · %s\n体力 %d / %d" % [enemy_name, enemy_level, enemy_rank, int(view.get("enemy_hp", 0)), int(view.get("enemy_max_hp", enemy.get("hp", 1)))]
 	if is_instance_valid(battle_intent_label):
 		battle_intent_label.text = "敌方意图｜%s" % str(view.get("enemy_intent", "战斗已经结束")) if not bool(view.get("battle_over", false)) else "战斗已经结束"
 	if is_instance_valid(battle_skill_button):
 		var focus = int(view.get("focus", state.battle_focus()))
-		battle_skill_button.text = "破浪斩 %d/3" % focus
+		battle_skill_button.text = ("舷炮齐射 %d/3" if bool(view.get("sea_battle", false)) else "破浪斩 %d/3") % focus
 		battle_skill_button.disabled = focus < 3 or bool(view.get("battle_over", false)) or auto_battle_running
 
 func _set_battle_stance_2d(stance_id):
@@ -1831,10 +1834,10 @@ func _character_ship_card_2d():
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.add_theme_constant_override("separation", 4)
 	row.add_child(info)
-	info.add_child(_label("Lv.%d  %s" % [int(hull.level), str(hull.name)], 18, INK))
-	info.add_child(_label("航速 %.1f节 · %d海里/日\n货舱 %d/%d格 · 船甲%d" % [float(profile.knots), int(profile.nm_per_day), state.cargo_used(), state.cargo_capacity(), state.ship_armor()], 13, TEAL))
-	info.add_child(_label("帆装Lv.%d · 舱板Lv.%d · 装甲Lv.%d" % [int(state.ship.get("speed", 1)), int(state.ship.get("hold_level", 0)), int(state.ship.get("armor", 0))], 12, MUTED))
-	var trait_label = _label("特性｜%s\n产地｜%s · %s船行" % [str(hull.trait), str(port.name), str(port.get("ship_seller", "船老板"))], 12, GOLD)
+	info.add_child(_label("Lv.%d  %s｜%s" % [int(hull.level), str(hull.name), str(hull.role)], 18, INK))
+	info.add_child(_label("航速 %.1f节 · %d海里/日\n货舱 %d/%d格 · 船甲%d · 舰炮%d" % [float(profile.knots), int(profile.nm_per_day), state.cargo_used(), state.cargo_capacity(), state.ship_armor(), state.ship_cannon_power()], 13, TEAL))
+	info.add_child(_label("帆装Lv.%d · 舱板Lv.%d · 装甲Lv.%d · 舰炮Lv.%d" % [int(state.ship.get("speed", 1)), int(state.ship.get("hold_level", 0)), int(state.ship.get("armor", 0)), int(state.ship.get("cannon_level", 0))], 12, MUTED))
+	var trait_label = _label("船型专长｜%s\n船队收藏｜%d/9艘 · 产地｜%s · %s船行" % [str(hull.trait), state.owned_ship_ids().size(), str(port.name), str(port.get("ship_seller", "船老板"))], 12, GOLD)
 	trait_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	stack.add_child(trait_label)
 	var at_port = GameData.TRADE_PORTS.has(str(state.player.location))
@@ -1866,16 +1869,17 @@ func _ship_visual_2d(hull_id, icon_size):
 func _character_ship_catalog_2d():
 	var stack = VBoxContainer.new()
 	stack.add_theme_constant_override("separation", 6)
-	stack.add_child(_label("九港船型图鉴｜每个港口只出售自己的等级船只", 16, GOLD))
+	stack.add_child(_label("九港船型图鉴｜购入后永久加入船队，可在任一船坞换乘", 16, GOLD))
 	var current_hull_id = str(state.ship.get("hull_id", "sea_swallow"))
 	for hull_id in GameData.ship_hull_ids_by_level():
 		var hull = Dictionary(GameData.SHIP_HULLS[str(hull_id)])
 		var port_id = str(hull.sales_port)
 		var port = Dictionary(GameData.TRADE_PORTS[port_id])
 		var unlocked = state.is_port_unlocked(port_id)
-		var marker = "◆ 当前" if str(hull_id) == current_hull_id else ("○ 已发现" if unlocked else "◇ 未发现")
+		var owned = state.owns_ship(str(hull_id))
+		var marker = "◆ 当前" if str(hull_id) == current_hull_id else ("● 已拥有" if owned else ("○ 可购买" if unlocked else "◇ 未发现"))
 		var price_copy = "初始座舰" if int(hull.price) <= 0 else "%d银币" % int(hull.price)
-		var copy = "%s｜Lv.%d %s\n%s · %s船行｜%.1f节 · %d格 · 船甲%d · %s" % [marker, int(hull.level), str(hull.name), str(port.name), str(port.get("ship_seller", "船老板")), float(hull.base_knots), int(hull.capacity), int(hull.armor), price_copy if unlocked else "随主线解锁港口"]
+		var copy = "%s｜Lv.%d %s · %s\n%s · %s船行｜%.1f节 · %d格 · 船甲%d · 舰炮%d · %s" % [marker, int(hull.level), str(hull.name), str(hull.role), str(port.name), str(port.get("ship_seller", "船老板")), float(hull.base_knots), int(hull.capacity), int(hull.armor), int(hull.cannon), price_copy if unlocked else "随主线解锁港口"]
 		var row = _label(copy, 12, TEAL if unlocked else MUTED)
 		row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		row.add_theme_stylebox_override("normal", _style(Color(0.025, 0.095, 0.115, 0.88), 9, Color(TEAL if unlocked else MUTED, 0.35), 1, 7))
@@ -2987,21 +2991,34 @@ func _open_port_shipyard_2d(npc_id = ""):
 	var content = VBoxContainer.new()
 	content.add_theme_constant_override("separation", 10)
 	content.add_child(_label("%s · 船坞" % port.name, 25, GOLD))
-	_port_service_intro_2d(content, "shipyard", npc_id, "只负责购买本港船型以及货舱、帆装、船甲改造。")
+	_port_service_intro_2d(content, "shipyard", npc_id, "出售本港独有船型；购入后永久收藏，可在任一船坞换乘并转装帆、舱、甲、炮。")
 	_consume_port_notice_2d(content)
 	var list = _port_service_scroll_2d(content, 500)
-	list.add_child(_label("本港船型｜Lv.%d %s\n基础%.1f节 · 货舱%d格 · 船甲%d\n%s" % [int(offered_hull.level), str(offered_hull.name), float(offered_hull.base_knots), int(offered_hull.capacity), int(offered_hull.armor), str(offered_hull.trait)], 15, TEAL))
-	var buy_ship = _button("当前船只" if str(state.ship.get("hull_id", "sea_swallow")) == offered_hull_id else "购买%s · %d银币" % [str(offered_hull.name), int(offered_hull.price)], "gold")
-	buy_ship.disabled = str(state.ship.get("hull_id", "sea_swallow")) == offered_hull_id or int(state.player.silver) < int(offered_hull.price) or state.cargo_used() > int(offered_hull.capacity) + int(state.ship.get("hold_level", 0)) * 6
+	list.add_child(_label("本港船型｜Lv.%d %s · %s\n基础%.1f节 · 货舱%d格 · 船甲%d · 舰炮%d\n%s" % [int(offered_hull.level), str(offered_hull.name), str(offered_hull.role), float(offered_hull.base_knots), int(offered_hull.capacity), int(offered_hull.armor), int(offered_hull.cannon), str(offered_hull.trait)], 15, TEAL))
+	var offered_is_current = str(state.ship.get("hull_id", "sea_swallow")) == offered_hull_id
+	var offered_is_owned = state.owns_ship(offered_hull_id)
+	var offer_action = "当前船只" if offered_is_current else ("换乘%s · 已拥有" % str(offered_hull.name) if offered_is_owned else "购买%s · %d银币" % [str(offered_hull.name), int(offered_hull.price)])
+	var buy_ship = _button(offer_action, "gold")
+	buy_ship.disabled = offered_is_current or (not offered_is_owned and int(state.player.silver) < int(offered_hull.price)) or state.cargo_used() > int(offered_hull.capacity) + int(state.ship.get("hold_level", 0)) * 6
 	buy_ship.pressed.connect(_buy_ship_2d.bind(offered_hull_id))
 	list.add_child(buy_ship)
 	var profile = state.ship_speed_profile()
-	list.add_child(_label("当前｜%s · %.1f节 · %d海里/日｜货舱%d格｜船甲%d\n帆装Lv.%d · 舱板Lv.%d · 装甲Lv.%d" % [str(state.ship.name), float(profile.knots), int(profile.nm_per_day), state.cargo_capacity(), state.ship_armor(), int(state.ship.speed), int(state.ship.get("hold_level", 0)), int(state.ship.get("armor", 0))], 14, GOLD))
-	for upgrade_entry in [{"id": "hold", "text": "强化舱板 +6格"}, {"id": "speed", "text": "强化帆装 +1.5节"}, {"id": "armor", "text": "强化装甲 -6%风险"}]:
+	list.add_child(_label("当前｜%s · %s · %.1f节 · %d海里/日｜货舱%d格｜船甲%d｜舰炮%d\n帆装Lv.%d · 舱板Lv.%d · 装甲Lv.%d · 舰炮Lv.%d" % [str(state.ship.name), state.ship_role(), float(profile.knots), int(profile.nm_per_day), state.cargo_capacity(), state.ship_armor(), state.ship_cannon_power(), int(state.ship.speed), int(state.ship.get("hold_level", 0)), int(state.ship.get("armor", 0)), int(state.ship.get("cannon_level", 0))], 14, GOLD))
+	for upgrade_entry in [{"id": "hold", "text": "强化舱板 +6格"}, {"id": "speed", "text": "强化帆装 +1.5节"}, {"id": "armor", "text": "强化装甲 -6%风险"}, {"id": "cannon", "text": "强化舰炮 +4海战攻击"}]:
 		var upgrade = _button(upgrade_entry.text, "primary")
-		upgrade.disabled = (upgrade_entry.id == "hold" and int(state.ship.get("hold_level", 0)) >= 3) or (upgrade_entry.id == "speed" and int(state.ship.speed) >= 4) or (upgrade_entry.id == "armor" and int(state.ship.get("armor", 0)) >= 3)
+		upgrade.disabled = (upgrade_entry.id == "hold" and int(state.ship.get("hold_level", 0)) >= 3) or (upgrade_entry.id == "speed" and int(state.ship.speed) >= 4) or (upgrade_entry.id == "armor" and int(state.ship.get("armor", 0)) >= 3) or (upgrade_entry.id == "cannon" and int(state.ship.get("cannon_level", 0)) >= 3)
 		upgrade.pressed.connect(_trade_upgrade_2d.bind(upgrade_entry.id))
 		list.add_child(upgrade)
+	if state.owned_ship_ids().size() > 1:
+		list.add_child(_label("我的船队｜已拥有%d艘，换乘不再付费" % state.owned_ship_ids().size(), 16, GOLD))
+		for owned_hull_id in state.owned_ship_ids():
+			if str(owned_hull_id) == str(state.ship.get("hull_id", "sea_swallow")):
+				continue
+			var owned_hull = Dictionary(GameData.SHIP_HULLS[str(owned_hull_id)])
+			var switch_button = _button("换乘｜%s · %s · %.1f节 · %d格" % [str(owned_hull.name), str(owned_hull.role), float(owned_hull.base_knots) + float(GameData.SHIP_SPEED_LEVELS[int(state.ship.speed)].knots_bonus), int(owned_hull.capacity) + int(state.ship.get("hold_level", 0)) * 6], "ghost")
+			switch_button.disabled = state.cargo_used() > int(owned_hull.capacity) + int(state.ship.get("hold_level", 0)) * 6
+			switch_button.pressed.connect(_switch_ship_2d.bind(str(owned_hull_id)))
+			list.add_child(switch_button)
 	_finish_port_service_overlay_2d(content)
 
 func _open_port_orders_2d(npc_id = ""):
@@ -3409,6 +3426,16 @@ func _buy_ship_2d(hull_id):
 		call_deferred("_open_port_shipyard_2d")
 	else:
 		_show_message("购船失败", str(result.get("message", "无法购买船只")))
+
+func _switch_ship_2d(hull_id):
+	var result = state.switch_ship(str(hull_id))
+	inventory_notice = ("✓ " if bool(result.get("ok", false)) else "！") + str(result.get("message", "无法换乘船只"))
+	_refresh_hud()
+	_close_overlay()
+	if bool(result.get("ok", false)):
+		call_deferred("_open_port_shipyard_2d")
+	else:
+		_show_message("换乘失败", str(result.get("message", "无法换乘船只")))
 
 func _claim_trade_contract_2d():
 	var result = state.claim_trade_contract()

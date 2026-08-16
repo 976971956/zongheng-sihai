@@ -537,15 +537,15 @@ const NPC_SERVICE_LABELS = {
 }
 
 const SHIP_HULLS = {
-	"sea_swallow": {"name": "海燕号", "level": 1, "price": 0, "base_knots": 8.0, "capacity": 12, "armor": 0, "trait": "轻巧可靠的沿岸帆船", "sales_port": "venice_dock", "visual_cell": Vector2i(0, 0)},
-	"adriatic_cog": {"name": "石墙柯克船", "level": 2, "price": 260, "base_knots": 9.0, "capacity": 18, "armor": 1, "trait": "低速但有宽阔方形货舱", "sales_port": "ragusa_dock", "visual_cell": Vector2i(1, 0)},
-	"alex_caravel": {"name": "灯塔卡拉维尔", "level": 3, "price": 480, "base_knots": 11.0, "capacity": 20, "armor": 1, "trait": "三角帆擅长逆风航线", "sales_port": "alexandria_dock", "visual_cell": Vector2i(2, 0)},
-	"malta_galley": {"name": "金岛桨帆船", "level": 4, "price": 680, "base_knots": 12.0, "capacity": 18, "armor": 2, "trait": "无风海域仍能保持速度", "sales_port": "malta_dock", "visual_cell": Vector2i(0, 1)},
-	"cape_carrack": {"name": "风暴角大帆船", "level": 5, "price": 980, "base_knots": 10.5, "capacity": 32, "armor": 3, "trait": "为远洋重货与风暴打造", "sales_port": "cape_town_dock", "visual_cell": Vector2i(1, 1)},
-	"quanzhou_junk": {"name": "刺桐福船", "level": 6, "price": 1280, "base_knots": 13.0, "capacity": 30, "armor": 2, "trait": "水密隔舱兼顾速度和货量", "sales_port": "quanzhou_dock", "visual_cell": Vector2i(2, 1)},
-	"athens_trireme": {"name": "银帆战船", "level": 7, "price": 1420, "base_knots": 14.5, "capacity": 22, "armor": 3, "trait": "追击海盗的高速装甲船", "sales_port": "athens_dock", "visual_cell": Vector2i(0, 2)},
-	"yangzhou_treasure": {"name": "月港宝船", "level": 8, "price": 1850, "base_knots": 12.0, "capacity": 44, "armor": 3, "trait": "九港最大的贸易货舱", "sales_port": "yangzhou_dock", "visual_cell": Vector2i(1, 2)},
-	"amsterdam_clipper": {"name": "北海飞剪船", "level": 9, "price": 2400, "base_knots": 17.0, "capacity": 28, "armor": 2, "trait": "七海最快的远洋商船", "sales_port": "amsterdam_dock", "visual_cell": Vector2i(2, 2)}
+	"sea_swallow": {"name": "海燕号", "role": "轻帆船", "level": 1, "price": 0, "base_knots": 8.0, "capacity": 12, "armor": 0, "cannon": 0, "dive_bonus": 0, "trade_bonus": 0, "escape_bonus": 8, "sea_defense": 0, "trait": "灵活转向：海战撤退率提高8%", "sales_port": "venice_dock", "visual_cell": Vector2i(0, 0)},
+	"adriatic_cog": {"name": "石墙柯克船", "role": "商船", "level": 2, "price": 260, "base_knots": 9.0, "capacity": 18, "armor": 1, "cannon": 1, "dive_bonus": 0, "trade_bonus": 3, "escape_bonus": 0, "sea_defense": 1, "trait": "方舱议价：异港卖价提高3%", "sales_port": "ragusa_dock", "visual_cell": Vector2i(1, 0)},
+	"alex_caravel": {"name": "灯塔卡拉维尔", "role": "探险船", "level": 3, "price": 480, "base_knots": 11.0, "capacity": 20, "armor": 1, "cannon": 2, "dive_bonus": 6, "trade_bonus": 0, "escape_bonus": 4, "sea_defense": 1, "trait": "探潮索骥：潜水寻宝率提高6%", "sales_port": "alexandria_dock", "visual_cell": Vector2i(2, 0)},
+	"malta_galley": {"name": "金岛桨帆船", "role": "战船", "level": 4, "price": 680, "base_knots": 12.0, "capacity": 18, "armor": 2, "cannon": 4, "dive_bonus": 0, "trade_bonus": 0, "escape_bonus": 2, "sea_defense": 3, "trait": "撞角突击：海战攻防更强", "sales_port": "malta_dock", "visual_cell": Vector2i(0, 1)},
+	"cape_carrack": {"name": "风暴角大帆船", "role": "远洋商船", "level": 5, "price": 980, "base_knots": 10.5, "capacity": 32, "armor": 3, "cannon": 3, "dive_bonus": 0, "trade_bonus": 4, "escape_bonus": 0, "sea_defense": 4, "trait": "远洋重舱：异港卖价提高4%", "sales_port": "cape_town_dock", "visual_cell": Vector2i(1, 1)},
+	"quanzhou_junk": {"name": "刺桐福船", "role": "探险商船", "level": 6, "price": 1280, "base_knots": 13.0, "capacity": 30, "armor": 2, "cannon": 3, "dive_bonus": 8, "trade_bonus": 3, "escape_bonus": 3, "sea_defense": 3, "trait": "水密隔舱：潜水+8%、卖价+3%", "sales_port": "quanzhou_dock", "visual_cell": Vector2i(2, 1)},
+	"athens_trireme": {"name": "银帆战船", "role": "战船", "level": 7, "price": 1420, "base_knots": 14.5, "capacity": 22, "armor": 3, "cannon": 7, "dive_bonus": 0, "trade_bonus": 0, "escape_bonus": 5, "sea_defense": 6, "trait": "银帆猎手：舰炮与船甲加成最高", "sales_port": "athens_dock", "visual_cell": Vector2i(0, 2)},
+	"yangzhou_treasure": {"name": "月港宝船", "role": "大型商船", "level": 8, "price": 1850, "base_knots": 12.0, "capacity": 44, "armor": 3, "cannon": 4, "dive_bonus": 2, "trade_bonus": 6, "escape_bonus": 0, "sea_defense": 5, "trait": "万国货舱：异港卖价提高6%", "sales_port": "yangzhou_dock", "visual_cell": Vector2i(1, 2)},
+	"amsterdam_clipper": {"name": "北海飞剪船", "role": "高速商船", "level": 9, "price": 2400, "base_knots": 17.0, "capacity": 28, "armor": 2, "cannon": 5, "dive_bonus": 4, "trade_bonus": 4, "escape_bonus": 12, "sea_defense": 3, "trait": "追风脱战：海战撤退率提高12%", "sales_port": "amsterdam_dock", "visual_cell": Vector2i(2, 2)}
 }
 
 static func ship_hull_ids_by_level():

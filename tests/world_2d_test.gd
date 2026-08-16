@@ -579,7 +579,7 @@ func _run():
 	ship_state.player.silver = 1000
 	var starter_speed = float(ship_state.ship_speed_profile().knots)
 	var ship_purchase = ship_state.buy_ship("alex_caravel")
-	_check(bool(ship_purchase.get("ok", false)) and str(ship_state.ship.hull_id) == "alex_caravel" and str(ship_state.ship.name) == "灯塔卡拉维尔" and ship_state.cargo_capacity() == 20 and float(ship_state.ship_speed_profile().knots) > starter_speed and ship_state.ship_armor() == 1, "不同港口的船老板必须能出售独有船型，换船后速度、货舱和船甲立即生效")
+	_check(bool(ship_purchase.get("ok", false)) and str(ship_state.ship.hull_id) == "alex_caravel" and str(ship_state.ship.name) == "灯塔卡拉维尔" and ship_state.owns_ship("alex_caravel") and ship_state.cargo_capacity() == 20 and float(ship_state.ship_speed_profile().knots) > starter_speed and ship_state.ship_armor() == 1, "不同港口的船老板必须能出售独有船型并永久收藏，换船后速度、货舱和船甲立即生效")
 	var hull_model = ActorScript.new()
 	root.add_child(hull_model)
 	hull_model.configure("player", Color.WHITE, Color.WHITE, "player_ship")

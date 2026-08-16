@@ -9,6 +9,8 @@ var enemy_hp = 1
 var enemy_max_hp = 1
 var enemy_name = "敌人"
 var enemy_id = "drunk_sailor"
+var sea_battle = false
+var ship_hull_id = "sea_swallow"
 var player_offset = 0.0
 var enemy_offset = 0.0
 var impact_alpha = 0.0
@@ -40,6 +42,12 @@ func set_battle_values(view):
 	enemy_max_hp = max(1, int(view.get("enemy_max_hp", enemy_max_hp)))
 	enemy_name = str(view.get("enemy_name", enemy_name))
 	enemy_id = str(view.get("enemy_id", enemy_id))
+	sea_battle = bool(view.get("sea_battle", sea_battle))
+	ship_hull_id = str(view.get("ship_hull_id", ship_hull_id))
+	if is_instance_valid(player_model):
+		player_model.configure("player", Color("278e93"), Color("f1c66d"), "player_ship" if sea_battle else "player")
+		if sea_battle:
+			player_model.set_ship_hull(ship_hull_id)
 	if is_instance_valid(enemy_model):
 		_configure_enemy_model()
 	queue_redraw()
@@ -95,10 +103,18 @@ func _draw():
 	# The battle arena uses the same hand-painted harbor world instead of a flat placeholder.
 	# Keep the source rectangle fully inside the texture. An oversized region can
 	# leave transparent gaps that reveal world-map actors behind the battle panel.
-	var source = Rect2(0, 690, HARBOR_ART.get_width(), HARBOR_ART.get_height() - 690)
-	draw_texture_rect_region(HARBOR_ART, Rect2(Vector2.ZERO, size), source)
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.025, 0.07, 0.085, 0.23))
-	draw_rect(Rect2(0, size.y * 0.47, size.x, size.y * 0.53), Color(0.13, 0.08, 0.04, 0.12))
+	if sea_battle:
+		draw_rect(Rect2(Vector2.ZERO, size), Color("082b3b"))
+		draw_rect(Rect2(0, 0, size.x, size.y * 0.45), Color("123f51"))
+		for band in range(7):
+			var wave_y = size.y * 0.43 + float(band) * 34.0
+			draw_line(Vector2(0, wave_y), Vector2(size.x, wave_y - 14), Color(0.25, 0.72, 0.75, 0.12 + float(band % 2) * 0.07), 8, true)
+		draw_circle(Vector2(size.x * 0.82, size.y * 0.18), 46, Color(0.96, 0.76, 0.34, 0.30))
+	else:
+		var source = Rect2(0, 690, HARBOR_ART.get_width(), HARBOR_ART.get_height() - 690)
+		draw_texture_rect_region(HARBOR_ART, Rect2(Vector2.ZERO, size), source)
+		draw_rect(Rect2(Vector2.ZERO, size), Color(0.025, 0.07, 0.085, 0.23))
+		draw_rect(Rect2(0, size.y * 0.47, size.x, size.y * 0.53), Color(0.13, 0.08, 0.04, 0.12))
 	# Ornamental duel line and compass medallion anchor both combatants visually.
 	draw_line(Vector2(size.x * 0.12, size.y * 0.78), Vector2(size.x * 0.88, size.y * 0.78), Color(0.95, 0.75, 0.34, 0.32), 3, true)
 	draw_arc(Vector2(size.x * 0.5, size.y * 0.74), 48, 0, TAU, 48, Color(0.95, 0.75, 0.34, 0.28), 3)

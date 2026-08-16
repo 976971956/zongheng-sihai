@@ -33,6 +33,7 @@ func _run():
 	state.player.level = 8
 	state.player.location = "venice_dock"
 	state.player.silver = 300
+	_check(state.owned_ship_ids() == ["sea_swallow"] and state.owns_ship("sea_swallow") and state.ship_role() == "轻帆船", "新角色必须永久拥有海燕号，并能读取明确船型定位")
 	var coastal_plan = state.voyage_plan("ragusa_dock")
 	var regional_plan = state.voyage_plan("alexandria_dock")
 	var oceanic_plan = state.voyage_plan("cape_town_dock")
@@ -61,6 +62,28 @@ func _run():
 	_check(is_equal_approx(float(fast_oceanic_plan.speed_knots), 12.5) and int(fast_oceanic_plan.nm_per_day) == 300 and float(fast_oceanic_plan.world_speed) > float(oceanic_plan.world_speed) and int(fast_oceanic_plan.days) < level_one_days, "船型基础速度与帆装等级必须共同缩短贸易日历并提高地图驾驶速度")
 	state.ship.speed = 1
 	_check(int(coastal_plan.stamina_cost) < int(oceanic_plan.stamina_cost) and int(coastal_plan.dive_chance) < int(oceanic_plan.dive_chance), "远洋必须消耗更多出航体力，同时提供更高的潜水寻宝概率")
+	var fleet_state = TestState.new()
+	fleet_state.quest_index = GameData.QUESTS.size()
+	fleet_state.player.level = 12
+	fleet_state.player.location = "alexandria_dock"
+	fleet_state.player.silver = 1800
+	var old_ship_price = int(fleet_state.player.silver)
+	var fleet_purchase = fleet_state.buy_ship("alex_caravel")
+	_check(bool(fleet_purchase.get("ok", false)) and fleet_state.owns_ship("alex_caravel") and fleet_state.owned_ship_ids().size() == 2 and int(fleet_state.player.silver) == old_ship_price - int(GameData.SHIP_HULLS.alex_caravel.price), "购买船体必须只扣一次银币并永久加入个人船队")
+	var explorer_dive = int(fleet_state.voyage_plan("venice_dock").dive_chance)
+	fleet_state.player.location = "venice_dock"
+	var switch_back = fleet_state.switch_ship("sea_swallow")
+	var silver_before_switch = int(fleet_state.player.silver)
+	var switch_explorer = fleet_state.switch_ship("alex_caravel")
+	_check(bool(switch_back.get("ok", false)) and bool(switch_explorer.get("ok", false)) and int(fleet_state.player.silver) == silver_before_switch and str(fleet_state.ship.hull_id) == "alex_caravel", "已经拥有的船必须能在任一船坞免费换乘，不能重复收费")
+	var starter_dive = int(fleet_state.voyage_plan("ragusa_dock").dive_chance) - fleet_state.ship_dive_bonus()
+	_check(explorer_dive >= starter_dive + 6 and fleet_state.ship_dive_bonus() == 6, "探险船专长必须真实提高潜水寻宝概率")
+	var cannon_before = fleet_state.ship_cannon_power()
+	var cannon_upgrade = fleet_state.upgrade_ship("cannon")
+	_check(bool(cannon_upgrade.get("ok", false)) and fleet_state.ship_cannon_power() == cannon_before + 4 and int(fleet_state.ship.cannon_level) == 1, "舰炮改造必须提高海战攻击并记录强化等级")
+	fleet_state.begin_voyage("ragusa_dock")
+	var fleet_battle = fleet_state.start_battle(fleet_state.sea_enemy_id())
+	_check(bool(fleet_battle.get("sea_battle", false)) and str(fleet_battle.get("combatant_name", "")) == "灯塔卡拉维尔" and int(fleet_battle.player_attack) == int(fleet_state.get_stats().attack) + fleet_state.ship_cannon_power() and int(fleet_battle.player_defense) > int(fleet_state.get_stats().defense), "海战必须使用当前座舰、舰炮与船甲加成，不能继续只套用人物攻防")
 	var tired_state = TestState.new()
 	tired_state.quest_index = GameData.QUESTS.size()
 	tired_state.player.location = "venice_dock"
