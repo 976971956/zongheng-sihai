@@ -23,15 +23,11 @@ func _run():
 
 	_check(is_instance_valid(scene.world_layer), "世界地图必须成功创建")
 	_check(is_instance_valid(scene.player_actor), "玩家角色必须成功创建")
-	_check(scene.city_buildings.size() == _foreground_building_count("venice_dock"), "一体化城市背景中的每栋交互房屋都必须生成独立边框与碰撞层")
+	_check(scene.city_buildings.size() == _foreground_building_count("venice_dock"), "一体化城市背景中的每栋交互房屋都必须保留独立碰撞数据")
 	for initial_building in scene.city_buildings:
-		_check(initial_building.get_parent() == scene.world_layer and initial_building != scene.map_node and initial_building.z_index < scene.player_actor.z_index, "房屋交互框必须位于一体背景之上、人物之下")
-		_check(initial_building.integrated_background and initial_building.frame_size.x > 0.0 and initial_building.frame_size.y > 0.0, "房屋必须使用一体背景并拥有有效交互边框，不能继续叠加贴纸精灵")
-		_check(is_instance_valid(initial_building.name_label) and initial_building.display_name in initial_building.name_label.text, "房屋边框必须显示对应建筑名称")
-	var proximity_building = scene.city_buildings[0]
-	scene.player_actor.position = proximity_building.position + Vector2(0, 120)
-	scene._update_city_building_highlights()
-	_check(proximity_building.highlighted, "角色靠近一体化房屋时交互边框必须高亮")
+		_check(initial_building.get_parent() == scene.world_layer and initial_building != scene.map_node, "房屋碰撞数据必须独立于一体化背景节点")
+		_check(initial_building.integrated_background and initial_building.collision_size.x > 0.0 and initial_building.collision_size.y > 0.0, "房屋必须使用一体背景并保留有效碰撞尺寸")
+		_check(not initial_building.visual_frame_enabled and not initial_building.visible and initial_building.get_child_count() == 0, "一体化背景房屋不得再绘制错位方框、名称牌或贴纸精灵")
 	scene.player_actor.position = scene._spawn_for_location("venice_square")
 	_check(scene.player_actor.display_id == "player", "主角必须使用独立的新版角色模型")
 	_check(scene.player_actor.art_sprite.hframes == 4 and scene.player_actor.art_sprite.vframes == 2, "主角必须使用多帧行走图集")
@@ -501,9 +497,9 @@ func _run():
 		var city_model_signature = []
 		var housed_npcs = {}
 		for city_building in scene.city_buildings:
-			_check(city_building.port_id == str(modeled_port_id) and city_building.get_parent() == scene.world_layer and city_building.z_index < scene.player_actor.z_index, "%s的房屋交互框必须保持本城归属并绘制在NPC身后" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
-			_check(city_building.integrated_background and is_instance_valid(city_building.name_label), "%s的房屋必须由一体背景承载，并由程序框出名称和范围" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
-			city_model_signature.append("%s:%s" % [city_building.building_id, city_building.frame_size])
+			_check(city_building.port_id == str(modeled_port_id) and city_building.get_parent() == scene.world_layer, "%s的房屋碰撞数据必须保持本城归属" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
+			_check(city_building.integrated_background and not city_building.visual_frame_enabled and not city_building.visible, "%s的背景建筑不得叠加错位方框或名称牌" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
+			city_model_signature.append("%s:%s" % [city_building.building_id, city_building.collision_size])
 			for housed_npc_id in city_building.npc_ids:
 				housed_npcs[str(housed_npc_id)] = city_building.building_id
 		for service_npc_id in GameData.LOCATIONS[str(modeled_port_id)].npcs:
