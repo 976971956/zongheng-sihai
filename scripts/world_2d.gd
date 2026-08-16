@@ -15,7 +15,6 @@ const WorldMapScript = preload("res://scripts/world_map_2d.gd")
 const SailingMapScript = preload("res://scripts/sailing_map_2d.gd")
 const SeaWorldMapScript = preload("res://scripts/sea_world_2d.gd")
 const ActorScript = preload("res://scripts/actor_2d.gd")
-const CityBuildingScript = preload("res://scripts/city_building_2d.gd")
 const BattleStageScript = preload("res://scripts/battle_stage_2d.gd")
 const JoystickScript = preload("res://scripts/virtual_joystick.gd")
 const ItemIconScript = preload("res://scripts/item_icon_2d.gd")
@@ -80,7 +79,6 @@ var world_layer
 var map_node
 var player_actor
 var actors = []
-var city_buildings = []
 var move_target = Vector2.ZERO
 var has_move_target = false
 var nearest_actor = {}
@@ -271,6 +269,8 @@ func _build_world():
 	player_actor = ActorScript.new()
 	player_actor.z_index = 10
 	player_actor.configure("player", Color("278e93"), GOLD, "player_ship" if current_region == "sea" else "player")
+	if current_region == "sea":
+		player_actor.set_ship_hull(str(state.ship.get("hull_id", "sea_swallow")))
 	player_actor.scale = Vector2.ONE * (1.28 if current_region == "sea" else 1.12)
 	world_layer.add_child(player_actor)
 
@@ -319,18 +319,12 @@ func _spawn_world_actors():
 	for entry in actors:
 		if is_instance_valid(entry.node):
 			entry.node.queue_free()
-	for building in city_buildings:
-		if is_instance_valid(building):
-			building.queue_free()
 	for marker in enemy_respawn_markers.values():
 		if is_instance_valid(marker):
 			marker.queue_free()
 	actors = []
-	city_buildings = []
 	enemy_respawn_markers = {}
 	nearest_actor = {}
-	if current_region == "city":
-		_spawn_city_buildings()
 	if current_region == "sea":
 		if state.active_voyage.is_empty():
 			return
@@ -352,30 +346,22 @@ func _spawn_world_actors():
 		if not bool(state.active_voyage.get("treasure_claimed", false)):
 			_add_actor("sea_treasure", "drifting_cargo", "漂流货箱", _sea_treasure_position() / WORLD_SCALE, Color("735a2f"), GOLD, "")
 	elif current_region == "city":
-		var active_port = str(state.player.location)
-		if active_port in GameData.TRADE_PORTS and active_port != "venice_dock":
-			var city_layout = GameData.PORT_CITY_MAPS.get(active_port, {})
-			var npc_positions = Dictionary(city_layout.get("npc_positions", {}))
-			var fallback_positions = [Vector2(270, 700), Vector2(220, 890), Vector2(350, 650), Vector2(475, 900), Vector2(510, 600)]
-			var port_npc_colors = [Color("49697a"), Color("7b5944"), Color("506f61"), Color("6f526e"), Color("6a6945")]
-			var port_npcs = GameData.LOCATIONS[active_port].npcs
-			for npc_index in range(port_npcs.size()):
-				var remote_npc_id = str(port_npcs[npc_index])
-				if GameData.NPCS.has(remote_npc_id):
-					var npc_position = Vector2(npc_positions.get(remote_npc_id, fallback_positions[npc_index % fallback_positions.size()]))
-					_add_actor("npc", remote_npc_id, str(GameData.NPCS[remote_npc_id].name), npc_position, port_npc_colors[npc_index % port_npc_colors.size()], GOLD, active_port)
-			if active_port == "malta_dock" and state.quest_index >= 32:
-				_add_actor("travel", "white_whale", "白鲸号残骸", Vector2(520, 950), Color("315d66"), TEAL, "white_whale_1")
-		else:
-			_add_actor("npc", "alisa", "艾丽莎", Vector2(150, 365), Color("628ec6"), Color("f2d58b"), "alisa_hut")
-			_add_actor("npc", "tavern_keeper", "酒馆老板", Vector2(180, 675), Color("8c6750"), Color("c78d52"), "venice_tavern")
-			_add_actor("npc", "guard_captain", "守卫队长", Vector2(360, 690), Color("59677b"), Color("b7c6d5"), "venice_square")
-			_add_actor("npc", "jeweler", "珠宝商", Vector2(555, 665), Color("76566c"), Color("ead58c"), "venice_market")
-			_add_actor("npc", "venice_quartermaster", "蕾娜", Vector2(510, 870), Color("487169"), GOLD, "venice_dock")
-			_add_actor("npc", "ship_owner", "船老板", Vector2(225, 870), Color("3d7287"), Color("d6b35c"), "venice_dock")
-			_add_actor("npc", "venice_shipwright", "洛伦佐", Vector2(410, 900), Color("755b44"), GOLD, "venice_dock")
+		var active_port = _active_city_port_id()
+		var city_layout = GameData.PORT_CITY_MAPS.get(active_port, GameData.PORT_CITY_MAPS.venice_dock)
+		var npc_positions = Dictionary(city_layout.get("npc_positions", {}))
+		var npc_locations = Dictionary(city_layout.get("npc_locations", {}))
+		var port_npc_colors = [Color("49697a"), Color("7b5944"), Color("506f61"), Color("6f526e"), Color("6a6945")]
+		for npc_index in range(Array(city_layout.get("npc_ids", [])).size()):
+			var city_npc_id = str(Array(city_layout.npc_ids)[npc_index])
+			if not GameData.NPCS.has(city_npc_id) or not npc_positions.has(city_npc_id):
+				continue
+			var npc_location = str(npc_locations.get(city_npc_id, active_port))
+			_add_actor("npc", city_npc_id, str(GameData.NPCS[city_npc_id].name), Vector2(npc_positions[city_npc_id]), port_npc_colors[npc_index % port_npc_colors.size()], GOLD, npc_location)
+		if active_port == "venice_dock":
 			_spawn_enemy_if_ready("drunk_sailor")
 			_add_actor("travel", "field", "前往城外", Vector2(455, 285), Color("547b61"), GOLD, "residential_quarter")
+		elif active_port == "malta_dock" and state.quest_index >= 32:
+			_add_actor("travel", "white_whale", "白鲸号残骸", Vector2(600, 950), Color("315d66"), TEAL, "white_whale_1")
 		if (active_port == "venice_dock" or active_port not in GameData.TRADE_PORTS) and state.quest_index >= 12:
 			_add_actor("travel", "black_sail", "黑帆据点", Vector2(550, 950), Color("493b45"), RED, "black_sail_1")
 		var active_expedition = _current_story_expedition()
@@ -404,22 +390,6 @@ func _spawn_world_actors():
 			_add_actor("travel", "city", "返回%s" % GameData.TRADE_PORTS[str(expedition.port)].name, Vector2(215, 1080), Color("4e7781"), GOLD, str(expedition.port))
 	for discovery_id in DISCOVERY_SPAWNS:
 		_spawn_discovery_if_available(discovery_id)
-
-func _spawn_city_buildings():
-	var active_port = _active_city_port_id()
-	var city_data = GameData.PORT_CITY_MAPS.get(active_port, GameData.PORT_CITY_MAPS.venice_dock)
-	for building_data in Array(city_data.get("buildings", [])):
-		var resolved_data = Dictionary(building_data)
-		if not bool(resolved_data.get("foreground", true)):
-			continue
-		var footprint = Rect2(resolved_data.get("footprint", Rect2()))
-		if footprint.size.x <= 0.0 or footprint.size.y <= 0.0:
-			continue
-		var building = CityBuildingScript.new()
-		building.position = _world_point(Vector2(footprint.get_center().x, footprint.end.y))
-		building.configure(active_port, resolved_data, WORLD_SCALE)
-		world_layer.add_child(building)
-		city_buildings.append(building)
 
 func _spawn_next_dungeon_enemy(enemy_ids):
 	for enemy_id in enemy_ids:
@@ -812,7 +782,7 @@ func _process(delta):
 		if _is_walkable(next_position):
 			player_actor.position = next_position
 		else:
-			# Slide along building edges instead of feeling stuck on a corner.
+			# Slide along obstacle edges instead of feeling stuck on a corner.
 			var horizontal = Vector2(clamp(player_actor.position.x + movement.x, 28.0 * WORLD_SCALE, active_size.x - 28.0 * WORLD_SCALE), player_actor.position.y)
 			var vertical = Vector2(player_actor.position.x, clamp(player_actor.position.y + movement.y, 210.0 * WORLD_SCALE, active_size.y - 200.0))
 			if abs(movement.x) >= abs(movement.y) and _is_walkable(horizontal):
@@ -884,21 +854,17 @@ func _on_joystick_direction(value):
 func _is_walkable(position):
 	if current_region == "sea" and is_instance_valid(map_node) and map_node.has_method("is_navigable"):
 		return bool(map_node.is_navigable(position))
-	var active_obstacles = _city_building_obstacles() if current_region == "city" else region_obstacles.get(current_region, [])
+	# 城市只允许在视觉上明确的主广场内行走；远景建筑、水面与城墙不再
+	# 叠加房屋碰撞框，也不会出现与美术错位的方形障碍。
+	if current_region == "city":
+		var city_layout = GameData.PORT_CITY_MAPS.get(_active_city_port_id(), GameData.PORT_CITY_MAPS.venice_dock)
+		var plaza_bounds = _world_rect(Rect2(city_layout.get("plaza_rect", Rect2(45, 220, 630, 790)))).grow(14.0 * WORLD_SCALE)
+		return plaza_bounds.has_point(position)
+	var active_obstacles = [] if current_region == "city" else region_obstacles.get(current_region, [])
 	for rect in active_obstacles:
 		if rect.grow(18.0 * WORLD_SCALE).has_point(position):
 			return false
 	return true
-
-func _city_building_obstacles(port_id = ""):
-	var resolved_port = _active_city_port_id() if str(port_id).is_empty() else str(port_id)
-	var city_data = GameData.PORT_CITY_MAPS.get(resolved_port, GameData.PORT_CITY_MAPS.venice_dock)
-	var obstacles = []
-	for building in Array(city_data.get("buildings", [])):
-		var footprint = Dictionary(building).get("footprint", Rect2())
-		if typeof(footprint) == TYPE_RECT2 and footprint.size.x > 0.0 and footprint.size.y > 0.0:
-			obstacles.append(_world_rect(footprint))
-	return obstacles
 
 func _update_nearest_actor():
 	var best = {}
@@ -1098,6 +1064,7 @@ func _enter_active_voyage():
 	current_zone = ""
 	_replace_world_map("sea")
 	player_actor.configure("player", Color("278e93"), GOLD, "player_ship")
+	player_actor.set_ship_hull(str(state.ship.get("hull_id", "sea_swallow")))
 	player_actor.scale = Vector2.ONE * 1.28
 	_spawn_world_actors()
 	player_actor.position = state.voyage_position()
@@ -1147,9 +1114,9 @@ func _update_zone(force):
 			hint_label.text = floor_lock
 			return
 	var state_location = str(state.player.location)
-	# 远洋城市使用独立城内地图，但存档地点仍以港口 ID 表示；走进任何
-	# 视觉街区都不能把真实城市改回威尼斯。
-	if current_region == "city" and state_location in GameData.TRADE_PORTS and state_location != "venice_dock":
+	# 港口城现在是统一开放广场。只要玩家仍处在港口状态，走过旧版街区
+	# 热区就不能把真实地点改写成威尼斯酒馆/市场等遗留地点。
+	if current_region == "city" and state_location in GameData.TRADE_PORTS:
 		current_zone = "venice_dock"
 		_refresh_hud()
 		return
@@ -2529,13 +2496,10 @@ func _open_world_map():
 	var districts = _label("◆ %s" % "　◆ ".join(Array(city_data.districts)), 14, INK)
 	districts.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	list.add_child(districts)
-	list.add_child(_label("城内实体建筑", 17, TEAL))
-	var building_names = []
-	for building in Array(city_data.get("buildings", [])):
-		building_names.append(str(Dictionary(building).get("name", "建筑")))
-	var building_guide = _label("◆ %s" % "　◆ ".join(building_names), 14, INK)
-	building_guide.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	list.add_child(building_guide)
+	list.add_child(_label("开放广场", 17, TEAL))
+	var plaza_guide = _label("本城不设置可进入房屋；所有人物都在广场上，可直接步行接近并按职能互动。", 14, INK)
+	plaza_guide.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	list.add_child(plaza_guide)
 	list.add_child(_label("城内人物与职能", 17, TEAL))
 	for npc_id in Dictionary(city_data.npc_positions):
 		if not GameData.NPCS.has(str(npc_id)):

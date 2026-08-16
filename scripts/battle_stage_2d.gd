@@ -1,7 +1,7 @@
 extends Control
 
 const ActorScript = preload("res://scripts/actor_2d.gd")
-const HARBOR_ART = preload("res://assets/art/maps/venice_city_v4.png")
+const HARBOR_ART = preload("res://assets/art/maps/venice_plaza_v1.png")
 
 var player_hp = 1
 var player_max_hp = 1

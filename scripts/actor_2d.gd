@@ -1,14 +1,18 @@
 extends Node2D
 
 const CHARACTER_ATLAS = preload("res://assets/art/characters/character_atlas_v1.png")
-const HARBOR_NPC_ATLAS = preload("res://assets/art/characters/harbor_npc_atlas_v1.png")
+const NPC_ATLAS_A = preload("res://assets/art/characters/npc_profession_atlas_a_v2.png")
+const NPC_ATLAS_B = preload("res://assets/art/characters/npc_profession_atlas_b_v2.png")
+const NPC_ATLAS_C = preload("res://assets/art/characters/npc_profession_atlas_c_v2.png")
+const NPC_ATLAS_D = preload("res://assets/art/characters/npc_profession_atlas_d_v2.png")
+const NPC_ATLAS_E = preload("res://assets/art/characters/npc_profession_atlas_e_v2.png")
+const PLAYER_SHIP_ATLAS = preload("res://assets/art/ships/player_ship_atlas_v1.png")
 const ENEMY_ATLAS = preload("res://assets/art/characters/enemy_atlas_v2.png")
 const LEGACY_BOSS_ATLAS_A = preload("res://assets/art/characters/legacy_boss_atlas_a_v1.png")
 const LEGACY_BOSS_ATLAS_B = preload("res://assets/art/characters/legacy_boss_atlas_b_v1.png")
 const PLAYER_WALK = preload("res://assets/art/characters/player_walk_v1.png")
 const PLAYER_WALK_BACK = preload("res://assets/art/characters/player_walk_back_v1.png")
 const ATLAS_CELL_SIZE = Vector2(362, 362)
-const HARBOR_NPC_CELL_SIZE = Vector2(197, 197)
 const ENEMY_ATLAS_CELL_SIZE = Vector2(384, 256)
 const LEGACY_BOSS_ATLAS_CELL_SIZE = Vector2(384, 384)
 const ATLAS_CELLS = {
@@ -58,41 +62,50 @@ const LEGACY_BOSS_ATLAS_B_CELLS = {
 	"clockwork_tailor": Vector2i(0, 1),
 	"tide_void_emperor": Vector2i(1, 1)
 }
-const HARBOR_NPC_CELLS = {
-	"venice_quartermaster": Vector2i(0, 0),
-	"venice_shipwright": Vector2i(1, 0),
-	"ragusa_harbormaster": Vector2i(2, 0),
-	"ragusa_innkeeper": Vector2i(3, 0),
-	"alex_lighthouse_keeper": Vector2i(4, 0),
-	"alex_shipwright": Vector2i(5, 0),
-	"malta_cook": Vector2i(0, 1),
-	"malta_diver": Vector2i(1, 1),
-	"cape_shipwright": Vector2i(2, 1),
-	"cape_quartermaster": Vector2i(3, 1),
-	"quanzhou_navigator": Vector2i(4, 1),
-	"quanzhou_merchant": Vector2i(5, 1),
-	"athens_smith": Vector2i(0, 2),
-	"athens_innkeeper": Vector2i(1, 2),
-	"yangzhou_pilot": Vector2i(2, 2),
-	"yangzhou_merchant": Vector2i(3, 2),
-	"amsterdam_auctioneer": Vector2i(4, 2),
-	"amsterdam_shipwright": Vector2i(5, 2),
-	"ragusa_shipwright": Vector2i(1, 0),
-	"alex_harbormaster": Vector2i(2, 0),
-	"malta_harbormaster": Vector2i(4, 0),
-	"malta_shipwright": Vector2i(1, 0),
-	"quanzhou_shipwright": Vector2i(5, 1),
-	"athens_harbormaster": Vector2i(1, 2),
-	"yangzhou_shipwright": Vector2i(0, 2),
-	# Earlier story NPCs reuse the closest port-specific silhouette instead of
-	# falling back to the generic procedural mannequin.
-	"jeweler": Vector2i(0, 0),
-	"malta_keeper": Vector2i(4, 0),
-	"cape_keeper": Vector2i(3, 1),
-	"quanzhou_scholar": Vector2i(4, 1),
-	"athens_oracle": Vector2i(1, 2),
-	"yangzhou_weaver": Vector2i(3, 2),
-	"amsterdam_cartographer": Vector2i(5, 2)
+const NPC_ATLAS_CELLS = {
+	"alisa": {"atlas": "a", "cell": Vector2i(0, 0)},
+	"tavern_keeper": {"atlas": "a", "cell": Vector2i(1, 0)},
+	"guard_captain": {"atlas": "a", "cell": Vector2i(2, 0)},
+	"jeweler": {"atlas": "a", "cell": Vector2i(3, 0)},
+	"ship_owner": {"atlas": "a", "cell": Vector2i(0, 1)},
+	"venice_quartermaster": {"atlas": "a", "cell": Vector2i(1, 1)},
+	"venice_shipwright": {"atlas": "a", "cell": Vector2i(2, 1)},
+	"ragusa_broker": {"atlas": "a", "cell": Vector2i(3, 1)},
+	"ragusa_harbormaster": {"atlas": "b", "cell": Vector2i(0, 0)},
+	"ragusa_shipwright": {"atlas": "b", "cell": Vector2i(1, 0)},
+	"ragusa_innkeeper": {"atlas": "b", "cell": Vector2i(2, 0)},
+	"alexandria_merchant": {"atlas": "b", "cell": Vector2i(3, 0)},
+	"alex_harbormaster": {"atlas": "b", "cell": Vector2i(0, 1)},
+	"alex_lighthouse_keeper": {"atlas": "b", "cell": Vector2i(1, 1)},
+	"alex_shipwright": {"atlas": "b", "cell": Vector2i(2, 1)},
+	"malta_keeper": {"atlas": "b", "cell": Vector2i(3, 1)},
+	"malta_harbormaster": {"atlas": "c", "cell": Vector2i(0, 0)},
+	"malta_shipwright": {"atlas": "c", "cell": Vector2i(1, 0)},
+	"malta_cook": {"atlas": "c", "cell": Vector2i(2, 0)},
+	"malta_diver": {"atlas": "c", "cell": Vector2i(3, 0)},
+	"cape_keeper": {"atlas": "c", "cell": Vector2i(0, 1)},
+	"cape_shipwright": {"atlas": "c", "cell": Vector2i(1, 1)},
+	"cape_quartermaster": {"atlas": "c", "cell": Vector2i(2, 1)},
+	"quanzhou_scholar": {"atlas": "c", "cell": Vector2i(3, 1)},
+	"quanzhou_navigator": {"atlas": "d", "cell": Vector2i(0, 0)},
+	"quanzhou_merchant": {"atlas": "d", "cell": Vector2i(1, 0)},
+	"quanzhou_shipwright": {"atlas": "d", "cell": Vector2i(2, 0)},
+	"athens_oracle": {"atlas": "d", "cell": Vector2i(3, 0)},
+	"athens_harbormaster": {"atlas": "d", "cell": Vector2i(0, 1)},
+	"athens_smith": {"atlas": "d", "cell": Vector2i(1, 1)},
+	"athens_innkeeper": {"atlas": "d", "cell": Vector2i(2, 1)},
+	"yangzhou_weaver": {"atlas": "d", "cell": Vector2i(3, 1)},
+	"yangzhou_pilot": {"atlas": "e", "cell": Vector2i(0, 0)},
+	"yangzhou_merchant": {"atlas": "e", "cell": Vector2i(1, 0)},
+	"yangzhou_shipwright": {"atlas": "e", "cell": Vector2i(2, 0)},
+	"amsterdam_cartographer": {"atlas": "e", "cell": Vector2i(0, 1)},
+	"amsterdam_auctioneer": {"atlas": "e", "cell": Vector2i(1, 1)},
+	"amsterdam_shipwright": {"atlas": "e", "cell": Vector2i(2, 1)}
+}
+const PLAYER_SHIP_CELLS = {
+	"sea_swallow": Vector2i(0, 0), "adriatic_cog": Vector2i(1, 0), "alex_caravel": Vector2i(2, 0),
+	"malta_galley": Vector2i(0, 1), "cape_carrack": Vector2i(1, 1), "quanzhou_junk": Vector2i(2, 1),
+	"athens_trireme": Vector2i(0, 2), "yangzhou_treasure": Vector2i(1, 2), "amsterdam_clipper": Vector2i(2, 2)
 }
 const LEGACY_BOSS_IDS = [
 	"basin_leviathan", "nine_tail_fox", "earth_demon_king", "tira_guardian",
@@ -112,6 +125,7 @@ var art_sprite
 var motion_direction = Vector2.ZERO
 var walk_time = 0.0
 var last_facing = "down"
+var ship_hull_id = "sea_swallow"
 
 func _ready():
 	_refresh_art_sprite()
@@ -125,6 +139,12 @@ func configure(kind, color, accent = Color("f2c66d"), identity = ""):
 		_refresh_art_sprite()
 	queue_redraw()
 
+func set_ship_hull(hull_id):
+	ship_hull_id = str(hull_id) if PLAYER_SHIP_CELLS.has(str(hull_id)) else "sea_swallow"
+	if display_id == "player_ship" and is_inside_tree():
+		_refresh_art_sprite()
+	queue_redraw()
+
 func _process(delta):
 	bob_time += delta
 	if is_instance_valid(art_sprite):
@@ -133,6 +153,9 @@ func _process(delta):
 			if moving:
 				walk_time += delta
 			_update_player_walk_sprite(moving)
+		elif display_id == "player_ship":
+			art_sprite.position.y = sin(bob_time * 3.1) * 2.0
+			art_sprite.rotation = 0.0
 		else:
 			art_sprite.position.y = sin(bob_time * (7.5 if moving else 2.7)) * (2.2 if moving else 1.35)
 			art_sprite.rotation = sin(bob_time * 7.5) * 0.018 if moving else 0.0
@@ -168,15 +191,28 @@ func _refresh_art_sprite():
 		art_sprite.z_index = 1
 		add_child(art_sprite)
 		return
+	if display_id == "player_ship":
+		var ship_texture = AtlasTexture.new()
+		var ship_cell_size = Vector2(PLAYER_SHIP_ATLAS.get_width(), PLAYER_SHIP_ATLAS.get_height()) / 3.0
+		ship_texture.atlas = PLAYER_SHIP_ATLAS
+		ship_texture.region = Rect2(Vector2(PLAYER_SHIP_CELLS.get(ship_hull_id, Vector2i.ZERO)) * ship_cell_size, ship_cell_size)
+		art_sprite = Sprite2D.new()
+		art_sprite.texture = ship_texture
+		art_sprite.scale = Vector2.ONE * 0.50
+		art_sprite.z_index = 1
+		add_child(art_sprite)
+		return
 	if not _has_raster_art(display_id):
 		return
 	var atlas = CHARACTER_ATLAS
 	var cell_size = ATLAS_CELL_SIZE
 	var cell = ATLAS_CELLS.get(display_id, Vector2i.ZERO)
-	if HARBOR_NPC_CELLS.has(display_id):
-		atlas = HARBOR_NPC_ATLAS
-		cell_size = HARBOR_NPC_CELL_SIZE
-		cell = HARBOR_NPC_CELLS[display_id]
+	if NPC_ATLAS_CELLS.has(display_id):
+		var npc_art = Dictionary(NPC_ATLAS_CELLS[display_id])
+		atlas = _npc_atlas(str(npc_art.atlas))
+		var npc_grid = Vector2(3, 2) if str(npc_art.atlas) == "e" else Vector2(4, 2)
+		cell_size = Vector2(atlas.get_width(), atlas.get_height()) / npc_grid
+		cell = Vector2i(npc_art.cell)
 	elif ENEMY_ATLAS_CELLS.has(display_id):
 		atlas = ENEMY_ATLAS
 		cell_size = ENEMY_ATLAS_CELL_SIZE
@@ -199,7 +235,15 @@ func _refresh_art_sprite():
 	add_child(art_sprite)
 
 func _has_raster_art(identity):
-	return ATLAS_CELLS.has(identity) or HARBOR_NPC_CELLS.has(identity) or ENEMY_ATLAS_CELLS.has(identity) or LEGACY_BOSS_ATLAS_A_CELLS.has(identity) or LEGACY_BOSS_ATLAS_B_CELLS.has(identity)
+	return ATLAS_CELLS.has(identity) or NPC_ATLAS_CELLS.has(identity) or ENEMY_ATLAS_CELLS.has(identity) or LEGACY_BOSS_ATLAS_A_CELLS.has(identity) or LEGACY_BOSS_ATLAS_B_CELLS.has(identity)
+
+func _npc_atlas(atlas_id):
+	match str(atlas_id):
+		"b": return NPC_ATLAS_B
+		"c": return NPC_ATLAS_C
+		"d": return NPC_ATLAS_D
+		"e": return NPC_ATLAS_E
+		_: return NPC_ATLAS_A
 
 func _update_player_walk_sprite(moving):
 	if not is_instance_valid(art_sprite):
@@ -226,7 +270,7 @@ func _update_player_walk_sprite(moving):
 	art_sprite.rotation = 0.0
 
 func _art_scale():
-	if HARBOR_NPC_CELLS.has(display_id):
+	if NPC_ATLAS_CELLS.has(display_id):
 		return 0.45
 	if ENEMY_ATLAS_CELLS.has(display_id):
 		match display_id:
@@ -247,7 +291,10 @@ func _art_scale():
 		_: return 0.27
 
 func _draw():
-	if display_id == "player_ship" or (display_id in SEA_PIRATE_IDS and not _has_raster_art(display_id)):
+	if display_id == "player_ship":
+		_draw_player_ship_marker()
+		return
+	if display_id in SEA_PIRATE_IDS and not _has_raster_art(display_id):
 		_draw_ship()
 		return
 	var bob = sin(bob_time * 2.7) * 1.35
@@ -286,6 +333,14 @@ func _draw_ship():
 	draw_colored_polygon(PackedVector2Array([Vector2(-4, -35), Vector2(-29, -5), Vector2(-4, 0)]), small_sail_color)
 	draw_line(Vector2(0, -46), Vector2(0, 11), Color("f1c66d"), 2.0)
 	draw_circle(Vector2(0, 13), 6.0, Color("ef6f73") if pirate_ship else Color("f1c66d"))
+	if selected:
+		draw_arc(Vector2(0, 5), 54.0, 0.0, TAU, 40, Color("f6d778"), 4.0)
+	draw_set_transform(Vector2.ZERO)
+
+func _draw_player_ship_marker():
+	var bob = sin(bob_time * 3.1) * 2.0
+	draw_set_transform(Vector2(0, bob))
+	draw_ellipse_shadow(Vector2(0, 23), Vector2(43, 14), Color(0.005, 0.02, 0.025, 0.34))
 	if selected:
 		draw_arc(Vector2(0, 5), 54.0, 0.0, TAU, 40, Color("f6d778"), 4.0)
 	draw_set_transform(Vector2.ZERO)

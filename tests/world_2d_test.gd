@@ -23,11 +23,10 @@ func _run():
 
 	_check(is_instance_valid(scene.world_layer), "世界地图必须成功创建")
 	_check(is_instance_valid(scene.player_actor), "玩家角色必须成功创建")
-	_check(scene.city_buildings.size() == _foreground_building_count("venice_dock"), "一体化城市背景中的每栋交互房屋都必须保留独立碰撞数据")
-	for initial_building in scene.city_buildings:
-		_check(initial_building.get_parent() == scene.world_layer and initial_building != scene.map_node, "房屋碰撞数据必须独立于一体化背景节点")
-		_check(initial_building.integrated_background and initial_building.collision_size.x > 0.0 and initial_building.collision_size.y > 0.0, "房屋必须使用一体背景并保留有效碰撞尺寸")
-		_check(not initial_building.visual_frame_enabled and not initial_building.visible and initial_building.get_child_count() == 0, "一体化背景房屋不得再绘制错位方框、名称牌或贴纸精灵")
+	var initial_city_layout = GameData.PORT_CITY_MAPS.venice_dock
+	_check(not initial_city_layout.has("buildings") and initial_city_layout.has("plaza_rect"), "新版城市必须彻底取消前景房屋，改用开放广场")
+	for initial_npc_id in Array(initial_city_layout.npc_ids):
+		_check(initial_city_layout.plaza_rect.has_point(Vector2(initial_city_layout.npc_positions[str(initial_npc_id)])), "%s必须站在威尼斯开放广场内" % GameData.NPCS[str(initial_npc_id)].name)
 	scene.player_actor.position = scene._spawn_for_location("venice_square")
 	_check(scene.player_actor.display_id == "player", "主角必须使用独立的新版角色模型")
 	_check(scene.player_actor.art_sprite.hframes == 4 and scene.player_actor.art_sprite.vframes == 2, "主角必须使用多帧行走图集")
@@ -357,29 +356,19 @@ func _run():
 	# 九座城市必须拥有独立主题、地标与人物站位，不能继续复用同一张码头背景。
 	_check(GameData.PORT_CITY_MAPS.size() == GameData.TRADE_PORTS.size(), "每座贸易城市都必须配置完整城内地图")
 	var city_styles = {}
-	var city_building_ids = {}
-	var city_building_signatures = {}
 	for city_port_id in GameData.TRADE_PORTS:
 		var city_layout = GameData.PORT_CITY_MAPS.get(str(city_port_id), {})
 		_check(not city_layout.is_empty() and str(city_layout.get("title", "")) != "" and str(city_layout.get("landmark", "")) != "" and Array(city_layout.get("districts", [])).size() >= 4, "%s必须拥有城市主题、地标和至少四个街区" % GameData.TRADE_PORTS[str(city_port_id)].name)
 		city_styles[str(city_layout.get("style", ""))] = true
-		var building_models = Array(city_layout.get("buildings", []))
-		_check(building_models.size() >= 6, "%s必须逐栋配置至少六座独立房屋模型与碰撞轮廓" % GameData.TRADE_PORTS[str(city_port_id)].name)
-		var building_signature = []
-		for building_model in building_models:
-			var building_data = Dictionary(building_model)
-			var building_id = str(building_data.get("id", ""))
-			var footprint = building_data.get("footprint", Rect2())
-			_check(building_id != "" and str(building_data.get("name", "")) != "" and typeof(footprint) == TYPE_RECT2 and footprint.size.x > 0.0 and footprint.size.y > 0.0, "%s的每座房屋都必须拥有独立名称和有效实体轮廓" % GameData.TRADE_PORTS[str(city_port_id)].name)
-			_check(not city_building_ids.has(building_id), "房屋模型%s不能被其他城市重复使用" % building_id)
-			city_building_ids[building_id] = true
-			building_signature.append(str(footprint))
-		city_building_signatures["|".join(building_signature)] = true
+		_check(not city_layout.has("buildings"), "%s不得再配置前景房屋、房屋边框或建筑碰撞" % GameData.TRADE_PORTS[str(city_port_id)].name)
+		var plaza_rect = Rect2(city_layout.get("plaza_rect", Rect2()))
+		_check(plaza_rect.size.x >= 550.0 and plaza_rect.size.y >= 650.0, "%s必须为NPC提供足够大的开放广场" % GameData.TRADE_PORTS[str(city_port_id)].name)
 		var configured_positions = Dictionary(city_layout.get("npc_positions", {}))
-		for city_npc_id in GameData.LOCATIONS[str(city_port_id)].npcs:
-			_check(configured_positions.has(str(city_npc_id)), "%s的%s必须在城内地图配置独立站位" % [GameData.TRADE_PORTS[str(city_port_id)].name, GameData.NPCS[str(city_npc_id)].name])
+		var configured_npc_ids = Array(city_layout.get("npc_ids", []))
+		_check(configured_npc_ids.size() == configured_positions.size(), "%s的每名NPC都必须拥有唯一广场站位" % GameData.TRADE_PORTS[str(city_port_id)].name)
+		for city_npc_id in configured_npc_ids:
+			_check(configured_positions.has(str(city_npc_id)) and plaza_rect.has_point(Vector2(configured_positions[str(city_npc_id)])), "%s的%s必须站在开放广场内" % [GameData.TRADE_PORTS[str(city_port_id)].name, GameData.NPCS[str(city_npc_id)].name])
 	_check(city_styles.size() == GameData.TRADE_PORTS.size(), "九座城市必须使用九种可区分的美术主题")
-	_check(city_building_signatures.size() == GameData.TRADE_PORTS.size(), "九座城市必须使用九套不同的房屋布局，不能只共用一组碰撞")
 
 	# 重新加载或走入远洋城市的视觉街区时不能篡改真实所在港口。
 	scene.state.quest_index = GameData.QUESTS.size()
@@ -482,56 +471,39 @@ func _run():
 	recipe_target = scene._quest_navigation_target()
 	_check(str(recipe_target.location) == "malta_dock" and str(recipe_target.actor_id) == "malta_cook" and "厨房" in str(recipe_target.name), "全部配料备齐后导航必须切换到马耳他厨师")
 
-	# 九城地图、NPC位置与碰撞要逐城切换，每名人物都必须使用精灵模型。
+	# 九城开放广场与NPC站位要逐城切换，每名人物都必须使用带职业道具的新精灵。
 	scene.state.quest_index = GameData.QUESTS.size()
 	var modeled_city_art_paths = {}
-	var modeled_city_building_art = {}
 	for modeled_port_id in GameData.TRADE_PORTS:
 		scene._switch_region("city", str(modeled_port_id))
 		_check(str(scene.map_node.city_port_id) == str(modeled_port_id), "%s必须加载自己的城内地图主题" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
 		var modeled_city_art_path = str(scene.map_node.city_art_path(str(modeled_port_id)))
-		_check(modeled_city_art_path.ends_with("/%s_city_v%s.png" % [str(modeled_port_id).trim_suffix("_dock"), "4" if str(modeled_port_id) == "venice_dock" else "3"]), "%s必须加载背景与房屋一体绘制的城市地图" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
-		_check(not modeled_city_art_paths.has(modeled_city_art_path), "%s不能复用其他城市的房屋与背景图" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
+		_check(modeled_city_art_path.ends_with("/%s_plaza_v1.png" % str(modeled_port_id).trim_suffix("_dock")), "%s必须加载无前景房屋的独立广场背景" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
+		_check(not modeled_city_art_paths.has(modeled_city_art_path), "%s不能复用其他城市的广场背景图" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
 		modeled_city_art_paths[modeled_city_art_path] = true
-		_check(scene.city_buildings.size() == _foreground_building_count(str(modeled_port_id)), "%s必须把配置中的前景房屋生成为独立节点，背景地标不能冒充NPC店铺" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
-		var city_model_signature = []
-		var housed_npcs = {}
-		for city_building in scene.city_buildings:
-			_check(city_building.port_id == str(modeled_port_id) and city_building.get_parent() == scene.world_layer, "%s的房屋碰撞数据必须保持本城归属" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
-			_check(city_building.integrated_background and not city_building.visual_frame_enabled and not city_building.visible, "%s的背景建筑不得叠加错位方框或名称牌" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
-			city_model_signature.append("%s:%s" % [city_building.building_id, city_building.collision_size])
-			for housed_npc_id in city_building.npc_ids:
-				housed_npcs[str(housed_npc_id)] = city_building.building_id
-		for service_npc_id in GameData.LOCATIONS[str(modeled_port_id)].npcs:
-			if str(GameData.NPCS[str(service_npc_id)].get("service", "")) != "":
-				_check(housed_npcs.has(str(service_npc_id)), "%s的职能NPC%s必须明确归属于身后的独立房屋" % [GameData.TRADE_PORTS[str(modeled_port_id)].name, GameData.NPCS[str(service_npc_id)].name])
-		modeled_city_building_art["|".join(city_model_signature)] = true
-		for modeled_building in Array(GameData.PORT_CITY_MAPS[str(modeled_port_id)].buildings):
-			var modeled_footprint = Rect2(Dictionary(modeled_building).footprint)
-			_check(not scene._is_walkable(scene._world_point(modeled_footprint.get_center())), "%s的%s必须拥有不可穿透的实体碰撞" % [GameData.TRADE_PORTS[str(modeled_port_id)].name, str(Dictionary(modeled_building).name)])
-		for modeled_npc_id in GameData.LOCATIONS[str(modeled_port_id)].npcs:
+		var modeled_layout = GameData.PORT_CITY_MAPS[str(modeled_port_id)]
+		_check(not modeled_layout.has("buildings"), "%s场景中不得再生成任何房屋节点或房屋碰撞" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
+		for modeled_npc_id in Array(modeled_layout.npc_ids):
 			var expected_position = scene._world_point(Vector2(GameData.PORT_CITY_MAPS[str(modeled_port_id)].npc_positions[str(modeled_npc_id)]))
-			_check(_actor_has_art(scene, str(modeled_npc_id)), "%s的%s必须拥有可见人物精灵" % [GameData.TRADE_PORTS[str(modeled_port_id)].name, GameData.NPCS[str(modeled_npc_id)].name])
+			_check(_actor_has_art(scene, str(modeled_npc_id)) and "npc_profession_atlas" in _actor_art_atlas_path(scene, str(modeled_npc_id)), "%s的%s必须使用带身份道具的新版职业精灵" % [GameData.TRADE_PORTS[str(modeled_port_id)].name, GameData.NPCS[str(modeled_npc_id)].name])
 			var position_is_reachable = scene._is_walkable(expected_position)
-			_check(_actor_position(scene, str(modeled_npc_id)).distance_to(expected_position) < 1.0 and position_is_reachable, "%s的%s必须生成在地图配置的可行走街区" % [GameData.TRADE_PORTS[str(modeled_port_id)].name, GameData.NPCS[str(modeled_npc_id)].name])
+			_check(_actor_position(scene, str(modeled_npc_id)).distance_to(expected_position) < 1.0 and position_is_reachable, "%s的%s必须生成在开放广场的可行走区域" % [GameData.TRADE_PORTS[str(modeled_port_id)].name, GameData.NPCS[str(modeled_npc_id)].name])
 			var city_npc_path = scene._build_task_navigation_path(scene._spawn_for_location(str(modeled_port_id)), expected_position)
-			var path_avoids_buildings = not city_npc_path.is_empty()
+			var path_stays_walkable = not city_npc_path.is_empty()
 			for city_path_point in city_npc_path:
-				path_avoids_buildings = path_avoids_buildings and scene._is_walkable(Vector2(city_path_point))
-			_check(path_avoids_buildings, "%s前往%s的道路必须绕开本城全部实体房屋" % [GameData.TRADE_PORTS[str(modeled_port_id)].name, GameData.NPCS[str(modeled_npc_id)].name])
+				path_stays_walkable = path_stays_walkable and scene._is_walkable(Vector2(city_path_point))
+			_check(path_stays_walkable, "%s前往%s的导航必须能直达开放广场站位" % [GameData.TRADE_PORTS[str(modeled_port_id)].name, GameData.NPCS[str(modeled_npc_id)].name])
 	_check(modeled_city_art_paths.size() == GameData.TRADE_PORTS.size(), "九座港口必须拥有九张互不复用的城内背景")
-	_check(modeled_city_building_art.size() == GameData.TRADE_PORTS.size(), "九座港口必须使用可区分的本地建筑模型组合")
 	scene._switch_region("city", "venice_dock")
-	var tavern_footprint = Rect2(GameData.PORT_CITY_MAPS.venice_dock.buildings[3].footprint)
-	var wall_test_start = scene._world_point(Vector2(tavern_footprint.end.x + 22.0, tavern_footprint.get_center().y))
-	scene.player_actor.position = wall_test_start
-	scene.joystick_direction = Vector2.LEFT
+	var plaza_walk_start = scene._world_point(Vector2(360, 760))
+	scene.player_actor.position = plaza_walk_start
+	scene.joystick_direction = Vector2.RIGHT
 	scene._process(0.20)
 	scene.joystick_direction = Vector2.ZERO
-	_check(scene.player_actor.position.distance_to(wall_test_start) < 0.5 and scene._is_walkable(scene.player_actor.position), "玩家用摇杆撞向房屋时必须停在墙外，不能穿透房屋")
+	_check(scene.player_actor.position.x > plaza_walk_start.x and scene._is_walkable(scene.player_actor.position), "开放广场不得残留房屋隐形墙，摇杆移动必须连续")
 	scene._switch_region("city", "athens_dock")
 	scene._open_world_map()
-	_check(_has_label_text(scene.overlay, "雅典 · 城内地图") and _has_label_text(scene.overlay, "海岬神殿与银帆柱廊") and _has_label_text(scene.overlay, "城内实体建筑") and _has_label_text(scene.overlay, "潮汐神殿") and _has_button_text(scene.overlay, "卡珊德拉｜货栈 · 买卖特产") and _has_button_text(scene.overlay, "艾琳娜｜旅店 · 恢复补给"), "每座城市的城内地图必须展示本地地标、实体建筑、人物和职能")
+	_check(_has_label_text(scene.overlay, "雅典 · 城内地图") and _has_label_text(scene.overlay, "海岬神殿、橄榄石庭与银帆地纹") and _has_label_text(scene.overlay, "开放广场") and not _has_label_text(scene.overlay, "城内实体建筑") and _has_button_text(scene.overlay, "卡珊德拉｜货栈 · 买卖特产") and _has_button_text(scene.overlay, "艾琳娜｜旅店 · 恢复补给"), "每座城市的城内地图必须展示开放广场、地域地标、人物和职能")
 	var athens_map_start = scene.player_actor.position
 	scene._travel_to_city_npc("athens_dock", "athens_oracle")
 	_check(scene.task_navigation_active and scene.player_actor.position.distance_to(athens_map_start) < 1.0, "从城内地图选择NPC必须启动步行导航，不能直接传送")
@@ -560,7 +532,7 @@ func _run():
 	scene.joystick_direction = Vector2.ZERO
 	_check(scene.player_actor.position.distance_to(alexandria_departure_position) > 1.0, "亚历山大等港口出航后必须能立即驾船移动，不能被港内礁区卡住")
 	_check(str(scene.state.player.location) == origin_before_departure and int(scene.state.player.silver) == silver_before_departure, "海上航行未靠港前不能提前改写位置或扣传送费")
-	_check(scene.player_actor.display_id == "player_ship" and _has_actor(scene, scene.state.sea_enemy_id()) and _has_actor(scene, "drifting_cargo"), "海域必须生成可驾驶船只、航路海盗和漂流货箱")
+	_check(scene.player_actor.display_id == "player_ship" and is_instance_valid(scene.player_actor.art_sprite) and "player_ship_atlas_v1" in _actor_art_signature(scene.player_actor) and _has_actor(scene, scene.state.sea_enemy_id()) and _has_actor(scene, "drifting_cargo"), "海域必须生成当前船体的可驾驶模型、航路海盗和漂流货箱")
 	var visible_sea_ports = 0
 	var visible_sea_threats = 0
 	for sea_map_actor in scene.actors:
@@ -608,6 +580,15 @@ func _run():
 	var starter_speed = float(ship_state.ship_speed_profile().knots)
 	var ship_purchase = ship_state.buy_ship("alex_caravel")
 	_check(bool(ship_purchase.get("ok", false)) and str(ship_state.ship.hull_id) == "alex_caravel" and str(ship_state.ship.name) == "灯塔卡拉维尔" and ship_state.cargo_capacity() == 20 and float(ship_state.ship_speed_profile().knots) > starter_speed and ship_state.ship_armor() == 1, "不同港口的船老板必须能出售独有船型，换船后速度、货舱和船甲立即生效")
+	var hull_model = ActorScript.new()
+	root.add_child(hull_model)
+	hull_model.configure("player", Color.WHITE, Color.WHITE, "player_ship")
+	hull_model.set_ship_hull("sea_swallow")
+	var starter_hull_art = _actor_art_signature(hull_model)
+	hull_model.set_ship_hull("alex_caravel")
+	var purchased_hull_art = _actor_art_signature(hull_model)
+	_check("player_ship_atlas_v1" in starter_hull_art and "player_ship_atlas_v1" in purchased_hull_art and starter_hull_art != purchased_hull_art, "航海大地图船只必须根据玩家购买的船体切换独立模型")
+	hull_model.queue_free()
 	var capacity_before_hold = ship_state.cargo_capacity()
 	ship_state.player.silver = 1000
 	var hold_upgrade = ship_state.upgrade_ship("hold")
@@ -702,13 +683,6 @@ func _has_actor(scene, actor_id):
 			return true
 	return false
 
-func _foreground_building_count(port_id):
-	var count = 0
-	for building_data in Array(GameData.PORT_CITY_MAPS[str(port_id)].buildings):
-		if bool(Dictionary(building_data).get("foreground", true)):
-			count += 1
-	return count
-
 func _actor_model_id(scene, actor_id):
 	for entry in scene.actors:
 		if str(entry.id) == actor_id:
@@ -720,6 +694,16 @@ func _actor_has_art(scene, actor_id):
 		if str(entry.id) == str(actor_id):
 			return is_instance_valid(entry.node.art_sprite) and entry.node.art_sprite.texture != null
 	return false
+
+func _actor_art_atlas_path(scene, actor_id):
+	for entry in scene.actors:
+		if str(entry.id) != str(actor_id) or not is_instance_valid(entry.node.art_sprite):
+			continue
+		var texture = entry.node.art_sprite.texture
+		if texture is AtlasTexture and texture.atlas != null:
+			return str(texture.atlas.resource_path)
+		return str(texture.resource_path) if texture != null else ""
+	return ""
 
 func _actor_art_signature(actor):
 	if not is_instance_valid(actor.art_sprite) or actor.art_sprite.texture == null:
