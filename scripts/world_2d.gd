@@ -782,6 +782,7 @@ func _toggle_audio():
 
 func _process(delta):
 	_refresh_enemy_respawn_markers()
+	_update_city_building_highlights()
 	if is_instance_valid(overlay):
 		return
 	var keyboard = Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
@@ -836,6 +837,20 @@ func _process(delta):
 	else:
 		_update_zone(false)
 	_update_waypoint_screen_position()
+
+func _update_city_building_highlights():
+	if current_region != "city" or not is_instance_valid(player_actor):
+		return
+	var navigation_actor_id = ""
+	if task_navigation_active:
+		navigation_actor_id = str(task_navigation_target.get("actor_id", ""))
+	for building in city_buildings:
+		if not is_instance_valid(building):
+			continue
+		var proximity_radius = max(190.0, min(building.frame_size.x, building.frame_size.y) * 0.82)
+		var is_near = player_actor.position.distance_to(building.position) <= proximity_radius
+		var is_navigation_target = navigation_actor_id != "" and building.npc_ids.has(navigation_actor_id)
+		building.set_highlighted(is_near or is_navigation_target)
 
 func _gui_input(event):
 	if is_instance_valid(overlay):

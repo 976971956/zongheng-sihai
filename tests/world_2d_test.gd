@@ -23,11 +23,16 @@ func _run():
 
 	_check(is_instance_valid(scene.world_layer), "世界地图必须成功创建")
 	_check(is_instance_valid(scene.player_actor), "玩家角色必须成功创建")
-	_check(scene.city_buildings.size() == _foreground_building_count("venice_dock"), "城市背景与NPC对应房屋必须分层生成，不能把店铺继续画死在背景里")
+	_check(scene.city_buildings.size() == _foreground_building_count("venice_dock"), "一体化城市背景中的每栋交互房屋都必须生成独立边框与碰撞层")
 	for initial_building in scene.city_buildings:
-		_check(initial_building.get_parent() == scene.world_layer and initial_building != scene.map_node and initial_building.z_index < scene.player_actor.z_index, "独立房屋必须位于背景之上、人物之下的专用层级")
-		_check(is_instance_valid(initial_building.art_sprite) and initial_building.art_sprite.texture is AtlasTexture, "每栋独立房屋都必须绑定透明建筑图集模型")
-		_check(initial_building.art_sprite.material is ShaderMaterial and initial_building.rendered_width > 0.0, "独立房屋必须带城市色温校准与落地阴影，不能像悬浮贴纸")
+		_check(initial_building.get_parent() == scene.world_layer and initial_building != scene.map_node and initial_building.z_index < scene.player_actor.z_index, "房屋交互框必须位于一体背景之上、人物之下")
+		_check(initial_building.integrated_background and initial_building.frame_size.x > 0.0 and initial_building.frame_size.y > 0.0, "房屋必须使用一体背景并拥有有效交互边框，不能继续叠加贴纸精灵")
+		_check(is_instance_valid(initial_building.name_label) and initial_building.display_name in initial_building.name_label.text, "房屋边框必须显示对应建筑名称")
+	var proximity_building = scene.city_buildings[0]
+	scene.player_actor.position = proximity_building.position + Vector2(0, 120)
+	scene._update_city_building_highlights()
+	_check(proximity_building.highlighted, "角色靠近一体化房屋时交互边框必须高亮")
+	scene.player_actor.position = scene._spawn_for_location("venice_square")
 	_check(scene.player_actor.display_id == "player", "主角必须使用独立的新版角色模型")
 	_check(scene.player_actor.art_sprite.hframes == 4 and scene.player_actor.art_sprite.vframes == 2, "主角必须使用多帧行走图集")
 	scene.player_actor.set_motion(Vector2.RIGHT)
@@ -489,17 +494,16 @@ func _run():
 		scene._switch_region("city", str(modeled_port_id))
 		_check(str(scene.map_node.city_port_id) == str(modeled_port_id), "%s必须加载自己的城内地图主题" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
 		var modeled_city_art_path = str(scene.map_node.city_art_path(str(modeled_port_id)))
-		_check(modeled_city_art_path.ends_with("/%s_city_v%s.png" % [str(modeled_port_id).trim_suffix("_dock"), "3" if str(modeled_port_id) == "venice_dock" else "2"]), "%s必须加载与港口一一对应的无前景店铺手绘底图" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
+		_check(modeled_city_art_path.ends_with("/%s_city_v%s.png" % [str(modeled_port_id).trim_suffix("_dock"), "4" if str(modeled_port_id) == "venice_dock" else "3"]), "%s必须加载背景与房屋一体绘制的城市地图" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
 		_check(not modeled_city_art_paths.has(modeled_city_art_path), "%s不能复用其他城市的房屋与背景图" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
 		modeled_city_art_paths[modeled_city_art_path] = true
 		_check(scene.city_buildings.size() == _foreground_building_count(str(modeled_port_id)), "%s必须把配置中的前景房屋生成为独立节点，背景地标不能冒充NPC店铺" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
 		var city_model_signature = []
 		var housed_npcs = {}
 		for city_building in scene.city_buildings:
-			var building_texture = city_building.art_sprite.texture as AtlasTexture
-			_check(city_building.port_id == str(modeled_port_id) and city_building.get_parent() == scene.world_layer and city_building.z_index < scene.player_actor.z_index, "%s的房屋必须保持本城归属并绘制在NPC身后" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
-			_check(building_texture != null and building_texture.atlas != null and building_texture.atlas.resource_path.begins_with("res://assets/art/buildings/"), "%s的房屋必须使用独立透明建筑素材，不能截取城市背景冒充" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
-			city_model_signature.append("%s:%s" % [building_texture.atlas.resource_path, building_texture.region])
+			_check(city_building.port_id == str(modeled_port_id) and city_building.get_parent() == scene.world_layer and city_building.z_index < scene.player_actor.z_index, "%s的房屋交互框必须保持本城归属并绘制在NPC身后" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
+			_check(city_building.integrated_background and is_instance_valid(city_building.name_label), "%s的房屋必须由一体背景承载，并由程序框出名称和范围" % GameData.TRADE_PORTS[str(modeled_port_id)].name)
+			city_model_signature.append("%s:%s" % [city_building.building_id, city_building.frame_size])
 			for housed_npc_id in city_building.npc_ids:
 				housed_npcs[str(housed_npc_id)] = city_building.building_id
 		for service_npc_id in GameData.LOCATIONS[str(modeled_port_id)].npcs:
