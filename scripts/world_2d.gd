@@ -19,6 +19,7 @@ const BattleStageScript = preload("res://scripts/battle_stage_2d.gd")
 const JoystickScript = preload("res://scripts/virtual_joystick.gd")
 const ItemIconScript = preload("res://scripts/item_icon_2d.gd")
 const PlayerPortraitTexture = preload("res://assets/art/characters/player_walk_v1.png")
+const PlayerShipTexture = preload("res://assets/art/ships/player_ship_atlas_v1.png")
 const MONSTER_RESPAWN_SECONDS = GameState.ENEMY_RESPAWN_SECONDS
 const MONSTER_RESPAWN_RETRY_SECONDS = 1.5
 const MONSTER_RESPAWN_SAFE_DISTANCE = 170.0
@@ -1782,6 +1783,7 @@ func _open_character():
 	equipment_stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	equipment_stack.add_theme_constant_override("separation", 8)
 	scroll.add_child(equipment_stack)
+	equipment_stack.add_child(_character_ship_card_2d())
 	equipment_stack.add_child(_label("当前已装备｜最高强化 +10", 16, GOLD))
 	var equipment_grid = GridContainer.new()
 	equipment_grid.columns = 2
@@ -1800,6 +1802,7 @@ func _open_character():
 		equipment_stack.add_child(_equipment_set_card_2d(set_progress))
 	if visible_set_count == 0:
 		equipment_stack.add_child(_label("尚未穿戴套装装备。副本 Boss 会掉落带套装标记的部件。", 13, MUTED))
+	equipment_stack.add_child(_character_ship_catalog_2d())
 	var bag = _button("打开物品背包", "primary")
 	bag.pressed.connect(_switch_overlay_to_inventory)
 	content.add_child(bag)
@@ -1807,6 +1810,81 @@ func _open_character():
 	close.pressed.connect(_close_overlay)
 	content.add_child(close)
 	_open_overlay(content, true, Vector2(666, 1020))
+
+func _character_ship_card_2d():
+	var hull_id = str(state.ship.get("hull_id", "sea_swallow"))
+	var hull = Dictionary(GameData.SHIP_HULLS.get(hull_id, GameData.SHIP_HULLS.sea_swallow))
+	var sales_port = str(hull.get("sales_port", "venice_dock"))
+	var port = Dictionary(GameData.TRADE_PORTS.get(sales_port, GameData.TRADE_PORTS.venice_dock))
+	var profile = state.ship_speed_profile()
+	var panel = PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", _style(Color(0.035, 0.14, 0.18, 0.97), 13, Color(TEAL, 0.58), 2, 10))
+	var stack = VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 7)
+	panel.add_child(stack)
+	stack.add_child(_label("座舰系统｜当前船只", 16, GOLD))
+	var row = HBoxContainer.new()
+	row.add_theme_constant_override("separation", 11)
+	stack.add_child(row)
+	row.add_child(_ship_visual_2d(hull_id, 116))
+	var info = VBoxContainer.new()
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.add_theme_constant_override("separation", 4)
+	row.add_child(info)
+	info.add_child(_label("Lv.%d  %s" % [int(hull.level), str(hull.name)], 18, INK))
+	info.add_child(_label("航速 %.1f节 · %d海里/日\n货舱 %d/%d格 · 船甲%d" % [float(profile.knots), int(profile.nm_per_day), state.cargo_used(), state.cargo_capacity(), state.ship_armor()], 13, TEAL))
+	info.add_child(_label("帆装Lv.%d · 舱板Lv.%d · 装甲Lv.%d" % [int(state.ship.get("speed", 1)), int(state.ship.get("hold_level", 0)), int(state.ship.get("armor", 0))], 12, MUTED))
+	var trait_label = _label("特性｜%s\n产地｜%s · %s船行" % [str(hull.trait), str(port.name), str(port.get("ship_seller", "船老板"))], 12, GOLD)
+	trait_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	stack.add_child(trait_label)
+	var at_port = GameData.TRADE_PORTS.has(str(state.player.location))
+	var local_port = Dictionary(GameData.TRADE_PORTS.get(str(state.player.location), {}))
+	var local_offer = Dictionary(GameData.SHIP_HULLS.get(str(local_port.get("ship_offer", "")), {}))
+	var shipyard = _button("查看本港船坞 · Lv.%d %s" % [int(local_offer.get("level", 0)), str(local_offer.get("name", "未发现"))] if at_port else "抵达港口后可查看当地船坞", "gold")
+	shipyard.disabled = not at_port or not state.is_trade_unlocked()
+	shipyard.pressed.connect(_open_shipyard_from_character_2d)
+	stack.add_child(shipyard)
+	return panel
+
+func _ship_visual_2d(hull_id, icon_size):
+	var frame = PanelContainer.new()
+	frame.custom_minimum_size = Vector2(icon_size, icon_size)
+	frame.add_theme_stylebox_override("panel", _style(Color(0.015, 0.075, 0.10, 0.98), 12, Color(GOLD, 0.46), 1, 5))
+	var visual = TextureRect.new()
+	visual.name = "CurrentShipModel"
+	visual.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	visual.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	var texture = AtlasTexture.new()
+	var cell_size = Vector2(PlayerShipTexture.get_width(), PlayerShipTexture.get_height()) / 3.0
+	var hull = Dictionary(GameData.SHIP_HULLS.get(str(hull_id), GameData.SHIP_HULLS.sea_swallow))
+	texture.atlas = PlayerShipTexture
+	texture.region = Rect2(Vector2(hull.get("visual_cell", Vector2i.ZERO)) * cell_size, cell_size)
+	visual.texture = texture
+	frame.add_child(visual)
+	return frame
+
+func _character_ship_catalog_2d():
+	var stack = VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 6)
+	stack.add_child(_label("九港船型图鉴｜每个港口只出售自己的等级船只", 16, GOLD))
+	var current_hull_id = str(state.ship.get("hull_id", "sea_swallow"))
+	for hull_id in GameData.ship_hull_ids_by_level():
+		var hull = Dictionary(GameData.SHIP_HULLS[str(hull_id)])
+		var port_id = str(hull.sales_port)
+		var port = Dictionary(GameData.TRADE_PORTS[port_id])
+		var unlocked = state.is_port_unlocked(port_id)
+		var marker = "◆ 当前" if str(hull_id) == current_hull_id else ("○ 已发现" if unlocked else "◇ 未发现")
+		var price_copy = "初始座舰" if int(hull.price) <= 0 else "%d银币" % int(hull.price)
+		var copy = "%s｜Lv.%d %s\n%s · %s船行｜%.1f节 · %d格 · 船甲%d · %s" % [marker, int(hull.level), str(hull.name), str(port.name), str(port.get("ship_seller", "船老板")), float(hull.base_knots), int(hull.capacity), int(hull.armor), price_copy if unlocked else "随主线解锁港口"]
+		var row = _label(copy, 12, TEAL if unlocked else MUTED)
+		row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		row.add_theme_stylebox_override("normal", _style(Color(0.025, 0.095, 0.115, 0.88), 9, Color(TEAL if unlocked else MUTED, 0.35), 1, 7))
+		stack.add_child(row)
+	return stack
+
+func _open_shipyard_from_character_2d():
+	_close_overlay()
+	call_deferred("_open_port_shipyard_2d", GameData.port_service_npc(str(state.player.location), "shipyard"))
 
 func _character_progress_2d(copy, value, maximum, color):
 	var stack = VBoxContainer.new()

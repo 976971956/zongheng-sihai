@@ -108,7 +108,7 @@ func _run():
 	_check(_has_button_text(scene.overlay, "装备") and _has_button_text(scene.overlay, "使用"), "背包必须显示装备与使用按钮")
 	_check(_has_label_text(scene.overlay, "物品背包") and _has_label_text(scene.overlay, "背包物品") and not _has_label_text(scene.overlay, "当前已装备") and _count_visuals(scene.overlay, "equipment") >= 1 and _count_visuals(scene.overlay, "consumable") >= 1, "物品背包必须只展示带模型的未装备物品，不能继续混入角色装备槽")
 	scene._open_character()
-	_check(_has_label_text(scene.overlay, "角色信息 · 已装备") and _has_label_text(scene.overlay, "当前已装备") and _has_named_node(scene.overlay, "CharacterPortrait") and _count_visuals(scene.overlay, "equipment") == 6 and not _has_label_text(scene.overlay, "背包物品"), "角色页必须独立展示人物立绘、属性和六个已装备槽，不能与背包混成同一列表")
+	_check(_has_label_text(scene.overlay, "角色信息 · 已装备") and _has_label_text(scene.overlay, "当前已装备") and _has_named_node(scene.overlay, "CharacterPortrait") and _has_named_node(scene.overlay, "CurrentShipModel") and _has_label_text(scene.overlay, "座舰系统") and _has_label_text(scene.overlay, "Lv.1  海燕号") and _has_label_text(scene.overlay, "九港船型图鉴") and _has_label_text(scene.overlay, "Lv.9 北海飞剪船") and _count_visuals(scene.overlay, "equipment") == 6 and not _has_label_text(scene.overlay, "背包物品"), "角色页必须独立展示人物、装备与当前座舰，并列出九港分级船型")
 	scene._open_inventory()
 	scene._equip_item_2d("warrior_blade")
 	await process_frame

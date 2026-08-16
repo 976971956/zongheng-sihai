@@ -35,6 +35,9 @@ func _run():
 	await process_frame
 	_check(scene.state.active_card == "ghost_card" and _has_text(scene.modal_layer, "当前怪物卡"), "完整日志必须显示已启用怪物卡")
 	scene._close_modal()
+	scene._open_character()
+	_check(_has_text(scene.modal_layer, "座舰系统") and _has_text(scene.modal_layer, "Lv.1 海燕号") and _has_named_node(scene.modal_layer, "CurrentShipModel"), "完整日志角色页必须同步展示当前座舰模型、等级和航行属性")
+	scene._close_modal()
 	scene.state.player.location = "venice_market"
 	scene.state.player.silver = 500
 	scene._open_vendor_shop("jeweler")
@@ -90,6 +93,16 @@ func _has_button(node, fragment):
 		return true
 	for child in node.get_children():
 		if _has_button(child, fragment):
+			return true
+	return false
+
+func _has_named_node(node, node_name):
+	if not is_instance_valid(node):
+		return false
+	if str(node.name) == str(node_name):
+		return true
+	for child in node.get_children():
+		if _has_named_node(child, node_name):
 			return true
 	return false
 

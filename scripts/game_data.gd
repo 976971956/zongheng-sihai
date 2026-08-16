@@ -537,16 +537,21 @@ const NPC_SERVICE_LABELS = {
 }
 
 const SHIP_HULLS = {
-	"sea_swallow": {"name": "海燕号", "level": 1, "price": 0, "base_knots": 8.0, "capacity": 12, "armor": 0, "trait": "轻巧可靠的沿岸帆船"},
-	"adriatic_cog": {"name": "石墙柯克船", "level": 2, "price": 260, "base_knots": 9.0, "capacity": 18, "armor": 1, "trait": "低速但有宽阔方形货舱"},
-	"alex_caravel": {"name": "灯塔卡拉维尔", "level": 3, "price": 480, "base_knots": 11.0, "capacity": 20, "armor": 1, "trait": "三角帆擅长逆风航线"},
-	"malta_galley": {"name": "金岛桨帆船", "level": 4, "price": 680, "base_knots": 12.0, "capacity": 18, "armor": 2, "trait": "无风海域仍能保持速度"},
-	"cape_carrack": {"name": "风暴角大帆船", "level": 5, "price": 980, "base_knots": 10.5, "capacity": 32, "armor": 3, "trait": "为远洋重货与风暴打造"},
-	"quanzhou_junk": {"name": "刺桐福船", "level": 6, "price": 1280, "base_knots": 13.0, "capacity": 30, "armor": 2, "trait": "水密隔舱兼顾速度和货量"},
-	"athens_trireme": {"name": "银帆战船", "level": 7, "price": 1420, "base_knots": 14.5, "capacity": 22, "armor": 3, "trait": "追击海盗的高速装甲船"},
-	"yangzhou_treasure": {"name": "月港宝船", "level": 8, "price": 1850, "base_knots": 12.0, "capacity": 44, "armor": 3, "trait": "九港最大的贸易货舱"},
-	"amsterdam_clipper": {"name": "北海飞剪船", "level": 9, "price": 2400, "base_knots": 17.0, "capacity": 28, "armor": 2, "trait": "七海最快的远洋商船"}
+	"sea_swallow": {"name": "海燕号", "level": 1, "price": 0, "base_knots": 8.0, "capacity": 12, "armor": 0, "trait": "轻巧可靠的沿岸帆船", "sales_port": "venice_dock", "visual_cell": Vector2i(0, 0)},
+	"adriatic_cog": {"name": "石墙柯克船", "level": 2, "price": 260, "base_knots": 9.0, "capacity": 18, "armor": 1, "trait": "低速但有宽阔方形货舱", "sales_port": "ragusa_dock", "visual_cell": Vector2i(1, 0)},
+	"alex_caravel": {"name": "灯塔卡拉维尔", "level": 3, "price": 480, "base_knots": 11.0, "capacity": 20, "armor": 1, "trait": "三角帆擅长逆风航线", "sales_port": "alexandria_dock", "visual_cell": Vector2i(2, 0)},
+	"malta_galley": {"name": "金岛桨帆船", "level": 4, "price": 680, "base_knots": 12.0, "capacity": 18, "armor": 2, "trait": "无风海域仍能保持速度", "sales_port": "malta_dock", "visual_cell": Vector2i(0, 1)},
+	"cape_carrack": {"name": "风暴角大帆船", "level": 5, "price": 980, "base_knots": 10.5, "capacity": 32, "armor": 3, "trait": "为远洋重货与风暴打造", "sales_port": "cape_town_dock", "visual_cell": Vector2i(1, 1)},
+	"quanzhou_junk": {"name": "刺桐福船", "level": 6, "price": 1280, "base_knots": 13.0, "capacity": 30, "armor": 2, "trait": "水密隔舱兼顾速度和货量", "sales_port": "quanzhou_dock", "visual_cell": Vector2i(2, 1)},
+	"athens_trireme": {"name": "银帆战船", "level": 7, "price": 1420, "base_knots": 14.5, "capacity": 22, "armor": 3, "trait": "追击海盗的高速装甲船", "sales_port": "athens_dock", "visual_cell": Vector2i(0, 2)},
+	"yangzhou_treasure": {"name": "月港宝船", "level": 8, "price": 1850, "base_knots": 12.0, "capacity": 44, "armor": 3, "trait": "九港最大的贸易货舱", "sales_port": "yangzhou_dock", "visual_cell": Vector2i(1, 2)},
+	"amsterdam_clipper": {"name": "北海飞剪船", "level": 9, "price": 2400, "base_knots": 17.0, "capacity": 28, "armor": 2, "trait": "七海最快的远洋商船", "sales_port": "amsterdam_dock", "visual_cell": Vector2i(2, 2)}
 }
+
+static func ship_hull_ids_by_level():
+	var hull_ids = SHIP_HULLS.keys()
+	hull_ids.sort_custom(func(a, b): return int(SHIP_HULLS[str(a)].level) < int(SHIP_HULLS[str(b)].level))
+	return hull_ids
 
 const PORT_UNLOCK_QUEST = {
 	"venice_dock": 7, "ragusa_dock": 8, "alexandria_dock": 20,

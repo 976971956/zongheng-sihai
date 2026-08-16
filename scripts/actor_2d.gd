@@ -102,11 +102,6 @@ const NPC_ATLAS_CELLS = {
 	"amsterdam_auctioneer": {"atlas": "e", "cell": Vector2i(1, 1)},
 	"amsterdam_shipwright": {"atlas": "e", "cell": Vector2i(2, 1)}
 }
-const PLAYER_SHIP_CELLS = {
-	"sea_swallow": Vector2i(0, 0), "adriatic_cog": Vector2i(1, 0), "alex_caravel": Vector2i(2, 0),
-	"malta_galley": Vector2i(0, 1), "cape_carrack": Vector2i(1, 1), "quanzhou_junk": Vector2i(2, 1),
-	"athens_trireme": Vector2i(0, 2), "yangzhou_treasure": Vector2i(1, 2), "amsterdam_clipper": Vector2i(2, 2)
-}
 const LEGACY_BOSS_IDS = [
 	"basin_leviathan", "nine_tail_fox", "earth_demon_king", "tira_guardian",
 	"celestial_demon_general", "jade_dream_queen", "black_furnace_lord",
@@ -140,7 +135,7 @@ func configure(kind, color, accent = Color("f2c66d"), identity = ""):
 	queue_redraw()
 
 func set_ship_hull(hull_id):
-	ship_hull_id = str(hull_id) if PLAYER_SHIP_CELLS.has(str(hull_id)) else "sea_swallow"
+	ship_hull_id = str(hull_id) if GameData.SHIP_HULLS.has(str(hull_id)) else "sea_swallow"
 	if display_id == "player_ship" and is_inside_tree():
 		_refresh_art_sprite()
 	queue_redraw()
@@ -195,7 +190,8 @@ func _refresh_art_sprite():
 		var ship_texture = AtlasTexture.new()
 		var ship_cell_size = Vector2(PLAYER_SHIP_ATLAS.get_width(), PLAYER_SHIP_ATLAS.get_height()) / 3.0
 		ship_texture.atlas = PLAYER_SHIP_ATLAS
-		ship_texture.region = Rect2(Vector2(PLAYER_SHIP_CELLS.get(ship_hull_id, Vector2i.ZERO)) * ship_cell_size, ship_cell_size)
+		var hull = Dictionary(GameData.SHIP_HULLS.get(ship_hull_id, GameData.SHIP_HULLS.sea_swallow))
+		ship_texture.region = Rect2(Vector2(hull.get("visual_cell", Vector2i.ZERO)) * ship_cell_size, ship_cell_size)
 		art_sprite = Sprite2D.new()
 		art_sprite.texture = ship_texture
 		art_sprite.scale = Vector2.ONE * 0.50

@@ -12,6 +12,7 @@ const PANEL_SOFT = Color(0.05, 0.13, 0.18, 0.92)
 const LINE = Color(0.18, 0.39, 0.45, 0.55)
 const DESKTOP_DESIGN_SIZE = Vector2i(1280, 720)
 const MOBILE_DESIGN_SIZE = Vector2i(720, 1280)
+const PlayerShipTexture = preload("res://assets/art/ships/player_ship_atlas_v1.png")
 
 var state = GameState.new()
 var main_margin
@@ -1571,6 +1572,7 @@ func _open_character():
 	summary_row.add_child(fill)
 	summary_row.add_child(_label("体力 %d  ·  攻击 %d  ·  防御 %d  ·  敏捷 %d" % [stats.max_hp, stats.attack, stats.defense, stats.speed], 12, MUTED))
 	content.add_child(summary)
+	content.add_child(_journal_ship_summary())
 	content.add_child(_label("持有银币：%d｜装备最高可强化至+10" % int(state.player.silver), 12, GOLD))
 	var recommend = _button("一键穿戴推荐装备", "gold")
 	recommend.pressed.connect(func():
@@ -1624,6 +1626,38 @@ func _open_character():
 	social_parts.append("当前物品掉落加成：%d%%" % int(round(float(stats.drop_bonus) * 100.0)))
 	content.add_child(_label("  ·  ".join(social_parts), 11, Color("8ecbd0")))
 	_open_modal("角色与装备", content, Vector2(740, 630))
+
+func _journal_ship_summary():
+	var hull_id = str(state.ship.get("hull_id", "sea_swallow"))
+	var hull = Dictionary(GameData.SHIP_HULLS.get(hull_id, GameData.SHIP_HULLS.sea_swallow))
+	var port = Dictionary(GameData.TRADE_PORTS[str(hull.get("sales_port", "venice_dock"))])
+	var profile = state.ship_speed_profile()
+	var panel = _panel_container(Color(0.035, 0.14, 0.18, 0.92), 11, Color(TEAL, 0.52), 1)
+	var margin = _inside_margin(10, 8)
+	panel.add_child(margin)
+	var row = HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	margin.add_child(row)
+	row.add_child(_journal_ship_visual(hull_id, 72))
+	var copy = _label("座舰系统｜Lv.%d %s\n%.1f节 · %d海里/日｜货舱%d/%d｜船甲%d｜%s船行" % [int(hull.level), str(hull.name), float(profile.knots), int(profile.nm_per_day), state.cargo_used(), state.cargo_capacity(), state.ship_armor(), str(port.name)], 11, GOLD)
+	copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	row.add_child(copy)
+	return panel
+
+func _journal_ship_visual(hull_id, icon_size):
+	var visual = TextureRect.new()
+	visual.name = "CurrentShipModel"
+	visual.custom_minimum_size = Vector2(icon_size, icon_size)
+	visual.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	visual.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	var texture = AtlasTexture.new()
+	var cell_size = Vector2(PlayerShipTexture.get_width(), PlayerShipTexture.get_height()) / 3.0
+	var hull = Dictionary(GameData.SHIP_HULLS.get(str(hull_id), GameData.SHIP_HULLS.sea_swallow))
+	texture.atlas = PlayerShipTexture
+	texture.region = Rect2(Vector2(hull.get("visual_cell", Vector2i.ZERO)) * cell_size, cell_size)
+	visual.texture = texture
+	return visual
 
 func _open_quest_detail():
 	var content = VBoxContainer.new()

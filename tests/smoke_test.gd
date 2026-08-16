@@ -19,6 +19,8 @@ func _init():
 	_check(not port_lock_state.sail_to("alexandria_dock").ok, "尚未发现的港口不能绕过海图锁定直接启航")
 	_check(GameData.NPCS.size() >= 31, "九港剧情与服务人物必须完整配置，不能只保留少量任务NPC")
 	var specialty_goods = {}
+	var regional_ship_offers = {}
+	var ship_levels = {}
 	for port_id in GameData.TRADE_PORTS:
 		var port = GameData.TRADE_PORTS[port_id]
 		var order_npc = str(GameData.TRADE_PORTS[port_id].get("order_npc", ""))
@@ -30,6 +32,12 @@ func _init():
 		for service_id in ["market", "harbor", "shipyard"]:
 			var service_npc = GameData.port_service_npc(str(port_id), service_id)
 			_check(service_npc != "" and service_npc in GameData.LOCATIONS[port_id].npcs and str(GameData.NPCS.get(service_npc, {}).get("service", "")) == service_id, "%s必须由不同NPC分别承担%s职能" % [port.name, service_id])
+		var offered_hull_id = str(port.get("ship_offer", ""))
+		var offered_hull = Dictionary(GameData.SHIP_HULLS.get(offered_hull_id, {}))
+		_check(not offered_hull.is_empty() and str(offered_hull.get("sales_port", "")) == str(port_id) and str(port.get("ship_seller", "")) != "", "%s必须由当地船老板出售本港专属船型" % port.name)
+		_check(not regional_ship_offers.has(offered_hull_id), "%s不能与其他港口重复出售同一船型" % port.name)
+		regional_ship_offers[offered_hull_id] = true
+		ship_levels[int(offered_hull.get("level", 0))] = true
 		_check(specialty_good != "" and specialty_good in stock and str(GameData.TRADE_GOODS.get(specialty_good, {}).get("origin", "")) == str(port_id), "%s必须出售产地归属明确的本港特色商品" % port.name)
 		for stock_good_id in stock:
 			_check(str(GameData.TRADE_GOODS.get(str(stock_good_id), {}).get("origin", "")) == str(port_id), "%s货栈不能混入其他城市出产的%s" % [port.name, GameData.TRADE_GOODS[str(stock_good_id)].name])
@@ -37,6 +45,9 @@ func _init():
 		if port_id != "venice_dock":
 			_check(GameData.LOCATIONS[port_id].npcs.size() >= 3, "%s至少需要剧情、贸易和港口服务三名可互动人物" % GameData.TRADE_PORTS[port_id].name)
 	_check(specialty_goods.size() == GameData.TRADE_PORTS.size(), "九座城市必须各有不同的特色商品，不能重复套用同一批特产")
+	_check(regional_ship_offers.size() == GameData.TRADE_PORTS.size() and ship_levels.size() == 9, "九座城市必须各卖一艘不同等级的专属船只")
+	for expected_ship_level in range(1, 10):
+		_check(ship_levels.has(expected_ship_level), "九港船只等级必须从Lv.1连续成长到Lv.9")
 	var athens_to_ragusa = GameData.trade_route_path("athens_dock", "ragusa_dock", GameData.TRADE_PORTS.keys())
 	_check(athens_to_ragusa == ["athens_dock", "ragusa_dock"], "雅典至拉古萨必须直接通航，不能被固定路线强制到威尼斯中转")
 	for good_id in GameData.TRADE_GOODS:
