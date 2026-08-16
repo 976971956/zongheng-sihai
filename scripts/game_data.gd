@@ -462,8 +462,8 @@ const PORT_CITY_MAPS = {
 		"npc_ids": ["alisa", "tavern_keeper", "guard_captain", "jeweler", "venice_quartermaster", "ship_owner", "venice_shipwright"],
 		"npc_positions": {
 			"alisa": Vector2(155, 390), "tavern_keeper": Vector2(360, 390), "guard_captain": Vector2(565, 390),
-			"jeweler": Vector2(155, 625), "venice_quartermaster": Vector2(360, 625), "ship_owner": Vector2(565, 625),
-			"venice_shipwright": Vector2(360, 855)
+			"jeweler": Vector2(155, 625), "venice_quartermaster": Vector2(360, 625), "ship_owner": Vector2(360, 880),
+			"venice_shipwright": Vector2(540, 820)
 		},
 		"npc_locations": {"alisa": "alisa_hut", "tavern_keeper": "venice_tavern", "guard_captain": "venice_square", "jeweler": "venice_market"}
 	},
@@ -472,56 +472,56 @@ const PORT_CITY_MAPS = {
 		"districts": ["石墙主广场", "橄榄商贸席", "港务席", "柯克船改造席"],
 		"plaza_rect": Rect2(80, 250, 560, 720),
 		"npc_ids": ["ragusa_broker", "ragusa_harbormaster", "ragusa_shipwright", "ragusa_innkeeper"],
-		"npc_positions": {"ragusa_broker": Vector2(190, 455), "ragusa_harbormaster": Vector2(530, 455), "ragusa_shipwright": Vector2(190, 760), "ragusa_innkeeper": Vector2(530, 760)}
+		"npc_positions": {"ragusa_broker": Vector2(190, 455), "ragusa_harbormaster": Vector2(360, 880), "ragusa_shipwright": Vector2(190, 760), "ragusa_innkeeper": Vector2(530, 760)}
 	},
 	"alexandria_dock": {
 		"style": "alexandria", "title": "法罗斯航海广场", "landmark": "灯塔、纸莎草庭与蓝金罗盘地纹",
 		"districts": ["灯塔主广场", "香料商贸席", "商会订单席", "三角帆改造席"],
 		"plaza_rect": Rect2(75, 250, 570, 720),
 		"npc_ids": ["alexandria_merchant", "alex_harbormaster", "alex_lighthouse_keeper", "alex_shipwright"],
-		"npc_positions": {"alexandria_merchant": Vector2(190, 455), "alex_harbormaster": Vector2(530, 455), "alex_lighthouse_keeper": Vector2(190, 760), "alex_shipwright": Vector2(530, 760)}
+		"npc_positions": {"alexandria_merchant": Vector2(190, 455), "alex_harbormaster": Vector2(360, 880), "alex_lighthouse_keeper": Vector2(190, 760), "alex_shipwright": Vector2(530, 760)}
 	},
 	"malta_dock": {
 		"style": "malta", "title": "蜂蜜石船钟广场", "landmark": "圣钟堡、柑橘石庭与金色海湾",
 		"districts": ["船钟主广场", "柑橘商贸席", "远航厨房席", "桨帆船改造席"],
 		"plaza_rect": Rect2(70, 260, 580, 710),
 		"npc_ids": ["malta_keeper", "malta_harbormaster", "malta_shipwright", "malta_cook", "malta_diver"],
-		"npc_positions": {"malta_keeper": Vector2(145, 445), "malta_harbormaster": Vector2(360, 445), "malta_shipwright": Vector2(575, 445), "malta_cook": Vector2(235, 755), "malta_diver": Vector2(485, 755)}
+		"npc_positions": {"malta_keeper": Vector2(145, 445), "malta_harbormaster": Vector2(360, 880), "malta_shipwright": Vector2(575, 445), "malta_cook": Vector2(235, 755), "malta_diver": Vector2(485, 755)}
 	},
 	"cape_town_dock": {
 		"style": "cape_town", "title": "风暴角远征广场", "landmark": "桌山云墙、双洋流与普洛蒂亚石庭",
 		"districts": ["桌山主广场", "北河向导席", "金砂商贸席", "远洋船改造席"],
 		"plaza_rect": Rect2(75, 300, 570, 675),
 		"npc_ids": ["cape_keeper", "cape_quartermaster", "cape_shipwright"],
-		"npc_positions": {"cape_keeper": Vector2(180, 505), "cape_quartermaster": Vector2(540, 505), "cape_shipwright": Vector2(360, 790)}
+		"npc_positions": {"cape_keeper": Vector2(360, 880), "cape_quartermaster": Vector2(540, 505), "cape_shipwright": Vector2(530, 780)}
 	},
 	"quanzhou_dock": {
 		"style": "quanzhou", "title": "刺桐海丝广场", "landmark": "东西塔、刺桐花与海丝罗盘地纹",
 		"districts": ["海丝主广场", "青瓷商贸席", "季风港务席", "福船改造席"],
 		"plaza_rect": Rect2(70, 250, 580, 720),
 		"npc_ids": ["quanzhou_scholar", "quanzhou_navigator", "quanzhou_merchant", "quanzhou_shipwright"],
-		"npc_positions": {"quanzhou_scholar": Vector2(190, 455), "quanzhou_navigator": Vector2(530, 455), "quanzhou_merchant": Vector2(190, 760), "quanzhou_shipwright": Vector2(530, 760)}
+		"npc_positions": {"quanzhou_scholar": Vector2(190, 455), "quanzhou_navigator": Vector2(360, 880), "quanzhou_merchant": Vector2(190, 760), "quanzhou_shipwright": Vector2(530, 760)}
 	},
 	"athens_dock": {
 		"style": "athens", "title": "银帆海岬广场", "landmark": "海岬神殿、橄榄石庭与银帆地纹",
 		"districts": ["海岬主广场", "葡萄酒商贸席", "爱琴港务席", "银帆锻造席"],
 		"plaza_rect": Rect2(70, 255, 580, 715),
 		"npc_ids": ["athens_oracle", "athens_harbormaster", "athens_smith", "athens_innkeeper"],
-		"npc_positions": {"athens_oracle": Vector2(190, 455), "athens_harbormaster": Vector2(530, 455), "athens_smith": Vector2(190, 760), "athens_innkeeper": Vector2(530, 760)}
+		"npc_positions": {"athens_oracle": Vector2(190, 455), "athens_harbormaster": Vector2(360, 880), "athens_smith": Vector2(190, 760), "athens_innkeeper": Vector2(530, 760)}
 	},
 	"yangzhou_dock": {
 		"style": "yangzhou", "title": "运河月港广场", "landmark": "月桥、莲灯水庭与玉纱地纹",
 		"districts": ["月港主广场", "玉纱商贸席", "潮位港务席", "宝船改造席"],
 		"plaza_rect": Rect2(75, 260, 570, 710),
 		"npc_ids": ["yangzhou_weaver", "yangzhou_pilot", "yangzhou_merchant", "yangzhou_shipwright"],
-		"npc_positions": {"yangzhou_weaver": Vector2(190, 455), "yangzhou_pilot": Vector2(530, 455), "yangzhou_merchant": Vector2(190, 760), "yangzhou_shipwright": Vector2(530, 760)}
+		"npc_positions": {"yangzhou_weaver": Vector2(190, 455), "yangzhou_pilot": Vector2(360, 880), "yangzhou_merchant": Vector2(190, 760), "yangzhou_shipwright": Vector2(530, 760)}
 	},
 	"amsterdam_dock": {
 		"style": "amsterdam", "title": "北海航交广场", "landmark": "环形运河、风车远景与航海仪地纹",
 		"districts": ["航交主广场", "制图港务席", "航海仪拍卖席", "飞剪船改造席"],
 		"plaza_rect": Rect2(70, 270, 580, 700),
 		"npc_ids": ["amsterdam_cartographer", "amsterdam_auctioneer", "amsterdam_shipwright"],
-		"npc_positions": {"amsterdam_cartographer": Vector2(180, 505), "amsterdam_auctioneer": Vector2(540, 505), "amsterdam_shipwright": Vector2(360, 790)}
+		"npc_positions": {"amsterdam_cartographer": Vector2(360, 880), "amsterdam_auctioneer": Vector2(540, 505), "amsterdam_shipwright": Vector2(535, 780)}
 	}
 }
 

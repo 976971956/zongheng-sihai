@@ -366,8 +366,13 @@ func _run():
 		var configured_positions = Dictionary(city_layout.get("npc_positions", {}))
 		var configured_npc_ids = Array(city_layout.get("npc_ids", []))
 		_check(configured_npc_ids.size() == configured_positions.size(), "%s的每名NPC都必须拥有唯一广场站位" % GameData.TRADE_PORTS[str(city_port_id)].name)
+		var harbor_npc_id = GameData.port_service_npc(str(city_port_id), "harbor")
+		var harbor_position = Vector2(configured_positions.get(harbor_npc_id, Vector2.ZERO))
+		_check(harbor_npc_id != "" and is_equal_approx(harbor_position.x, 360.0) and harbor_position.y >= 850.0, "%s负责出海的航务NPC必须统一站在广场正下方" % GameData.TRADE_PORTS[str(city_port_id)].name)
 		for city_npc_id in configured_npc_ids:
 			_check(configured_positions.has(str(city_npc_id)) and plaza_rect.has_point(Vector2(configured_positions[str(city_npc_id)])), "%s的%s必须站在开放广场内" % [GameData.TRADE_PORTS[str(city_port_id)].name, GameData.NPCS[str(city_npc_id)].name])
+			if str(city_npc_id) != harbor_npc_id:
+				_check(harbor_position.distance_to(Vector2(configured_positions[str(city_npc_id)])) >= 150.0, "%s的出海NPC不能与%s站位或名牌重叠" % [GameData.TRADE_PORTS[str(city_port_id)].name, GameData.NPCS[str(city_npc_id)].name])
 	_check(city_styles.size() == GameData.TRADE_PORTS.size(), "九座城市必须使用九种可区分的美术主题")
 
 	# 重新加载或走入远洋城市的视觉街区时不能篡改真实所在港口。
