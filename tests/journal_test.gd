@@ -20,6 +20,16 @@ func _run():
 	await process_frame
 	scene._close_modal()
 
+	scene._open_settings()
+	_check(_has_text(scene.modal_layer, "当前：普通难度") and _has_button(scene.modal_layer, "冒险") and _has_button(scene.modal_layer, "背景音乐与音效") and _has_button(scene.modal_layer, "重置游戏进度"), "完整日志设置页必须提供难度、声音与重置游戏功能")
+	scene._set_difficulty_from_settings(GameState.DIFFICULTY_ADVENTURE)
+	await process_frame
+	_check(scene.state.difficulty == GameState.DIFFICULTY_ADVENTURE and _has_text(scene.modal_layer, "当前：冒险难度"), "完整日志必须能切换并刷新冒险难度")
+	scene._open_reset_confirmation()
+	_check(_has_text(scene.modal_layer, "此操作无法撤销") and _has_button(scene.modal_layer, "确认重置"), "完整日志重置游戏必须经过二次确认")
+	scene._close_modal()
+	scene.state.set_difficulty(GameState.DIFFICULTY_NORMAL)
+
 	# 无道具奖励的贸易任务不得使完整日志报错。
 	scene.state.quest_index = 8
 	scene.state.quest_progress = 0

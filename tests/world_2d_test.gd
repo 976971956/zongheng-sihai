@@ -54,6 +54,16 @@ func _run():
 		enemy_model.free()
 	_check(scene.player_actor.position.x > 0 and scene.player_actor.position.y > 0, "玩家必须出生在可行走地图内")
 	_check(_has_button_text(scene, "角色") and _has_button_text(scene, "背包") and _has_button_text(scene, "任务") and _has_button_text(scene, "地图") and _has_button_text(scene, "日志"), "手机底栏必须把角色与背包拆成独立入口")
+	_check(_has_button_text(scene, "设置"), "手机主界面必须提供设置入口")
+	scene._open_settings()
+	_check(_has_label_text(scene.overlay, "当前：普通难度") and _has_button_text(scene.overlay, "冒险") and _has_button_text(scene.overlay, "背景音乐与音效") and _has_button_text(scene.overlay, "重置游戏进度"), "设置页必须集中提供难度、声音和重置游戏功能")
+	scene._set_difficulty_from_settings(GameState.DIFFICULTY_ADVENTURE)
+	await process_frame
+	_check(scene.state.difficulty == GameState.DIFFICULTY_ADVENTURE and _has_label_text(scene.overlay, "当前：冒险难度"), "手机设置页切换难度后必须立即保存并刷新选中状态")
+	scene._open_reset_confirmation()
+	_check(_has_label_text(scene.overlay, "此操作无法撤销") and _has_button_text(scene.overlay, "确认重置") and _has_button_text(scene.overlay, "取消，返回设置"), "重置游戏必须先显示不可撤销的二次确认")
+	scene._close_overlay()
+	scene.state.set_difficulty(GameState.DIFFICULTY_NORMAL)
 	var saved_respawn_key = scene._enemy_spawn_key("drunk_sailor")
 	scene.state.enemy_respawns[saved_respawn_key] = scene._world_time_seconds() + 60.0
 	scene._spawn_world_actors()

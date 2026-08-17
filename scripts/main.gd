@@ -327,6 +327,11 @@ func _build_mobile_topbar():
 	guide_button.tooltip_text = "航海指南"
 	guide_button.pressed.connect(_show_welcome)
 	row.add_child(guide_button)
+	var settings_button = _button("设置", "ghost")
+	settings_button.custom_minimum_size = Vector2(58, 48)
+	settings_button.tooltip_text = "难度、声音与存档设置"
+	settings_button.pressed.connect(_open_settings)
+	row.add_child(settings_button)
 	return panel
 
 func _build_mobile_navigation():
@@ -414,6 +419,9 @@ func _build_topbar():
 	save_indicator = _label("已自动保存", 12, MUTED)
 	save_indicator.custom_minimum_size.x = 80
 	row.add_child(save_indicator)
+	var settings_button = _button("设置", "ghost")
+	settings_button.pressed.connect(_open_settings)
+	row.add_child(settings_button)
 	return panel
 
 func _build_profile_panel():
@@ -1170,7 +1178,7 @@ func _show_battle_screen(result = {}):
 	banner.add_child(banner_margin)
 	var banner_row = HBoxContainer.new()
 	banner_margin.add_child(banner_row)
-	var title_text = "战斗状态 · 第%d回合" % int(current.get("round", 1))
+	var title_text = "战斗状态 · %s · 第%d回合" % [str(current.get("difficulty_name", state.difficulty_name())), int(current.get("round", 1))]
 	if battle_over:
 		title_text = "战斗胜利" if won else ("成功撤退" if fled else "战斗失败")
 	banner_row.add_child(_label(title_text, 19, color))
@@ -2172,6 +2180,85 @@ func _buy_voyage_protection_from_journal():
 		call_deferred("_show_quest_completion_prompt")
 	else:
 		call_deferred("_open_harbor")
+
+func _open_settings():
+	var content = VBoxContainer.new()
+	content.add_theme_constant_override("separation", 13)
+	content.add_child(_label("游戏难度", 20, GOLD))
+	var current = _label("当前：%s难度" % state.difficulty_name(), 14, TEAL)
+	current.add_theme_stylebox_override("normal", _style(Color(0.04, 0.18, 0.18, 0.88), 11, Color(TEAL, 0.55), 1, 10))
+	content.add_child(current)
+	for mode in [
+		{"id": GameState.DIFFICULTY_NORMAL, "name": "普通", "note": "当前标准数值，适合剧情与轻松成长。"},
+		{"id": GameState.DIFFICULTY_ADVENTURE, "name": "冒险", "note": "敌人耐久+25%、攻击+12%、航行风险+6；战斗经验与银币+20%、掉落率+10%。"}
+	]:
+		var row = HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		content.add_child(row)
+		var selected = str(state.difficulty) == str(mode.id)
+		var choose = _button(("◆ " if selected else "") + str(mode.name), "gold" if selected else "ghost")
+		choose.custom_minimum_size.x = 135
+		choose.disabled = selected
+		choose.pressed.connect(_set_difficulty_from_settings.bind(str(mode.id)))
+		row.add_child(choose)
+		var note = _label(str(mode.note), 12, INK if selected else MUTED)
+		note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		row.add_child(note)
+	content.add_child(_thin_line())
+	content.add_child(_label("声音", 17, TEAL))
+	var audio = _button("背景音乐与音效：开" if AudioDirector.is_audio_enabled() else "背景音乐与音效：关", "ghost")
+	audio.pressed.connect(_toggle_audio_from_settings)
+	content.add_child(audio)
+	content.add_child(_thin_line())
+	content.add_child(_label("存档管理", 17, RED))
+	var reset_note = _label("重置会清除等级、任务、装备、货物、船队与航行进度；难度和声音设置会保留。", 12, MUTED)
+	reset_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(reset_note)
+	var reset = _button("重置游戏进度", "ghost")
+	reset.add_theme_color_override("font_color", RED)
+	reset.pressed.connect(_open_reset_confirmation)
+	content.add_child(reset)
+	_open_modal("游戏设置", content, Vector2(680, 650))
+
+func _set_difficulty_from_settings(mode):
+	var result = state.set_difficulty(str(mode))
+	_close_modal()
+	refresh_ui()
+	_show_toast(str(result.get("message", "难度切换失败。")), bool(result.get("ok", false)))
+	if bool(result.get("ok", false)):
+		call_deferred("_open_settings")
+
+func _toggle_audio_from_settings():
+	var enabled = AudioDirector.toggle_audio()
+	_close_modal()
+	_show_toast("背景音乐与音效已开启。" if enabled else "背景音乐与音效已关闭。", true)
+	call_deferred("_open_settings")
+
+func _open_reset_confirmation():
+	var content = VBoxContainer.new()
+	content.add_theme_constant_override("separation", 15)
+	content.add_child(_label("确定重置全部游戏进度？", 21, RED))
+	var warning = _label("此操作无法撤销。当前角色、十三卷任务、背包装备、贸易货物、船只和地图进度都会从头开始。", 14, INK)
+	warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(warning)
+	var buttons = HBoxContainer.new()
+	buttons.add_theme_constant_override("separation", 10)
+	content.add_child(buttons)
+	var cancel = _button("取消，返回设置", "ghost")
+	cancel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cancel.pressed.connect(_open_settings)
+	buttons.add_child(cancel)
+	var confirm = _button("确认重置", "primary")
+	confirm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	confirm.add_theme_color_override("font_color", Color("ffd6d8"))
+	confirm.pressed.connect(_confirm_reset_game)
+	buttons.add_child(confirm)
+	_open_modal("重置游戏", content, Vector2(620, 380))
+
+func _confirm_reset_game():
+	state.reset_progress()
+	get_tree().change_scene_to_file("res://scenes/world_2d.tscn")
 
 func _show_welcome():
 	var content = VBoxContainer.new()

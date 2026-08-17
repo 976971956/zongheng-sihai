@@ -6,6 +6,9 @@ const SAVE_PATH = "user://tides_save.json"
 const ENEMY_RESPAWN_SECONDS = 20.0
 const LEGACY_VOYAGE_ORIGIN_Y = 1580.0
 const LEGACY_VOYAGE_DESTINATION_Y = 365.0
+const DIFFICULTY_NORMAL = "normal"
+const DIFFICULTY_ADVENTURE = "adventure"
+const DIFFICULTY_NAMES = {DIFFICULTY_NORMAL: "普通", DIFFICULTY_ADVENTURE: "冒险"}
 
 var rng = RandomNumberGenerator.new()
 var player = {}
@@ -46,12 +49,14 @@ var bounty_progress = 0
 var bounty_cycles = 0
 var enemy_respawns = {}
 var meal_buff_battles = 0
+var difficulty = DIFFICULTY_NORMAL
 
 func _init():
 	rng.randomize()
 	new_game()
 
 func new_game():
+	difficulty = DIFFICULTY_NORMAL
 	player = {
 		"name": "失忆的航者", "title": "海边苏醒者", "level": 1, "xp": 0, "hp": 94,
 		"silver": 72, "location": "alisa_hut", "battles": 0, "victories": 0
@@ -97,6 +102,35 @@ func new_game():
 	meal_buff_battles = 0
 	message_history = ["你从海边小屋醒来，已经不记得自己的名字。"]
 	player.hp = get_stats().max_hp
+
+func difficulty_name():
+	return str(DIFFICULTY_NAMES.get(difficulty, DIFFICULTY_NAMES[DIFFICULTY_NORMAL]))
+
+func set_difficulty(value):
+	var resolved = str(value)
+	if not resolved in DIFFICULTY_NAMES:
+		return {"ok": false, "message": "未知的游戏难度。"}
+	if not active_battle.is_empty():
+		return {"ok": false, "message": "战斗进行中不能切换难度。"}
+	difficulty = resolved
+	save_game()
+	return {"ok": true, "message": "游戏难度已切换为%s。" % difficulty_name(), "difficulty": difficulty}
+
+func reset_progress():
+	var preserved_difficulty = difficulty if difficulty in DIFFICULTY_NAMES else DIFFICULTY_NORMAL
+	new_game()
+	difficulty = preserved_difficulty
+	save_game()
+	return {"ok": true, "message": "游戏进度已重置，难度保留为%s。" % difficulty_name()}
+
+func difficulty_enemy_hp(base_hp):
+	return int(ceil(float(base_hp) * (1.25 if difficulty == DIFFICULTY_ADVENTURE else 1.0)))
+
+func difficulty_enemy_attack(base_attack):
+	return int(ceil(float(base_attack) * (1.12 if difficulty == DIFFICULTY_ADVENTURE else 1.0)))
+
+func difficulty_battle_reward(base_reward):
+	return int(round(float(base_reward) * (1.20 if difficulty == DIFFICULTY_ADVENTURE else 1.0)))
 
 func get_stats():
 	var level = int(player.level)
@@ -569,8 +603,9 @@ func start_battle(enemy_id):
 			return get_battle_view()
 		return {"ok": false, "message": "你正在与其他敌人战斗。"}
 	var enemy = GameData.ENEMIES[enemy_id]
+	var scaled_enemy_hp = difficulty_enemy_hp(int(enemy.hp))
 	active_battle = {
-		"enemy_id": enemy_id, "enemy_hp": int(enemy.hp), "enemy_max_hp": int(enemy.hp),
+		"enemy_id": enemy_id, "enemy_hp": scaled_enemy_hp, "enemy_max_hp": scaled_enemy_hp,
 		"round": 1, "focus": 0, "skill_prepared": false, "sea_battle": sea_encounter, "log": [enemy.intro]
 	}
 	player.battles += 1
@@ -596,7 +631,7 @@ func get_battle_view():
 		"round": int(active_battle.round), "statuses": statuses.duplicate(), "logs": [],
 		"battle_stance": battle_stance, "enemy_intent": get_enemy_intent(),
 		"auto_heal_threshold": auto_heal_threshold, "auto_cure_status": auto_cure_status,
-		"focus": battle_focus(), "focus_max": 3
+		"focus": battle_focus(), "focus_max": 3, "difficulty": difficulty, "difficulty_name": difficulty_name()
 	}
 
 func battle_focus():
@@ -782,7 +817,7 @@ func _enemy_strike(enemy, stats, round_number, logs, special_weakened = false):
 		effective_defense = int(round(float(effective_defense) * 1.28))
 	if statuses.has("诅咒"):
 		effective_defense = max(0, int(round(effective_defense * 0.80)))
-	var enemy_attack = int(enemy.attack)
+	var enemy_attack = difficulty_enemy_attack(int(enemy.attack))
 	var special = enemy.get("special", {})
 	var special_every = int(special.get("every", 0))
 	var uses_special = special_every > 0 and round_number % special_every == 0
@@ -831,13 +866,15 @@ func _tick_statuses():
 
 func _finish_battle_win(enemy_id, round_logs):
 	var enemy = GameData.ENEMIES[enemy_id]
+	var defeated_enemy_max_hp = int(active_battle.get("enemy_max_hp", difficulty_enemy_hp(int(enemy.hp))))
 	var was_sea_battle = bool(active_battle.get("sea_battle", false))
 	var finishing_stance = battle_stance
 	player.victories += 1
 	player.hp = max(1, int(player.hp))
-	var silver = rng.randi_range(int(enemy.silver[0]), int(enemy.silver[1]))
+	var exp_reward = difficulty_battle_reward(int(enemy.exp))
+	var silver = difficulty_battle_reward(rng.randi_range(int(enemy.silver[0]), int(enemy.silver[1])))
 	player.silver += silver
-	var leveled = _add_xp(int(enemy.exp))
+	var leveled = _add_xp(exp_reward)
 	defeated[enemy_id] = int(defeated.get(enemy_id, 0)) + 1
 	if _is_dungeon_location(str(player.location)):
 		dungeon_cleared[enemy_id] = true
@@ -851,14 +888,15 @@ func _finish_battle_win(enemy_id, round_logs):
 	var drop_id = ""
 	var stats = get_stats()
 	var stance_drop_bonus = 0.14 if finishing_stance == "plunder" else 0.0
-	var drop_chance = 1.0 if enemy.rank in ["首领", "副本 Boss"] else min(0.90, 0.22 + float(stats.drop_bonus) + stance_drop_bonus)
+	var difficulty_drop_bonus = 0.10 if difficulty == DIFFICULTY_ADVENTURE else 0.0
+	var drop_chance = 1.0 if enemy.rank in ["首领", "副本 Boss"] else min(0.90, 0.22 + float(stats.drop_bonus) + stance_drop_bonus + difficulty_drop_bonus)
 	if rng.randf() <= drop_chance and enemy.drops.size() > 0:
 		drop_id = enemy.drops[rng.randi_range(0, enemy.drops.size() - 1)]
 		_add_item(drop_id, 1)
-	round_logs.append("战斗胜利！获得%d经验、%d银币。" % [int(enemy.exp), silver])
+	round_logs.append("战斗胜利！获得%d经验、%d银币。" % [exp_reward, silver])
 	if drop_id != "":
 		round_logs.append("百宝箱拾取：%s。" % GameData.ITEMS[drop_id].name)
-	message_history.push_front("击败%s，获得%d经验。" % [enemy.name, int(enemy.exp)])
+	message_history.push_front("击败%s，获得%d经验。" % [enemy.name, exp_reward])
 	_trim_history()
 	active_battle = {}
 	statuses = {}
@@ -867,10 +905,10 @@ func _finish_battle_win(enemy_id, round_logs):
 	return {
 		"ok": true, "battle_over": true, "won": true, "fled": false,
 		"enemy_id": enemy_id, "enemy_name": enemy.name, "enemy_rank": enemy.rank, "enemy_level": int(enemy.level),
-		"enemy_hp": 0, "enemy_max_hp": int(enemy.hp), "player_level": int(player.level), "player_hp": int(player.hp), "player_max_hp": int(get_stats().max_hp),
+		"enemy_hp": 0, "enemy_max_hp": defeated_enemy_max_hp, "player_level": int(player.level), "player_hp": int(player.hp), "player_max_hp": int(get_stats().max_hp),
 		"sea_battle": was_sea_battle, "combatant_name": str(ship.name) if was_sea_battle else str(player.name),
 		"round": 0, "statuses": {}, "logs": round_logs,
-		"exp": int(enemy.exp), "silver": silver, "drop": drop_id, "leveled": leveled, "new_level": int(player.level),
+		"exp": exp_reward, "silver": silver, "drop": drop_id, "leveled": leveled, "new_level": int(player.level),
 		"quest_completed": quest_completed, "bounty_completed": bounty_completed, "battle_stance": finishing_stance
 	}
 
@@ -880,8 +918,10 @@ func _finish_battle_loss(enemy_id, round_logs):
 	var voyage_origin = str(active_voyage.get("origin", ""))
 	var lost_at_sea = voyage_origin in GameData.TRADE_PORTS
 	var remaining_enemy_hp = int(active_battle.get("enemy_hp", enemy.hp))
+	var defeated_enemy_max_hp = int(active_battle.get("enemy_max_hp", difficulty_enemy_hp(int(enemy.hp))))
 	var defeated_player_hp = int(player.hp)
-	player.hp = max(1, int(get_stats().max_hp * 0.35))
+	var recovery_ratio = 0.25 if difficulty == DIFFICULTY_ADVENTURE else 0.35
+	player.hp = max(1, int(get_stats().max_hp * recovery_ratio))
 	var recovered_hp = int(player.hp)
 	player.location = voyage_origin if lost_at_sea else "venice_tavern"
 	if lost_at_sea:
@@ -897,7 +937,7 @@ func _finish_battle_loss(enemy_id, round_logs):
 	return {
 		"ok": true, "battle_over": true, "won": false, "fled": false,
 		"enemy_id": enemy_id, "enemy_name": enemy.name, "enemy_rank": enemy.rank, "enemy_level": int(enemy.level),
-		"enemy_hp": remaining_enemy_hp, "enemy_max_hp": int(enemy.hp), "player_level": int(player.level),
+		"enemy_hp": remaining_enemy_hp, "enemy_max_hp": defeated_enemy_max_hp, "player_level": int(player.level),
 		"player_hp": defeated_player_hp, "player_max_hp": int(get_stats().max_hp), "recovered_hp": recovered_hp, "round": 0, "statuses": {},
 		"sea_battle": was_sea_battle, "combatant_name": str(ship.name) if was_sea_battle else str(player.name),
 		"logs": round_logs, "exp": 0, "silver": 0, "drop": "", "leveled": false, "new_level": int(player.level),
@@ -1436,7 +1476,8 @@ func voyage_risk(port_id):
 func _voyage_risk_for_route(route):
 	var card_risk_bonus = 4 if active_card == "corsair_card" else 0
 	var protection_bonus = 8 if voyage_protection > 0 else 0
-	return max(4, int(route.get("risk", 15)) - ship_armor() * 6 - card_risk_bonus - protection_bonus)
+	var difficulty_risk = 6 if difficulty == DIFFICULTY_ADVENTURE else 0
+	return clamp(int(route.get("risk", 15)) + difficulty_risk - ship_armor() * 6 - card_risk_bonus - protection_bonus, 4, 60)
 
 func voyage_plan(port_id, origin_override = ""):
 	var origin = str(origin_override) if str(origin_override) != "" else str(player.location)
@@ -2141,6 +2182,7 @@ func save_game():
 		"trade_contract_count": trade_contract_count, "active_card": active_card, "discoveries": discoveries,
 		"bounty_index": bounty_index, "bounty_progress": bounty_progress, "bounty_cycles": bounty_cycles,
 		"enemy_respawns": enemy_respawns, "meal_buff_battles": meal_buff_battles
+		,"difficulty": difficulty
 	}
 	var file = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file:
@@ -2218,6 +2260,9 @@ func load_game():
 			player.location = saved_origin
 			_normalize_active_voyage()
 	meal_buff_battles = clamp(int(parsed.get("meal_buff_battles", 0)), 0, 3)
+	difficulty = str(parsed.get("difficulty", DIFFICULTY_NORMAL))
+	if not difficulty in DIFFICULTY_NAMES:
+		difficulty = DIFFICULTY_NORMAL
 	for trade_port_id in GameData.TRADE_PORTS:
 		port_reputation[str(trade_port_id)] = clamp(int(port_reputation.get(str(trade_port_id), 0)), 0, 30)
 		trade_order_cycles[str(trade_port_id)] = max(0, int(trade_order_cycles.get(str(trade_port_id), 0)))

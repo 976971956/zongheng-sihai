@@ -115,7 +115,7 @@ var waypoint_label
 var waypoint_world_target = Vector2.ZERO
 var navigation_button
 var inventory_notice = ""
-var audio_button
+var settings_button
 var footstep_timer = 0.0
 var task_navigation_active = false
 var task_navigation_target = {}
@@ -678,11 +678,11 @@ func _build_hud():
 	currency_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	currency_label.add_theme_stylebox_override("normal", _style(Color(0.18, 0.13, 0.03, 0.92), 11, Color(GOLD, 0.62), 1, 8))
 	row.add_child(currency_label)
-	audio_button = _button("♪ 开" if AudioDirector.is_audio_enabled() else "♪ 关", "ghost")
-	audio_button.custom_minimum_size = Vector2(66, 42)
-	audio_button.add_theme_font_size_override("font_size", 13)
-	audio_button.pressed.connect(_toggle_audio)
-	row.add_child(audio_button)
+	settings_button = _button("设置", "ghost")
+	settings_button.custom_minimum_size = Vector2(66, 42)
+	settings_button.add_theme_font_size_override("font_size", 13)
+	settings_button.pressed.connect(_open_settings)
+	row.add_child(settings_button)
 	quest_label = _label("", 13, MUTED)
 	quest_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	top_box.add_child(quest_label)
@@ -747,9 +747,81 @@ func _build_hud():
 
 func _toggle_audio():
 	var is_enabled = AudioDirector.toggle_audio()
-	if is_instance_valid(audio_button):
-		audio_button.text = "♪ 开" if is_enabled else "♪ 关"
 	hint_label.text = "背景音乐与音效已开启。" if is_enabled else "背景音乐与音效已关闭。"
+	call_deferred("_open_settings")
+
+func _open_settings():
+	var content = VBoxContainer.new()
+	content.add_theme_constant_override("separation", 14)
+	content.add_child(_label("游戏难度", 22, GOLD))
+	var current = _label("当前：%s难度" % state.difficulty_name(), 15, TEAL)
+	current.add_theme_stylebox_override("normal", _style(Color(0.04, 0.18, 0.18, 0.88), 12, Color(TEAL, 0.55), 1, 10))
+	content.add_child(current)
+	var mode_row = HBoxContainer.new()
+	mode_row.add_theme_constant_override("separation", 10)
+	content.add_child(mode_row)
+	for mode in [
+		{"id": GameState.DIFFICULTY_NORMAL, "name": "普通", "note": "当前标准数值，适合剧情与轻松成长。"},
+		{"id": GameState.DIFFICULTY_ADVENTURE, "name": "冒险", "note": "敌人耐久+25%、攻击+12%、航行风险+6；战斗经验与银币+20%、掉落率+10%。"}
+	]:
+		var card = VBoxContainer.new()
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		card.add_theme_constant_override("separation", 7)
+		var selected = str(state.difficulty) == str(mode.id)
+		var choose = _button(("◆ " if selected else "") + str(mode.name), "gold" if selected else "ghost")
+		choose.disabled = selected
+		choose.pressed.connect(_set_difficulty_from_settings.bind(str(mode.id)))
+		card.add_child(choose)
+		var note = _label(str(mode.note), 12, INK if selected else MUTED)
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		note.custom_minimum_size.y = 72
+		card.add_child(note)
+		mode_row.add_child(card)
+	content.add_child(HSeparator.new())
+	content.add_child(_label("声音", 18, TEAL))
+	var audio = _button("背景音乐与音效：开" if AudioDirector.is_audio_enabled() else "背景音乐与音效：关", "ghost")
+	audio.pressed.connect(_toggle_audio)
+	content.add_child(audio)
+	content.add_child(HSeparator.new())
+	content.add_child(_label("存档管理", 18, RED))
+	var reset_note = _label("重置会清除等级、任务、装备、货物、船队与航行进度；难度和声音设置会保留。", 13, MUTED)
+	reset_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(reset_note)
+	var reset = _button("重置游戏进度", "ghost")
+	reset.add_theme_color_override("font_color", RED)
+	reset.pressed.connect(_open_reset_confirmation)
+	content.add_child(reset)
+	_open_overlay(content, true, Vector2(666, 760))
+
+func _set_difficulty_from_settings(mode):
+	var result = state.set_difficulty(str(mode))
+	hint_label.text = str(result.get("message", "难度切换失败。"))
+	call_deferred("_open_settings")
+
+func _open_reset_confirmation():
+	var content = VBoxContainer.new()
+	content.add_theme_constant_override("separation", 15)
+	content.add_child(_label("确定重置全部游戏进度？", 22, RED))
+	var warning = _label("此操作无法撤销。当前角色、十三卷任务、背包装备、贸易货物、船只和地图进度都会从头开始。", 15, INK)
+	warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(warning)
+	var buttons = HBoxContainer.new()
+	buttons.add_theme_constant_override("separation", 10)
+	content.add_child(buttons)
+	var cancel = _button("取消，返回设置", "ghost")
+	cancel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cancel.pressed.connect(_open_settings)
+	buttons.add_child(cancel)
+	var confirm = _button("确认重置", "primary")
+	confirm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	confirm.add_theme_color_override("font_color", Color("ffd6d8"))
+	confirm.pressed.connect(_confirm_reset_game)
+	buttons.add_child(confirm)
+	_open_overlay(content, true, Vector2(666, 470))
+
+func _confirm_reset_game():
+	state.reset_progress()
+	get_tree().reload_current_scene()
 
 func _process(delta):
 	_refresh_enemy_respawn_markers()
@@ -1382,7 +1454,7 @@ func _open_battle(view):
 	content.add_theme_constant_override("separation", 12)
 	var heading = HBoxContainer.new()
 	content.add_child(heading)
-	battle_round_label = _label("遭遇战 · 第%d回合" % int(view.get("round", 1)), 24, GOLD)
+	battle_round_label = _label("遭遇战 · %s · 第%d回合" % [str(view.get("difficulty_name", state.difficulty_name())), int(view.get("round", 1))], 24, GOLD)
 	heading.add_child(battle_round_label)
 	var spacer = Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1470,7 +1542,7 @@ func _refresh_battle_info(view):
 		if bool(view.get("battle_over", false)):
 			battle_round_label.text = "战斗胜利" if bool(view.get("won", false)) else ("成功撤退" if bool(view.get("fled", false)) else "战斗失败")
 		else:
-			battle_round_label.text = "遭遇战 · 第%d回合" % int(view.get("round", 1))
+			battle_round_label.text = "遭遇战 · %s · 第%d回合" % [str(view.get("difficulty_name", state.difficulty_name())), int(view.get("round", 1))]
 	if bool(view.get("sea_battle", false)):
 		battle_player_info_label.text = "%s · %s\n体力 %d/%d · 攻%d 防%d" % [str(view.get("combatant_name", state.ship.name)), str(view.get("ship_role", state.ship_role())), int(view.get("player_hp", state.player.hp)), int(view.get("player_max_hp", state.get_stats().max_hp)), int(view.get("player_attack", 0)), int(view.get("player_defense", 0))]
 	else:

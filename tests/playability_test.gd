@@ -10,22 +10,25 @@ var milestone_losses = {}
 
 func _init():
 	for seed_value in range(1001, 1001 + RUNS):
-		_run_normal_player(seed_value)
+		_run_normal_player(seed_value, GameState.DIFFICULTY_NORMAL)
+	for seed_value in range(2001, 2001 + RUNS):
+		_run_normal_player(seed_value, GameState.DIFFICULTY_ADVENTURE)
 	var total_losses = 0
 	for count in milestone_losses.values():
 		total_losses += int(count)
-	_check(total_losses == 0, "标准成长路线在%d次随机压测中不应出现无法继续的必败节点：%s" % [RUNS, str(milestone_losses)])
+	_check(total_losses == 0, "标准成长路线在普通、冒险各%d次随机压测中不应出现无法继续的必败节点：%s" % [RUNS, str(milestone_losses)])
 	if failures.is_empty():
-		print("PLAYABILITY_OK: %d次十三卷完整成长压测全部通过，十三座副本与终局远征无卡关" % RUNS)
+		print("PLAYABILITY_OK: 普通、冒险各%d次十三卷完整成长压测全部通过，十三座副本与终局远征无卡关" % RUNS)
 		quit(0)
 	else:
 		for failure in failures:
 			push_error(failure)
 		quit(1)
 
-func _run_normal_player(seed_value):
+func _run_normal_player(seed_value, difficulty_mode):
 	var state = TestState.new()
 	state.rng.seed = seed_value
+	state.set_difficulty(str(difficulty_mode))
 	# 剧情交谈与旅行部分在 smoke_test 中已逐步验证；这里按正常顺序领取同样的奖励。
 	for quest_id in ["scale_memory", "to_tavern", "tavern_clue"]:
 		_complete_current_quest(state, quest_id)

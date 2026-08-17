@@ -11,6 +11,21 @@ func _init():
 	state.rng.seed = 424242
 	_check(state.player.location == "alisa_hut", "新游戏应从海边小屋开始")
 	_check(state.get_current_quest().objective.type == "talk", "首个任务应为交谈任务")
+	_check(state.difficulty == GameState.DIFFICULTY_NORMAL and state.difficulty_name() == "普通", "新游戏必须默认使用普通难度")
+	var difficulty_state = TestState.new()
+	difficulty_state.player.location = "venice_dock"
+	var normal_route_risk = difficulty_state.voyage_risk("ragusa_dock")
+	_check(bool(difficulty_state.set_difficulty(GameState.DIFFICULTY_ADVENTURE).ok), "设置页必须能切换到冒险难度")
+	_check(difficulty_state.difficulty_enemy_hp(42) == 53 and difficulty_state.difficulty_enemy_attack(8) == 9 and difficulty_state.difficulty_battle_reward(100) == 120, "冒险难度必须应用耐久、攻击与奖励倍率")
+	_check(difficulty_state.voyage_risk("ragusa_dock") == normal_route_risk + 6, "冒险难度必须让航行风险提高6点")
+	difficulty_state.player.location = "venice_north_gate"
+	var adventure_battle = difficulty_state.start_battle("drunk_sailor")
+	_check(bool(adventure_battle.ok) and int(adventure_battle.enemy_max_hp) == 53 and str(adventure_battle.difficulty_name) == "冒险", "冒险难度必须真实改变战斗敌人耐久并显示难度")
+	_check(not bool(difficulty_state.set_difficulty(GameState.DIFFICULTY_NORMAL).ok), "战斗进行中不能切换难度")
+	difficulty_state.quest_index = 9
+	difficulty_state.inventory["warrior_blade"] = 1
+	difficulty_state.reset_progress()
+	_check(difficulty_state.difficulty == GameState.DIFFICULTY_ADVENTURE and difficulty_state.quest_index == 0 and not difficulty_state.inventory.has("warrior_blade") and difficulty_state.player.location == "alisa_hut", "重置游戏必须清空成长进度并保留所选难度")
 	var port_lock_state = TestState.new()
 	port_lock_state.quest_index = 8
 	port_lock_state.player.location = "venice_dock"
