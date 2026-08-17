@@ -64,6 +64,21 @@ func _run():
 	_check(_has_label_text(scene.overlay, "此操作无法撤销") and _has_button_text(scene.overlay, "确认重置") and _has_button_text(scene.overlay, "取消，返回设置"), "重置游戏必须先显示不可撤销的二次确认")
 	scene._close_overlay()
 	scene.state.set_difficulty(GameState.DIFFICULTY_NORMAL)
+	scene.state.quest_index = 9
+	scene.state.quest_progress = 0
+	scene.state.cargo = {"venetian_glass": 2}
+	scene._open_quest()
+	_check(_has_label_text(scene.overlay, "行动清单") and _has_label_text(scene.overlay, "拉古萨港") and str(scene._quest_navigation_target().location) == "ragusa_dock", "手机任务页和任务导航必须把玻璃商路准确指向拉古萨")
+	scene._close_overlay()
+	scene.state.quest_index = 20
+	scene.state.player.location = "venice_dock"
+	scene.state.cargo = {}
+	var preparation_target = scene._quest_navigation_target()
+	_check(str(preparation_target.location) == "venice_dock" and str(preparation_target.actor_id) == "venice_quartermaster" and "远航准备" in str(preparation_target.name), "灯塔远航缺少玻璃时导航必须先指向威尼斯货栈")
+	scene.state.cargo = {"venetian_glass": 3}
+	_check(str(scene._quest_navigation_target().location) == "alexandria_dock", "备齐三箱玻璃后灯塔远航导航必须切换到亚历山大")
+	scene.state.quest_index = 0
+	scene.state.cargo = {}
 	var saved_respawn_key = scene._enemy_spawn_key("drunk_sailor")
 	scene.state.enemy_respawns[saved_respawn_key] = scene._world_time_seconds() + 60.0
 	scene._spawn_world_actors()

@@ -1697,8 +1697,7 @@ func _open_quest_detail():
 		if reward.has("title"):
 			reward_parts.append("称号「%s」" % str(reward.title))
 		content.add_child(_label("任务奖励｜%s" % " · ".join(reward_parts), 12, MUTED))
-		var route = _quest_route_hint(state.quest_index)
-		var route_label = _label("推荐路线\n%s" % route, 12, Color("8ecbd0"))
+		var route_label = _label("行动清单\n• %s" % "\n• ".join(state.quest_action_steps()), 12, Color("8ecbd0"))
 		route_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		route_label.add_theme_stylebox_override("normal", _style(Color(0.04, 0.16, 0.19, 0.8), 10, LINE, 1, 12))
 		content.add_child(route_label)
@@ -1727,52 +1726,6 @@ func _claim_bounty_from_journal():
 	refresh_ui()
 	_show_toast(result.message, result.ok)
 	call_deferred("_open_quest_detail")
-
-func _quest_route_hint(index):
-	if index < 0 or index >= GameData.QUESTS.size():
-		return "打开世界地图的任务导航寻找当前目标。"
-	var quest_id = str(GameData.QUESTS[index].id)
-	var routes = {
-		"scale_memory": "海边小屋 → 与艾丽莎交谈",
-		"to_tavern": "海边小屋 → 威尼斯酒馆",
-		"tavern_clue": "威尼斯酒馆 → 与酒馆老板交谈",
-		"north_gate": "城市广场 → 北城门",
-		"stolen_ore": "北城门 → 住宅区 → 废矿山",
-		"back_hill_bear": "住宅区 → 后山",
-		"four_floor_trial": "北城门 → 经验副本，逐层击败守卫",
-		"first_cargo": "威尼斯码头 → 购买2箱威尼斯玻璃",
-		"sail_ragusa": "威尼斯码头 → 启航前往拉古萨",
-		"sell_glass": "拉古萨码头 → 卖出2箱威尼斯玻璃",
-		"forge_for_sea": "背包 → 将已装备的手持武器强化1次",
-		"armor_the_swallow": "港口贸易 → 船只改造 → 加固船体",
-		"black_sail_clue": "世界地图 → 黑帆据点外围",
-		"clear_deckhands": "黑帆据点一层 → 击败黑帆水手长",
-		"powder_store": "黑帆据点二层 → 击败黑帆袭击者",
-		"cave_battery": "黑帆据点三层 → 夺取洞窟炮台",
-		"captain_ledger": "黑帆据点四层 → 击败船长雷蒙",
-		"return_chart": "回威尼斯酒馆 → 交付黑帆海图",
-		"alisa_truth": "回海边小屋 → 与艾丽莎交谈",
-		"lighthouse_letter": "步行返回老海鸥酒馆 → 阅读萨米尔来信",
-		"sail_lighthouse": "步行到威尼斯码头 → 可先买3箱玻璃 → 启航亚历山大",
-		"samir_testimony": "亚历山大灯塔港 → 与香料商萨米尔交谈",
-		"lighthouse_repairs": "亚历山大码头 → 找商会执事莱拉 → 交付3箱威尼斯玻璃",
-		"ragusa_nightwatch": "亚历山大买4桶橄榄油 → 航行拉古萨 → 交付订单",
-		"three_port_trust": "完成任意港口订单或盈利出售货物 → 三港总声望达到6",
-		"guarded_passage": "任意港口 → 购买护航物资",
-		"tide_medicine": "亚历山大买4袋东方香料 → 航行威尼斯 → 交付订单",
-		"white_whale_news": "海边小屋 → 与艾丽莎交谈",
-		"sail_malta": "威尼斯码头 → 启航前往马耳他",
-		"meet_isabella": "马耳他港 → 与守钟人伊莎贝拉交谈",
-		"island_feast": "马耳他港购买配料 → 港口厨房烹制海风炖汤",
-		"wreck_entry": "马耳他港 → 步行进入白鲸号残骸",
-		"clear_reef": "白鲸残骸一层 → 击败覆甲礁蟹",
-		"drowned_deck": "白鲸残骸二层 → 击败溺潮水手",
-		"fog_hold": "白鲸残骸三层 → 击败雾歌海妖",
-		"white_whale_heart": "白鲸残骸四层 → 击败深渊海妖",
-		"heir_testimony": "返回马耳他港 → 与伊莎贝拉交谈",
-		"keeper_return": "威尼斯码头 → 步行老海鸥酒馆 → 解读星图"
-	}
-	return str(routes.get(quest_id, "打开世界地图的任务导航寻找当前目标。"))
 
 func _objective_text(objective):
 	var target_name = GameData.objective_name(objective)

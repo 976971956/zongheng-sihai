@@ -2240,6 +2240,10 @@ func _open_quest():
 		content.add_child(story)
 		content.add_child(_label("当前进度  %d / %d" % [state.quest_progress, int(quest.objective.need)], 18, TEAL))
 		content.add_child(_label("下一步｜%s" % GameData.objective_name(quest.objective), 15, GOLD))
+		var action_plan = _label("行动清单\n• %s" % "\n• ".join(state.quest_action_steps()), 14, Color("8ecbd0"))
+		action_plan.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		action_plan.add_theme_stylebox_override("normal", _style(Color(0.04, 0.16, 0.19, 0.88), 11, Color(TEAL, 0.38), 1, 12))
+		content.add_child(action_plan)
 		if state.quest_can_claim():
 			var claim = _button("领取任务奖励", "gold")
 			claim.pressed.connect(_claim_quest_2d)
@@ -2283,7 +2287,16 @@ func _quest_navigation_target():
 	var target_actor_id = ""
 	var target_name_override = ""
 	if objective.type == "visit":
-		target_location = str(objective.target)
+		for cargo_id in Dictionary(objective.get("cargo", {})):
+			var cargo_need = int(objective.cargo[cargo_id])
+			var cargo_held = int(state.cargo.get(str(cargo_id), 0))
+			if cargo_held < cargo_need:
+				target_location = str(GameData.TRADE_GOODS[str(cargo_id)].origin)
+				target_actor_id = str(GameData.TRADE_PORTS.get(target_location, {}).get("merchant_npc", ""))
+				target_name_override = "远航准备·%s %d/%d" % [GameData.TRADE_GOODS[str(cargo_id)].name, cargo_held, cargo_need]
+				break
+		if target_location == "":
+			target_location = str(objective.target)
 	elif objective.type == "talk":
 		for location_id in GameData.LOCATIONS:
 			if str(objective.target) in GameData.LOCATIONS[location_id].npcs:
@@ -2324,7 +2337,9 @@ func _quest_navigation_target():
 		target_location = str(GameData.TRADE_GOODS.get(str(objective.target), {"origin": "venice_dock"}).origin)
 		target_actor_id = str(GameData.TRADE_PORTS.get(target_location, {}).get("merchant_npc", ""))
 	elif objective.type == "trade_sell":
-		target_location = str(state.player.location) if str(state.player.location) in GameData.TRADE_PORTS else "venice_dock"
+		target_location = str(objective.get("location", ""))
+		if target_location == "":
+			target_location = str(state.player.location) if str(state.player.location) in GameData.TRADE_PORTS else "venice_dock"
 		target_actor_id = str(GameData.TRADE_PORTS.get(target_location, {}).get("merchant_npc", ""))
 	elif objective.type == "trade_reputation":
 		target_location = str(state.player.location) if str(state.player.location) in GameData.TRADE_PORTS else "venice_dock"

@@ -170,6 +170,23 @@ func _init():
 	var final_reward = _claim(state, "four_floor_trial")
 	_check(state.get_current_quest().id == "first_cargo", "威尼斯试炼后必须衔接远洋贸易主线")
 	_check(bool(final_reward.get("trade_unlocked", false)) and state.is_trade_unlocked(), "威尼斯试炼领奖后必须解锁货物贸易")
+	var sale_rule_state = TestState.new()
+	sale_rule_state.quest_index = 9
+	sale_rule_state.player.location = "venice_dock"
+	sale_rule_state.cargo = {"venetian_glass": 4}
+	sale_rule_state.cargo_costs = {"venetian_glass": 120}
+	var wrong_port_sale = sale_rule_state.sell_cargo("venetian_glass", 2)
+	_check(bool(wrong_port_sale.ok) and bool(wrong_port_sale.wrong_quest_port) and sale_rule_state.quest_progress == 0 and "拉古萨" in str(wrong_port_sale.message), "玻璃商路不能在错误港口完成，交易结果必须明确提示正确目的地")
+	_check("拉古萨港" in " ".join(sale_rule_state.quest_action_steps()), "贸易任务行动清单必须由目标数据生成正确的出售港口")
+	sale_rule_state.player.location = "ragusa_dock"
+	var correct_port_sale = sale_rule_state.sell_cargo("venetian_glass", 2)
+	_check(bool(correct_port_sale.ok) and not bool(correct_port_sale.wrong_quest_port) and sale_rule_state.quest_can_claim(), "抵达拉古萨出售足量玻璃后才能完成玻璃商路")
+	var lighthouse_plan_state = TestState.new()
+	lighthouse_plan_state.quest_index = 20
+	lighthouse_plan_state.player.location = "venice_dock"
+	_check("启航前到威尼斯港采购威尼斯玻璃×3" in " ".join(lighthouse_plan_state.quest_action_steps()), "灯塔远航行动清单必须先提示装载三箱玻璃，避免抵港后折返")
+	lighthouse_plan_state.cargo = {"venetian_glass": 3}
+	_check(not "启航前" in " ".join(lighthouse_plan_state.quest_action_steps()), "备齐灯塔玻璃后行动清单必须自动移除采购步骤")
 
 	state.player.location = "venice_dock"
 	_check(not state.buy_cargo("wool_cloth").ok and state.max_buyable_cargo("wool_cloth") == 0, "威尼斯货栈不能出售拉古萨特产，港口商品不能再全部混在一起")

@@ -500,6 +500,104 @@ func completed_story_titles(limit = 3):
 		titles.append(str(GameData.QUESTS[index].title))
 	return titles
 
+func quest_action_steps():
+	var quest = get_current_quest()
+	if quest.is_empty():
+		return ["主线已经完成，可继续贸易、悬赏与远征。"]
+	var objective = Dictionary(quest.objective)
+	var objective_type = str(objective.type)
+	var target_id = str(objective.target)
+	var need = int(objective.need)
+	var remaining = max(0, need - int(quest_progress))
+	var steps = []
+	match objective_type:
+		"talk":
+			var npc_location = _quest_npc_location(target_id)
+			steps.append("前往%s" % _quest_location_name(npc_location))
+			steps.append("与%s交谈" % GameData.NPCS[target_id].name)
+		"visit":
+			for cargo_id in Dictionary(objective.get("cargo", {})):
+				var cargo_good = Dictionary(GameData.TRADE_GOODS[str(cargo_id)])
+				var cargo_need = int(objective.cargo[cargo_id])
+				var cargo_held = int(cargo.get(str(cargo_id), 0))
+				if cargo_held < cargo_need:
+					steps.append("启航前到%s采购%s×%d（现有%d/%d）" % [_quest_location_name(str(cargo_good.origin)), str(cargo_good.name), cargo_need - cargo_held, cargo_held, cargo_need])
+			steps.append("前往%s" % _quest_location_name(target_id))
+		"kill":
+			var enemy_location = _quest_enemy_location(target_id)
+			var enemy = Dictionary(GameData.ENEMIES[target_id])
+			if int(player.hp) * 2 < int(get_stats().max_hp):
+				steps.append("当前体力不足一半，先到旅店休息或使用恢复补给")
+			steps.append("前往%s，击败Lv.%d %s×%d" % [_quest_location_name(enemy_location), int(enemy.level), str(enemy.name), remaining])
+			if need > 1:
+				steps.append("普通怪物击败后约%d秒刷新，可在附近探索等待" % int(ENEMY_RESPAWN_SECONDS))
+		"trade_buy":
+			var good = Dictionary(GameData.TRADE_GOODS[target_id])
+			var origin = str(good.origin)
+			steps.append("前往%s，找%s" % [_quest_location_name(origin), GameData.NPCS[str(GameData.TRADE_PORTS[origin].merchant_npc)].name])
+			steps.append("买入%s×%d（任务进度%d/%d）" % [str(good.name), remaining, int(quest_progress), need])
+		"trade_sell":
+			var sell_good = Dictionary(GameData.TRADE_GOODS[target_id])
+			var held = int(cargo.get(target_id, 0))
+			var destination = str(objective.get("location", ""))
+			if destination == "":
+				var opportunity = best_trade_opportunity()
+				destination = str(opportunity.get("destination", player.location))
+			if held < remaining:
+				steps.append("货舱还缺%s×%d，先到%s采购" % [str(sell_good.name), remaining - held, _quest_location_name(str(sell_good.origin))])
+			steps.append("航行至%s，在当地市场卖出%s×%d" % [_quest_location_name(destination), str(sell_good.name), remaining])
+		"upgrade_equipment":
+			steps.append("打开角色信息，确认%s部位已经装备物品" % GameData.SLOT_NAMES[target_id])
+			steps.append("消耗银币强化%s一次" % GameData.SLOT_NAMES[target_id])
+		"upgrade_ship":
+			steps.append("前往任意已发现港口，与当地船匠交谈")
+			steps.append("选择“加固船体”并升级一次")
+		"trade_order":
+			var order = Dictionary(GameData.TRADE_ORDERS[target_id])
+			var order_good_id = str(order.good)
+			var order_good = Dictionary(GameData.TRADE_GOODS[order_good_id])
+			var held_amount = int(cargo.get(order_good_id, 0))
+			if held_amount < int(order.amount):
+				steps.append("到%s采购%s×%d（现有%d/%d）" % [_quest_location_name(str(order_good.origin)), str(order_good.name), int(order.amount) - held_amount, held_amount, int(order.amount)])
+			steps.append("前往%s，找商会订单负责人交付“%s”" % [_quest_location_name(str(order.port)), str(order.title)])
+		"trade_reputation":
+			steps.append("当前九港总声望%d/%d" % [total_trade_reputation(), need])
+			steps.append("完成港口商会订单，或在异地盈利出售至少一批货物")
+		"prepare_voyage":
+			steps.append("前往任意已发现港口，与港务负责人交谈")
+			steps.append("购买一次护航物资；下一次正常航行风险降低并防止风暴损货")
+		"cook":
+			var recipe = Dictionary(GameData.RECIPES[target_id])
+			for good_id in recipe.cargo:
+				var ingredient = Dictionary(GameData.TRADE_GOODS[str(good_id)])
+				var ingredient_need = int(recipe.cargo[good_id])
+				var ingredient_held = int(cargo.get(str(good_id), 0))
+				steps.append("%s：%d/%d，产地%s" % [str(ingredient.name), ingredient_held, ingredient_need, _quest_location_name(str(ingredient.origin))])
+			steps.append("带齐原料后前往%s厨房烹制%s" % [_quest_location_name(str(recipe.port)), str(recipe.name)])
+		_:
+			steps.append(GameData.objective_name(objective))
+	return steps
+
+func _quest_npc_location(npc_id):
+	for location_id in GameData.LOCATIONS:
+		if str(npc_id) in Array(GameData.LOCATIONS[location_id].get("npcs", [])):
+			return str(location_id)
+	return str(player.location)
+
+func _quest_enemy_location(enemy_id):
+	for location_id in GameData.LOCATIONS:
+		if str(enemy_id) in Array(GameData.LOCATIONS[location_id].get("enemies", [])):
+			return str(location_id)
+	return str(player.location)
+
+func _quest_location_name(location_id):
+	var resolved = str(location_id)
+	if GameData.TRADE_PORTS.has(resolved):
+		return "%s港" % GameData.TRADE_PORTS[resolved].name
+	if GameData.LOCATIONS.has(resolved):
+		return str(GameData.LOCATIONS[resolved].name)
+	return "当前地点"
+
 func equip_card(item_id):
 	if int(inventory.get(item_id, 0)) <= 0:
 		return {"ok": false, "message": "你还没有这张怪物卡。"}
@@ -1034,7 +1132,9 @@ func _advance_quest(action_type, target, amount = 1):
 		return false
 	var was_complete = quest_can_claim()
 	var objective = quest.objective
-	if objective.type == action_type and objective.target == target:
+	var required_location = str(objective.get("location", ""))
+	var at_required_location = required_location == "" or str(player.location) == required_location
+	if objective.type == action_type and objective.target == target and at_required_location:
 		quest_progress = min(int(objective.need), quest_progress + amount)
 	return not was_complete and quest_can_claim()
 
@@ -1399,6 +1499,11 @@ func sell_cargo(good_id, amount = 1):
 	if int(cargo.get(good_id, 0)) <= 0 or not GameData.TRADE_GOODS.has(good_id):
 		return {"ok": false, "message": "货舱中没有这种货物。"}
 	var good = GameData.TRADE_GOODS[good_id]
+	var current_quest = get_current_quest()
+	var required_sale_port = ""
+	if not current_quest.is_empty() and str(current_quest.objective.type) == "trade_sell" and str(current_quest.objective.target) == str(good_id):
+		required_sale_port = str(current_quest.objective.get("location", ""))
+	var wrong_quest_port = required_sale_port != "" and str(player.location) != required_sale_port
 	var price = trade_sell_price(good_id)
 	var old_count = int(cargo[good_id])
 	var actual_amount = min(max(1, int(amount)), old_count)
@@ -1423,7 +1528,10 @@ func sell_cargo(good_id, amount = 1):
 	message_history.push_front("在%s卖出%d%s%s。" % [GameData.TRADE_PORTS[player.location].name, actual_amount, good.unit, good.name])
 	_trim_history()
 	save_game()
-	return {"ok": true, "message": "卖出%s×%d，收入%d银币｜实际盈亏%+d" % [good.name, actual_amount, total, realized_profit], "price": price, "amount": actual_amount, "total": total, "realized_profit": realized_profit, "quest_completed": quest_completed}
+	var sale_message = "卖出%s×%d，收入%d银币｜实际盈亏%+d" % [good.name, actual_amount, total, realized_profit]
+	if wrong_quest_port:
+		sale_message += "\n主线要求在%s出售，本次交易不计入任务进度。" % GameData.TRADE_PORTS[required_sale_port].name
+	return {"ok": true, "message": sale_message, "price": price, "amount": actual_amount, "total": total, "realized_profit": realized_profit, "quest_completed": quest_completed, "wrong_quest_port": wrong_quest_port}
 
 func buy_max_cargo(good_id):
 	return buy_cargo(good_id, max_buyable_cargo(good_id))

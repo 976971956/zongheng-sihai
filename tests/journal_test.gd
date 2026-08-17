@@ -36,6 +36,17 @@ func _run():
 	scene._open_quest_detail()
 	_check(_has_text(scene.modal_layer, "扬帆拉古萨") and _has_text(scene.modal_layer, "第一卷·潮汐纪事") and _has_text(scene.modal_layer, "剧情回顾") and _has_text(scene.modal_layer, "400 经验"), "完整日志必须显示分卷章节进度与剧情回顾，并安全显示无道具奖励的任务")
 	scene._close_modal()
+	scene.state.quest_index = 9
+	scene.state.quest_progress = 0
+	scene.state.cargo = {"venetian_glass": 2}
+	scene._open_quest_detail()
+	_check(_has_text(scene.modal_layer, "行动清单") and _has_text(scene.modal_layer, "拉古萨港") and _has_text(scene.modal_layer, "卖出威尼斯玻璃×2"), "完整日志必须根据实时货舱生成玻璃商路行动清单，不能沿用错误手写路线")
+	scene._close_modal()
+	scene.state.quest_index = 31
+	scene.state.cargo = {}
+	scene._open_quest_detail()
+	_check(_has_text(scene.modal_layer, "亚得里亚橄榄油") and _has_text(scene.modal_layer, "产地拉古萨港") and _has_text(scene.modal_layer, "亚历山大香料") and _has_text(scene.modal_layer, "产地亚历山大港") and _has_text(scene.modal_layer, "金岛柑橘"), "料理任务行动清单必须逐项显示真实跨港采购地")
+	scene._close_modal()
 
 	scene.state.inventory["ghost_card"] = 1
 	scene.state.inventory["warrior_blade"] = 1

@@ -5,10 +5,15 @@ class TestState extends GameState:
 		pass
 
 const RUNS = 30
+const RECOVERY_RUNS = 20
 var failures = []
 var milestone_losses = {}
 
 func _init():
+	for seed_value in range(301, 301 + RECOVERY_RUNS):
+		_run_early_hunting_loop(seed_value, GameState.DIFFICULTY_NORMAL)
+	for seed_value in range(601, 601 + RECOVERY_RUNS):
+		_run_early_hunting_loop(seed_value, GameState.DIFFICULTY_ADVENTURE)
 	for seed_value in range(1001, 1001 + RUNS):
 		_run_normal_player(seed_value, GameState.DIFFICULTY_NORMAL)
 	for seed_value in range(2001, 2001 + RUNS):
@@ -18,12 +23,32 @@ func _init():
 		total_losses += int(count)
 	_check(total_losses == 0, "标准成长路线在普通、冒险各%d次随机压测中不应出现无法继续的必败节点：%s" % [RUNS, str(milestone_losses)])
 	if failures.is_empty():
-		print("PLAYABILITY_OK: 普通、冒险各%d次十三卷完整成长压测全部通过，十三座副本与终局远征无卡关" % RUNS)
+		print("PLAYABILITY_OK: 普通、冒险各%d次连续狩猎与各%d次十三卷完整成长压测全部通过" % [RECOVERY_RUNS, RUNS])
 		quit(0)
 	else:
 		for failure in failures:
 			push_error(failure)
 		quit(1)
+
+func _run_early_hunting_loop(seed_value, difficulty_mode):
+	var state = TestState.new()
+	state.rng.seed = seed_value
+	state.set_difficulty(str(difficulty_mode))
+	for quest_id in ["scale_memory", "to_tavern", "tavern_clue"]:
+		_complete_current_quest(state, quest_id)
+	state.player.location = "venice_north_gate"
+	for _index in range(3):
+		if not _fight(state, "drunk_sailor"):
+			_record_loss("continuous_hunt/%s/north_gate" % difficulty_mode)
+			return
+	_complete_current_quest(state, "north_gate")
+	state.equip_recommended()
+	state.player.location = "venice_mine"
+	for _index in range(3):
+		if not _fight(state, "mine_thief"):
+			_record_loss("continuous_hunt/%s/mine" % difficulty_mode)
+			return
+	_complete_current_quest(state, "stolen_ore")
 
 func _run_normal_player(seed_value, difficulty_mode):
 	var state = TestState.new()

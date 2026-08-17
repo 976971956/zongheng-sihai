@@ -1012,7 +1012,7 @@ const EARLY_QUESTS = [
 	{"id": "four_floor_trial", "title": "四层试炼", "story": "进入北城门的经验副本，登上第四层并击败朱雀幻影。", "objective": {"type": "kill", "target": "vermilion_phantom", "need": 1}, "reward": {"exp": 180, "silver": 160, "item": "lion_charm"}}
 	,{"id": "first_cargo", "title": "第一批货物", "story": "前往威尼斯码头，在市场买入两箱威尼斯玻璃。", "objective": {"type": "trade_buy", "target": "venetian_glass", "need": 2}, "reward": {"exp": 300, "silver": 80, "item": "small_milk"}}
 	,{"id": "sail_ragusa", "title": "扬帆拉古萨", "story": "驾驶海燕号抵达拉古萨，熟悉第一条跨港航线。", "objective": {"type": "visit", "target": "ragusa_dock", "need": 1}, "reward": {"exp": 400, "silver": 100}}
-	,{"id": "sell_glass", "title": "玻璃商路", "story": "在拉古萨出售两箱威尼斯玻璃，完成第一笔远洋生意。", "objective": {"type": "trade_sell", "target": "venetian_glass", "need": 2}, "reward": {"exp": 600, "silver": 140, "item": "unknown_equipment"}}
+	,{"id": "sell_glass", "title": "玻璃商路", "story": "在拉古萨出售两箱威尼斯玻璃，完成第一笔远洋生意。", "objective": {"type": "trade_sell", "target": "venetian_glass", "location": "ragusa_dock", "need": 2}, "reward": {"exp": 600, "silver": 140, "item": "unknown_equipment"}}
 	,{"id": "forge_for_sea", "title": "远洋武装", "story": "使用贸易赚得的银币，将手持武器强化一次。", "objective": {"type": "upgrade_equipment", "target": "weapon", "need": 1}, "reward": {"exp": 800, "silver": 180, "item": "universal_medicine"}}
 	,{"id": "armor_the_swallow", "title": "加固海燕号", "story": "升级一次船体护甲，为危险航线做好准备。", "objective": {"type": "upgrade_ship", "target": "armor", "need": 1}, "reward": {"exp": 1000, "silver": 220}}
 	,{"id": "black_sail_clue", "title": "黑帆密令", "story": "根据商会提供的线索，进入黑帆据点外围码头。", "objective": {"type": "visit", "target": "black_sail_1", "need": 1}, "reward": {"exp": 1200, "silver": 160, "item": "small_milk"}}
@@ -1023,7 +1023,7 @@ const EARLY_QUESTS = [
 	,{"id": "return_chart", "title": "黑帆海图", "story": "将从雷蒙手中夺回的黑帆海图带给老海鸥酒馆老板。", "objective": {"type": "talk", "target": "tavern_keeper", "need": 1}, "reward": {"exp": 0, "silver": 260, "item": "stamina_tonic"}}
 	,{"id": "alisa_truth", "title": "潮汐中的名字", "story": "回到海边小屋见艾丽莎，听她说出一直隐瞒的真相。", "objective": {"type": "talk", "target": "alisa", "need": 1}, "reward": {"exp": 0, "silver": 320, "item": "tide_seal", "title": "潮汐追迹者"}}
 	,{"id": "lighthouse_letter", "title": "灯塔来信", "story": "第一卷之后，酒馆老板收到萨米尔的密信。回酒馆确认灯塔异象。", "objective": {"type": "talk", "target": "tavern_keeper", "need": 1}, "reward": {"exp": 1800, "silver": 260}}
-	,{"id": "sail_lighthouse", "title": "驶向灯塔港", "story": "备好三箱威尼斯玻璃，驾驶海燕号抵达亚历山大。", "objective": {"type": "visit", "target": "alexandria_dock", "need": 1}, "reward": {"exp": 2200, "silver": 300}}
+	,{"id": "sail_lighthouse", "title": "驶向灯塔港", "story": "备好三箱威尼斯玻璃，驾驶海燕号抵达亚历山大。", "objective": {"type": "visit", "target": "alexandria_dock", "cargo": {"venetian_glass": 3}, "need": 1}, "reward": {"exp": 2200, "silver": 300}}
 	,{"id": "samir_testimony", "title": "香料商的证词", "story": "在亚历山大港寻找萨米尔，询问艾丽莎父亲与潮门的秘密。", "objective": {"type": "talk", "target": "alexandria_merchant", "need": 1}, "reward": {"exp": 2600, "silver": 340}}
 	,{"id": "lighthouse_repairs", "title": "修缮灯塔镜室", "story": "到亚历山大灯塔港码头寻找商会执事莱拉，交付三箱威尼斯玻璃，换取第一枚商会印记。", "objective": {"type": "trade_order", "target": "alexandria_lighthouse_glass", "need": 1}, "reward": {"exp": 3000, "silver": 380}}
 	,{"id": "ragusa_nightwatch", "title": "石墙港的灯火", "story": "把四桶橄榄油送到拉古萨，为守夜人补足灯油。", "objective": {"type": "trade_order", "target": "ragusa_lamp_oil", "need": 1}, "reward": {"exp": 3400, "silver": 420}}
@@ -1192,7 +1192,12 @@ static func objective_name(objective):
 		"talk": return NPCS[objective.target].name
 		"visit": return LOCATIONS[objective.target].name
 		"trade_buy": return "买入%s" % TRADE_GOODS[objective.target].name
-		"trade_sell": return "卖出%s" % TRADE_GOODS[objective.target].name
+		"trade_sell":
+			var action = "卖出%s" % TRADE_GOODS[objective.target].name
+			var required_port = str(objective.get("location", ""))
+			if required_port in TRADE_PORTS:
+				action = "在%s%s" % [TRADE_PORTS[required_port].name, action]
+			return action
 		"upgrade_equipment": return "强化%s" % SLOT_NAMES[objective.target]
 		"upgrade_ship": return "升级船体护甲"
 		"trade_order": return "交付%s" % TRADE_ORDERS.get(str(objective.target), {"title": "港口订单"}).title
