@@ -872,7 +872,8 @@ func _process(delta):
 			footstep_timer = 0.34
 	else:
 		footstep_timer = min(footstep_timer, 0.08)
-	player_actor.set_motion(direction if direction.length() > 0.05 else Vector2.ZERO)
+	var motion_intensity = clamp(float(state.ship_speed_profile().knots) / 12.5, 0.35, 1.0) if current_region == "sea" else 1.0
+	player_actor.set_motion(direction if direction.length() > 0.05 else Vector2.ZERO, motion_intensity)
 	_update_camera(delta)
 	_update_nearest_actor()
 	if current_region == "sea":

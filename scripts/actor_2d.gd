@@ -121,6 +121,10 @@ var motion_direction = Vector2.ZERO
 var walk_time = 0.0
 var last_facing = "down"
 var ship_hull_id = "sea_swallow"
+var ship_target_heading = 0.0
+var ship_motion_blend = 0.0
+var ship_turn_lean = 0.0
+var ship_throttle = 1.0
 
 func _ready():
 	_refresh_art_sprite()
@@ -149,18 +153,25 @@ func _process(delta):
 				walk_time += delta
 			_update_player_walk_sprite(moving)
 		elif display_id == "player_ship":
-			art_sprite.position.y = sin(bob_time * 3.1) * 2.0
-			art_sprite.rotation = 0.0
+			_update_player_ship_motion(delta, moving)
 		else:
 			art_sprite.position.y = sin(bob_time * (7.5 if moving else 2.7)) * (2.2 if moving else 1.35)
 			art_sprite.rotation = sin(bob_time * 7.5) * 0.018 if moving else 0.0
 	queue_redraw()
 
-func set_motion(direction):
+func set_motion(direction, intensity = 1.0):
 	motion_direction = Vector2(direction)
-	if display_id == "player_ship" or display_id in SEA_PIRATE_IDS:
+	if display_id == "player_ship":
 		if motion_direction.length() > 0.05:
-			rotation = motion_direction.angle() + PI * 0.5
+			# 船体图集船首朝下，因此目标航向要减去 DOWN 的角度。旧逻辑加
+			# PI/2 会让船首与航行方向正好相反，看起来像贴图倒着平移。
+			ship_target_heading = motion_direction.angle() - PI * 0.5
+			ship_throttle = clamp(float(intensity), 0.35, 1.0)
+			ship_motion_blend = max(ship_motion_blend, ship_throttle * 0.08)
+		return
+	if display_id in SEA_PIRATE_IDS:
+		if motion_direction.length() > 0.05:
+			rotation = motion_direction.angle() - PI * 0.5
 		return
 	if display_id == "player":
 		if motion_direction.length() > 0.05:
@@ -171,6 +182,28 @@ func set_motion(direction):
 		return
 	if is_instance_valid(art_sprite) and abs(motion_direction.x) > 0.05:
 		art_sprite.flip_h = motion_direction.x < 0.0
+
+func _update_player_ship_motion(delta, moving):
+	var target_motion = ship_throttle if moving else 0.0
+	var blend_rate = 2.7 if moving else 1.55
+	ship_motion_blend = move_toward(ship_motion_blend, target_motion, float(delta) * blend_rate)
+	var previous_heading = rotation
+	if moving:
+		var turn_response = 1.0 - exp(-float(delta) * (4.2 + ship_motion_blend * 2.4))
+		rotation = lerp_angle(rotation, ship_target_heading, turn_response)
+	var heading_delta = wrapf(rotation - previous_heading, -PI, PI)
+	var target_lean = clamp(heading_delta / max(0.001, float(delta)) * 0.18, -1.0, 1.0) if moving else 0.0
+	ship_turn_lean = lerp(ship_turn_lean, target_lean, 1.0 - exp(-float(delta) * 5.0))
+
+	# 贴图本身保持清晰，只用极小的非均匀缩放、错切和位移模拟船体在
+	# 浪峰上的俯仰与侧倾；不会改变碰撞或实际航速。
+	var heave = sin(bob_time * (2.45 + ship_motion_blend * 0.55)) * (1.6 + ship_motion_blend * 1.5)
+	var swell_roll = sin(bob_time * 1.72 + 0.8) * (0.42 + ship_motion_blend * 0.58)
+	var roll = clamp(swell_roll * 0.42 + ship_turn_lean * 0.82, -1.0, 1.0)
+	art_sprite.position = Vector2(roll * 2.2, heave)
+	art_sprite.rotation = roll * 0.032
+	art_sprite.skew = -roll * 0.026
+	art_sprite.scale = Vector2(0.50 * (1.0 + abs(roll) * 0.035), 0.50 * (1.0 - abs(roll) * 0.022 + sin(bob_time * 2.45) * 0.012))
 
 func _refresh_art_sprite():
 	if is_instance_valid(art_sprite):
@@ -334,12 +367,40 @@ func _draw_ship():
 	draw_set_transform(Vector2.ZERO)
 
 func _draw_player_ship_marker():
-	var bob = sin(bob_time * 3.1) * 2.0
-	draw_set_transform(Vector2(0, bob))
-	draw_ellipse_shadow(Vector2(0, 23), Vector2(43, 14), Color(0.005, 0.02, 0.025, 0.34))
+	var bob = sin(bob_time * (2.45 + ship_motion_blend * 0.55)) * (1.6 + ship_motion_blend * 1.5)
+	_draw_ship_wake()
+	# 投影与船体错开并随浪高轻微压缩，让船体看起来浮在水面之上。
+	var shadow_squash = 1.0 - abs(bob) * 0.025
+	draw_ellipse_shadow(Vector2(-ship_turn_lean * 3.0, 23.0 + bob * 0.18), Vector2(43.0 * shadow_squash, 14.0 * shadow_squash), Color(0.005, 0.02, 0.025, 0.32))
+	if ship_motion_blend > 0.06:
+		var spray_alpha = 0.18 + ship_motion_blend * 0.42
+		draw_arc(Vector2.ZERO, 34.0, 0.32, PI - 0.32, 18, Color(0.72, 0.96, 1.0, spray_alpha), 3.0 + ship_motion_blend * 2.0)
+		draw_circle(Vector2(-22, 25), 2.2 + ship_motion_blend * 1.8, Color(0.82, 0.98, 1.0, spray_alpha * 0.8))
+		draw_circle(Vector2(22, 25), 2.2 + ship_motion_blend * 1.8, Color(0.82, 0.98, 1.0, spray_alpha * 0.8))
 	if selected:
 		draw_arc(Vector2(0, 5), 54.0, 0.0, TAU, 40, Color("f6d778"), 4.0)
-	draw_set_transform(Vector2.ZERO)
+
+func _draw_ship_wake():
+	if ship_motion_blend <= 0.015:
+		return
+	var wake_length = 40.0 + ship_motion_blend * 82.0
+	var foam = Color(0.72, 0.96, 1.0, 0.12 + ship_motion_blend * 0.43)
+	var deep_foam = Color(0.30, 0.82, 0.90, 0.08 + ship_motion_blend * 0.25)
+	for side in [-1.0, 1.0]:
+		var wake_points = PackedVector2Array()
+		for step in range(8):
+			var progress = float(step) / 7.0
+			var spread = 13.0 + progress * (25.0 + ship_motion_blend * 16.0)
+			var ripple = sin(bob_time * 4.0 - progress * 7.0) * (1.0 + progress * 3.0)
+			wake_points.append(Vector2(side * spread + side * ripple, -16.0 - wake_length * progress))
+		draw_polyline(wake_points, deep_foam, 8.0, true)
+		draw_polyline(wake_points, foam, 2.6 + ship_motion_blend * 1.8, true)
+	# 尾流中间的断续亮纹让速度可读，同时避免整块白色三角形的贴纸感。
+	for trail in range(5):
+		var progress = (float(trail) + 0.35 + fmod(bob_time * 0.65, 1.0)) / 5.6
+		var trail_y = -25.0 - wake_length * progress
+		var half_width = 7.0 + progress * 20.0
+		draw_arc(Vector2(0, trail_y), half_width, PI * 0.12, PI * 0.88, 12, Color(0.78, 0.97, 1.0, (1.0 - progress) * 0.24 * ship_motion_blend), 2.2)
 
 func draw_ellipse_shadow(center, radii, color):
 	draw_set_transform(center, 0.0, Vector2(1.0, float(radii.y) / float(radii.x)))

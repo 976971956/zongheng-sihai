@@ -625,6 +625,14 @@ func _run():
 	hull_model.set_ship_hull("alex_caravel")
 	var purchased_hull_art = _actor_art_signature(hull_model)
 	_check("player_ship_atlas_v1" in starter_hull_art and "player_ship_atlas_v1" in purchased_hull_art and starter_hull_art != purchased_hull_art, "航海大地图船只必须根据玩家购买的船体切换独立模型")
+	hull_model.set_motion(Vector2.RIGHT)
+	hull_model._process(0.18)
+	_check(hull_model.ship_target_heading < -1.5 and hull_model.rotation < -0.05 and hull_model.rotation > hull_model.ship_target_heading and hull_model.ship_motion_blend > 0.1, "船首必须朝实际航向平滑转舵，不能继续反向或瞬间旋转")
+	_check(abs(hull_model.art_sprite.skew) > 0.001 and hull_model.art_sprite.position.length() > 0.1, "航行船体必须产生波浪俯仰、转弯侧倾与位移反馈，不能只做平面贴图滑动")
+	var moving_wake_strength = hull_model.ship_motion_blend
+	hull_model.set_motion(Vector2.ZERO)
+	hull_model._process(0.50)
+	_check(hull_model.ship_motion_blend < moving_wake_strength, "停船后尾浪必须逐渐消退，不能保持全速航行效果")
 	hull_model.queue_free()
 	var capacity_before_hold = ship_state.cargo_capacity()
 	ship_state.player.silver = 1000
