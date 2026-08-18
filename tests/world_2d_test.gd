@@ -550,7 +550,7 @@ func _run():
 	_check(not scene.sailing_map.port_buttons["amsterdam_dock"].disabled, "主线完成后九座港口必须全部在海图上解锁")
 	scene.sailing_map.select_port("venice_dock")
 	var selected_voyage_distance = int(GameData.trade_route("alexandria_dock", "venice_dock").distance_nm)
-	_check("亚历山大" in scene.sailing_route_label.text and "威尼斯" in scene.sailing_route_label.text and ("%d海里" % selected_voyage_distance) in scene.sailing_route_label.text and "8.0节" in scene.sailing_route_label.text and "九港大地图" in scene.sailing_route_label.text and "航经" in scene.sailing_route_label.text and "威胁情报" in scene.sailing_route_label.text and "当前等级偏低" in scene.sailing_route_label.text and "正常出航免费" in scene.sailing_route_label.text and "付费传送" in scene.sailing_route_label.text and not scene.sailing_confirm_button.disabled, "选择港口后必须显示动态距离、船体与帆装合成船速、九港大地图、途经海域与威胁")
+	_check("亚历山大" in scene.sailing_route_label.text and "威尼斯" in scene.sailing_route_label.text and ("%d海里" % selected_voyage_distance) in scene.sailing_route_label.text and "8.0节" in scene.sailing_route_label.text and "九港大地图" in scene.sailing_route_label.text and "航经" in scene.sailing_route_label.text and "威胁情报" in scene.sailing_route_label.text and "动态建议Lv." in scene.sailing_route_label.text and "随角色与任务阶段匹配" in scene.sailing_route_label.text and "正常出航免费" in scene.sailing_route_label.text and "付费传送" in scene.sailing_route_label.text and not scene.sailing_confirm_button.disabled, "选择港口后必须显示动态距离、船体与帆装合成船速、九港大地图、途经海域与动态威胁")
 	var origin_before_departure = str(scene.state.player.location)
 	var silver_before_departure = int(scene.state.player.silver)
 	scene._start_sailing_voyage()

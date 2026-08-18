@@ -1197,6 +1197,7 @@ func _show_battle_screen(result = {}):
 		bars.add_child(_battle_health_block("%s Lv.%d" % [current.enemy_name, int(current.get("enemy_level", 1))], int(current.enemy_hp), int(current.enemy_max_hp), RED))
 		if bool(current.get("sea_battle", false)):
 			content.add_child(_label("座舰海战加成｜攻击%d · 防御%d · 舰炮%d" % [int(current.get("player_attack", 0)), int(current.get("player_defense", 0)), int(current.get("ship_cannon_power", 0))], 11, TEAL))
+			content.add_child(_label("%s动态威胁｜等级随角色与任务匹配 · 装备掉落：%s" % [str(current.get("sea_zone_name", "未知海域")), str(current.get("loot_tier_name", "航海装备"))], 11, GOLD))
 		var status_text = "状态：正常"
 		if not current.statuses.is_empty():
 			var status_parts = []

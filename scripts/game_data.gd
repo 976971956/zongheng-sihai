@@ -676,6 +676,13 @@ const SEA_ZONE_RISK = {
 	"africa": 3, "indian_ocean": 5, "east_asia": 2
 }
 
+# 海域决定敌群与同级强度，敌人的最终等级仍会结合玩家等级和当前主线阶段。
+# 偏移保持在小范围内，避免跨过海域边界时出现无法预警的难度断层。
+const SEA_ZONE_LEVEL_OFFSETS = {
+	"mediterranean": -2, "north_sea": 1, "atlantic": 2,
+	"africa": 1, "indian_ocean": 2, "east_asia": 0
+}
+
 const SEA_ZONE_ENEMIES = {
 	"mediterranean": ["coastal_pirate", "reef_serpent", "ocean_raider"],
 	"north_sea": ["drowned_sailor", "fog_siren", "ocean_raider", "black_flag_privateer"],
@@ -693,6 +700,43 @@ const SEA_ZONE_SIGNATURE_ENEMIES = {
 	"indian_ocean": ["reef_serpent", "wreck_crab", "abyss_kraken"],
 	"east_asia": ["reef_serpent", "fog_siren"]
 }
+
+const SEA_ENEMY_LEVEL_OFFSETS = {
+	"coastal_pirate": -2, "reef_serpent": 0, "wreck_crab": 0,
+	"drowned_sailor": 0, "ocean_raider": 1, "fog_siren": 1,
+	"abyss_kraken": 3, "black_flag_privateer": 4
+}
+
+# 航海掉落只使用通用装备和航海套装。主线 Boss 的唯一遗物不进入随机池。
+const SEA_EQUIPMENT_TIERS = [
+	{"min_level": 1, "name": "近海水手装", "items": ["linen_cap", "traveler_boots", "bronze_charm", "guard_belt", "spider_knife"]},
+	{"min_level": 10, "name": "武士套装", "items": ["warrior_blade", "warrior_coat", "warrior_circlet", "warrior_belt", "warrior_boots"]},
+	{"min_level": 22, "name": "黑帆征服套", "items": ["corsair_cutlass", "gunner_coat", "captain_hat", "black_sail_charm"]},
+	{"min_level": 36, "name": "白鲸遗航套", "items": ["whale_bone_sabre", "survivor_coat", "siren_charm", "white_whale_coat"]},
+	{"min_level": 52, "name": "七海巡游套", "items": ["stormsteel_cutlass", "stormwatch_coat", "chartmaster_hat", "leviathan_belt", "monsoon_boots"]}
+]
+
+const SEA_ZONE_PREFERRED_SLOTS = {
+	"mediterranean": "charm", "north_sea": "head", "atlantic": "body",
+	"africa": "waist", "indian_ocean": "boots", "east_asia": "weapon"
+}
+
+static func sea_equipment_tier(threat_level):
+	var resolved = Dictionary(SEA_EQUIPMENT_TIERS.front())
+	for tier in SEA_EQUIPMENT_TIERS:
+		if int(threat_level) >= int(tier.min_level):
+			resolved = Dictionary(tier)
+	return resolved
+
+static func sea_equipment_pool(zone_id, threat_level):
+	var tier = sea_equipment_tier(threat_level)
+	var pool = Array(tier.items).duplicate()
+	var preferred_slot = str(SEA_ZONE_PREFERRED_SLOTS.get(str(zone_id), ""))
+	for item_id in Array(tier.items):
+		if str(ITEMS.get(str(item_id), {}).get("slot", "")) == preferred_slot:
+			# 重复加入代表海域偏好，不会改变装备阶位。
+			pool.append(str(item_id))
+	return pool
 
 static func sea_zone_for_port(port_id):
 	return str(PORT_NAVIGATION.get(str(port_id), {}).get("zone", "mediterranean"))
@@ -875,6 +919,14 @@ const EQUIPMENT_SETS = {
 			{"pieces": 3, "stats": {"attack": 12, "speed": 6}, "text": "攻击+12、速度+6"}
 		]
 	},
+	"seven_seas": {
+		"name": "七海巡游套", "total": 5,
+		"bonuses": [
+			{"pieces": 2, "stats": {"max_hp": 70, "defense": 10}, "text": "体力+70、防御+10"},
+			{"pieces": 4, "stats": {"attack": 18, "speed": 10}, "drop_bonus": 0.10, "text": "攻击+18、速度+10、寻宝+10%"},
+			{"pieces": 5, "stats": {"max_hp": 120, "attack": 16, "defense": 16}, "text": "体力+120、攻击+16、防御+16"}
+		]
+	},
 	"earth_legacy": {
 		"name": "地魔遗珍套", "total": 6,
 		"bonuses": [
@@ -938,6 +990,11 @@ const ITEMS = {
 	,"demon_crown": {"name": "九港守夜冠", "type": "equipment", "slot": "head", "rarity": "神话", "set": "tidekeeper", "description": "九港居民共同重铸的王冠，不属于任何一位国王。", "stats": {"max_hp": 210, "attack": 32, "defense": 48, "speed": 25}, "price": 10200}
 	,"divine_shears": {"name": "天工神剪", "type": "equipment", "slot": "weapon", "rarity": "神话", "set": "tidekeeper", "description": "能剪断谎言，也能把破裂的命运重新裁合。", "stats": {"max_hp": 160, "attack": 78, "defense": 20, "speed": 29}, "price": 11800}
 	,"tidekeeper_regalia": {"name": "四海守潮圣装", "type": "equipment", "slot": "body", "rarity": "唯一", "set": "tidekeeper", "description": "十三卷航海日志与九港誓言共同织成的最终圣装。", "stats": {"max_hp": 420, "attack": 42, "defense": 72, "speed": 32}, "price": 15000}
+	,"stormsteel_cutlass": {"name": "风暴钢弯刀", "type": "equipment", "slot": "weapon", "rarity": "传说", "set": "seven_seas", "description": "由九港船匠共同锻造的巡海弯刀，适合中后期远洋战斗。", "stats": {"attack": 43, "defense": 5, "speed": 12}, "price": 3450}
+	,"stormwatch_coat": {"name": "守风者航海衣", "type": "equipment", "slot": "body", "rarity": "传说", "set": "seven_seas", "description": "多层油布与锁片缝合的远洋护衣，能抵御风暴和接舷箭雨。", "stats": {"max_hp": 165, "defense": 34, "speed": 8}, "price": 3720}
+	,"chartmaster_hat": {"name": "星图师船帽", "type": "equipment", "slot": "head", "rarity": "传说", "set": "seven_seas", "description": "帽檐刻着六大海域的星位，浓雾中也能辨清方向。", "stats": {"max_hp": 82, "attack": 9, "defense": 19, "speed": 15}, "price": 3280}
+	,"leviathan_belt": {"name": "镇浪龙骨带", "type": "equipment", "slot": "waist", "rarity": "传说", "set": "seven_seas", "description": "嵌入旧船龙骨碎片的宽腰带，接舷时稳如甲板桩。", "stats": {"max_hp": 105, "attack": 12, "defense": 22, "speed": 7}, "price": 3360}
+	,"monsoon_boots": {"name": "季风踏浪靴", "type": "equipment", "slot": "boots", "rarity": "传说", "set": "seven_seas", "description": "鞋底会顺着季风潮向发亮，是远洋巡游者的标志。", "stats": {"max_hp": 76, "defense": 15, "speed": 29}, "price": 3540}
 	,"dragon_spring_water": {"name": "龙泉水", "type": "material", "rarity": "锻造材料", "description": "装备强化至+4以上时用于稳定潮纹。", "price": 120}
 	,"forging_blueprint": {"name": "强化图纸", "type": "material", "rarity": "锻造材料", "description": "装备强化至+8以上时必须使用的通用图纸。", "price": 260}
 }

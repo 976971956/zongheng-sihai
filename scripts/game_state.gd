@@ -686,6 +686,58 @@ func enemy_respawn_remaining(enemy_id):
 	var deadline = float(enemy_respawns.get(str(enemy_id), 0.0))
 	return max(0.0, deadline - float(Time.get_unix_time_from_system()))
 
+func story_recommended_sea_level():
+	var current_quest = clamp(int(quest_index), 0, GameData.QUESTS.size())
+	if current_quest < 7:
+		return 3
+	if current_quest < 19:
+		return 8
+	if current_quest < 28:
+		return 16
+	if current_quest < 38:
+		return 24
+	var recommended = 30
+	for expedition_id in GameData.EXPEDITIONS:
+		var expedition = Dictionary(GameData.EXPEDITIONS[expedition_id])
+		if current_quest >= int(expedition.quest_start):
+			recommended = max(recommended, int(expedition.min_level))
+	return recommended
+
+func sea_encounter_level(enemy_id, zone_id):
+	var player_level = max(1, int(player.level))
+	var story_level = story_recommended_sea_level()
+	# 角色等级占主导，主线阶段负责防止压级刷穿或过早进入高危海域。
+	var blended = int(round(float(player_level) * 0.72 + float(story_level) * 0.28))
+	var matched_base = clamp(blended, max(1, player_level - 2), player_level + 3)
+	var zone_offset = int(GameData.SEA_ZONE_LEVEL_OFFSETS.get(str(zone_id), 0))
+	var enemy_offset = int(GameData.SEA_ENEMY_LEVEL_OFFSETS.get(str(enemy_id), 0))
+	return clamp(matched_base + zone_offset + enemy_offset, max(1, player_level - 5), min(GameData.MAX_LEVEL, player_level + 6))
+
+func _scaled_sea_enemy_profile(enemy_id, threat_level):
+	var profile = Dictionary(GameData.ENEMIES[str(enemy_id)]).duplicate(true)
+	var base_level = max(1, int(profile.level))
+	var resolved_level = clamp(int(threat_level), 1, GameData.MAX_LEVEL)
+	var scale = max(0.18, float(resolved_level + 7) / float(base_level + 7))
+	profile.level = resolved_level
+	profile.hp = max(30, int(round(float(profile.hp) * pow(scale, 1.30))))
+	profile.attack = max(7, int(round(float(profile.attack) * pow(scale, 1.05))))
+	profile.defense = max(1, int(round(float(profile.defense) * pow(scale, 1.02))))
+	profile.speed = max(4, int(round(float(profile.speed) * pow(scale, 0.78))))
+	profile.exp = max(18, int(round(float(profile.exp) * pow(scale, 1.12))))
+	var silver_scale = pow(scale, 0.92)
+	profile.silver = [
+		max(4, int(round(float(profile.silver[0]) * silver_scale))),
+		max(7, int(round(float(profile.silver[1]) * silver_scale)))
+	]
+	return profile
+
+func _battle_enemy_profile():
+	if active_battle.is_empty():
+		return {}
+	if active_battle.has("enemy_profile") and typeof(active_battle.enemy_profile) == TYPE_DICTIONARY:
+		return Dictionary(active_battle.enemy_profile)
+	return Dictionary(GameData.ENEMIES.get(str(active_battle.get("enemy_id", "")), {}))
+
 func start_battle(enemy_id):
 	if not GameData.ENEMIES.has(enemy_id):
 		return {"ok": false, "message": "敌人不存在。"}
@@ -700,10 +752,21 @@ func start_battle(enemy_id):
 		if active_battle.enemy_id == enemy_id:
 			return get_battle_view()
 		return {"ok": false, "message": "你正在与其他敌人战斗。"}
-	var enemy = GameData.ENEMIES[enemy_id]
+	var enemy = Dictionary(GameData.ENEMIES[enemy_id])
+	var sea_zone_id = ""
+	var loot_tier_name = ""
+	if sea_encounter:
+		var encounter = sea_encounter(str(active_voyage.get("current_encounter_id", "")))
+		sea_zone_id = str(encounter.get("zone_id", GameData.sea_zone_for_port(str(active_voyage.get("origin", player.location)))))
+		var threat_level = int(encounter.get("threat_level", sea_encounter_level(enemy_id, sea_zone_id)))
+		enemy = _scaled_sea_enemy_profile(enemy_id, threat_level)
+		loot_tier_name = str(GameData.sea_equipment_tier(threat_level).name)
 	var scaled_enemy_hp = difficulty_enemy_hp(int(enemy.hp))
 	active_battle = {
 		"enemy_id": enemy_id, "enemy_hp": scaled_enemy_hp, "enemy_max_hp": scaled_enemy_hp,
+		"enemy_profile": enemy, "sea_zone_id": sea_zone_id,
+		"sea_zone_name": str(GameData.SEA_REGIONS.get(sea_zone_id, {}).get("name", "")),
+		"loot_tier_name": loot_tier_name,
 		"round": 1, "focus": 0, "skill_prepared": false, "sea_battle": sea_encounter, "log": [enemy.intro]
 	}
 	player.battles += 1
@@ -715,7 +778,7 @@ func start_battle(enemy_id):
 func get_battle_view():
 	if active_battle.is_empty():
 		return {"ok": false, "message": "当前没有战斗。"}
-	var enemy = GameData.ENEMIES[active_battle.enemy_id]
+	var enemy = _battle_enemy_profile()
 	var combat_stats = get_battle_stats()
 	var sea_battle = bool(active_battle.get("sea_battle", false))
 	return {
@@ -728,6 +791,8 @@ func get_battle_view():
 		"ship_role": ship_role(), "ship_hull_id": str(ship.get("hull_id", "sea_swallow")), "ship_cannon_power": ship_cannon_power(),
 		"round": int(active_battle.round), "statuses": statuses.duplicate(), "logs": [],
 		"battle_stance": battle_stance, "enemy_intent": get_enemy_intent(),
+		"sea_zone_id": str(active_battle.get("sea_zone_id", "")), "sea_zone_name": str(active_battle.get("sea_zone_name", "")),
+		"loot_tier_name": str(active_battle.get("loot_tier_name", "")), "dynamic_threat": sea_battle,
 		"auto_heal_threshold": auto_heal_threshold, "auto_cure_status": auto_cure_status,
 		"focus": battle_focus(), "focus_max": 3, "difficulty": difficulty, "difficulty_name": difficulty_name()
 	}
@@ -753,7 +818,7 @@ func set_battle_stance(value):
 func get_enemy_intent():
 	if active_battle.is_empty():
 		return ""
-	var enemy = GameData.ENEMIES.get(str(active_battle.enemy_id), {})
+	var enemy = _battle_enemy_profile()
 	var special = enemy.get("special", {})
 	var every = int(special.get("every", 0))
 	if every > 0 and int(active_battle.round) % every == 0:
@@ -784,7 +849,7 @@ func attack_once():
 	if active_battle.is_empty():
 		return {"ok": false, "message": "当前没有战斗。"}
 	var enemy_id = active_battle.enemy_id
-	var enemy = GameData.ENEMIES[enemy_id]
+	var enemy = _battle_enemy_profile()
 	var stats = get_battle_stats()
 	var logs = []
 	var player_attack = int(stats.attack)
@@ -963,9 +1028,12 @@ func _tick_statuses():
 		statuses.erase(status_name)
 
 func _finish_battle_win(enemy_id, round_logs):
-	var enemy = GameData.ENEMIES[enemy_id]
+	var enemy = _battle_enemy_profile()
 	var defeated_enemy_max_hp = int(active_battle.get("enemy_max_hp", difficulty_enemy_hp(int(enemy.hp))))
 	var was_sea_battle = bool(active_battle.get("sea_battle", false))
+	var sea_zone_id = str(active_battle.get("sea_zone_id", ""))
+	var sea_zone_name = str(active_battle.get("sea_zone_name", ""))
+	var loot_tier_name = str(active_battle.get("loot_tier_name", ""))
 	var finishing_stance = battle_stance
 	player.victories += 1
 	player.hp = max(1, int(player.hp))
@@ -989,7 +1057,10 @@ func _finish_battle_win(enemy_id, round_logs):
 	var difficulty_drop_bonus = 0.10 if difficulty == DIFFICULTY_ADVENTURE else 0.0
 	var drop_chance = 1.0 if enemy.rank in ["首领", "副本 Boss"] else min(0.90, 0.22 + float(stats.drop_bonus) + stance_drop_bonus + difficulty_drop_bonus)
 	if rng.randf() <= drop_chance and enemy.drops.size() > 0:
-		drop_id = enemy.drops[rng.randi_range(0, enemy.drops.size() - 1)]
+		var drop_pool = Array(enemy.drops)
+		if was_sea_battle and rng.randf() <= 0.45:
+			drop_pool = GameData.sea_equipment_pool(sea_zone_id, int(enemy.level))
+		drop_id = str(drop_pool[rng.randi_range(0, drop_pool.size() - 1)])
 		_add_item(drop_id, 1)
 	round_logs.append("战斗胜利！获得%d经验、%d银币。" % [exp_reward, silver])
 	if drop_id != "":
@@ -1005,14 +1076,18 @@ func _finish_battle_win(enemy_id, round_logs):
 		"enemy_id": enemy_id, "enemy_name": enemy.name, "enemy_rank": enemy.rank, "enemy_level": int(enemy.level),
 		"enemy_hp": 0, "enemy_max_hp": defeated_enemy_max_hp, "player_level": int(player.level), "player_hp": int(player.hp), "player_max_hp": int(get_stats().max_hp),
 		"sea_battle": was_sea_battle, "combatant_name": str(ship.name) if was_sea_battle else str(player.name),
+		"sea_zone_id": sea_zone_id, "sea_zone_name": sea_zone_name, "loot_tier_name": loot_tier_name, "dynamic_threat": was_sea_battle,
 		"round": 0, "statuses": {}, "logs": round_logs,
 		"exp": exp_reward, "silver": silver, "drop": drop_id, "leveled": leveled, "new_level": int(player.level),
 		"quest_completed": quest_completed, "bounty_completed": bounty_completed, "battle_stance": finishing_stance
 	}
 
 func _finish_battle_loss(enemy_id, round_logs):
-	var enemy = GameData.ENEMIES[enemy_id]
+	var enemy = _battle_enemy_profile()
 	var was_sea_battle = bool(active_battle.get("sea_battle", false))
+	var sea_zone_id = str(active_battle.get("sea_zone_id", ""))
+	var sea_zone_name = str(active_battle.get("sea_zone_name", ""))
+	var loot_tier_name = str(active_battle.get("loot_tier_name", ""))
 	var voyage_origin = str(active_voyage.get("origin", ""))
 	var lost_at_sea = voyage_origin in GameData.TRADE_PORTS
 	var remaining_enemy_hp = int(active_battle.get("enemy_hp", enemy.hp))
@@ -1038,6 +1113,7 @@ func _finish_battle_loss(enemy_id, round_logs):
 		"enemy_hp": remaining_enemy_hp, "enemy_max_hp": defeated_enemy_max_hp, "player_level": int(player.level),
 		"player_hp": defeated_player_hp, "player_max_hp": int(get_stats().max_hp), "recovered_hp": recovered_hp, "round": 0, "statuses": {},
 		"sea_battle": was_sea_battle, "combatant_name": str(ship.name) if was_sea_battle else str(player.name),
+		"sea_zone_id": sea_zone_id, "sea_zone_name": sea_zone_name, "loot_tier_name": loot_tier_name, "dynamic_threat": was_sea_battle,
 		"logs": round_logs, "exp": 0, "silver": 0, "drop": "", "leveled": false, "new_level": int(player.level),
 		"return_port": voyage_origin if lost_at_sea else "venice_tavern", "lost_at_sea": lost_at_sea
 	}
@@ -1615,9 +1691,10 @@ func voyage_plan(port_id, origin_override = ""):
 	var zone_ids = Array(route.get("zone_ids", GameData.sea_zones_for_route(origin, destination)))
 	var enemy_plan = _voyage_enemy_roster(zone_ids, tier_id, threat_count)
 	var enemy_ids = Array(enemy_plan.enemy_ids)
+	var enemy_levels = Array(enemy_plan.enemy_levels)
 	var recommended_level = 1
-	for enemy_id in enemy_ids:
-		recommended_level = max(recommended_level, int(GameData.ENEMIES[str(enemy_id)].level))
+	for enemy_level in enemy_levels:
+		recommended_level = max(recommended_level, int(enemy_level))
 	return {
 		"origin": origin, "destination": destination,
 		"distance_nm": distance_nm, "tier": tier_id, "tier_name": str(tier.name),
@@ -1625,7 +1702,7 @@ func voyage_plan(port_id, origin_override = ""):
 		"speed_knots": float(speed_profile.knots), "nm_per_day": int(speed_profile.nm_per_day),
 		"world_speed": float(speed_profile.world_speed),
 		"stamina_cost": stamina_cost, "dive_chance": dive_chance,
-		"risk": risk, "threat_count": enemy_ids.size(), "enemy_ids": enemy_ids,
+		"risk": risk, "threat_count": enemy_ids.size(), "enemy_ids": enemy_ids, "enemy_levels": enemy_levels,
 		"enemy_zones": Array(enemy_plan.enemy_zones), "zone_ids": zone_ids,
 		"waters_text": str(route.get("waters_text", GameData.sea_waters_text(zone_ids))),
 		"recommended_level": recommended_level, "description": str(tier.description)
@@ -1700,12 +1777,16 @@ func _voyage_enemy_roster(zone_ids, tier_id, threat_count):
 		repeat_cursor += 1
 	for enemy_id in enemy_ids:
 		enemy_zones.append(str(candidate_zones.get(str(enemy_id), "mediterranean")))
-	return {"enemy_ids": enemy_ids, "enemy_zones": enemy_zones}
+	var enemy_levels = []
+	for index in range(enemy_ids.size()):
+		enemy_levels.append(sea_encounter_level(str(enemy_ids[index]), str(enemy_zones[index])))
+	return {"enemy_ids": enemy_ids, "enemy_zones": enemy_zones, "enemy_levels": enemy_levels}
 
 func _build_sea_encounters(plan):
 	var encounters = []
 	var enemy_ids = Array(plan.get("enemy_ids", []))
 	var enemy_zones = Array(plan.get("enemy_zones", []))
+	var enemy_levels = Array(plan.get("enemy_levels", []))
 	var zone_ids = Array(plan.get("zone_ids", []))
 	var lateral_offsets = [-260.0, 230.0, -150.0, 310.0, -330.0, 120.0, 360.0, -210.0, 180.0, -390.0, 285.0, -95.0]
 	var origin_position = GameData.sea_port_position(str(plan.origin))
@@ -1715,6 +1796,7 @@ func _build_sea_encounters(plan):
 	for index in range(enemy_ids.size()):
 		var enemy_id = str(enemy_ids[index])
 		var zone_id = str(enemy_zones[index]) if index < enemy_zones.size() else "mediterranean"
+		var threat_level = int(enemy_levels[index]) if index < enemy_levels.size() else sea_encounter_level(enemy_id, zone_id)
 		var progress = (float(index) + 1.0) / float(enemy_ids.size() + 1)
 		var lateral = lateral_offsets[index % lateral_offsets.size()]
 		var position = origin_position.lerp(destination_position, progress) + perpendicular * lateral
@@ -1723,7 +1805,8 @@ func _build_sea_encounters(plan):
 		encounters.append({
 			"id": "sea_%d" % (index + 1), "enemy_id": enemy_id,
 			"kind": "pirate" if enemy_id in ["coastal_pirate", "ocean_raider", "black_flag_privateer"] else "monster",
-			"zone_id": zone_id, "progress": progress,
+			"zone_id": zone_id, "threat_level": threat_level,
+			"loot_tier_name": str(GameData.sea_equipment_tier(threat_level).name), "progress": progress,
 			"x": position.x, "y": position.y, "defeated": false
 		})
 	return encounters
@@ -2214,8 +2297,7 @@ func _normalize_active_voyage():
 		active_voyage.zone_ids = Array(plan.zone_ids)
 	if not active_voyage.has("waters_text"):
 		active_voyage.waters_text = str(plan.waters_text)
-	if not active_voyage.has("recommended_level"):
-		active_voyage.recommended_level = int(plan.recommended_level)
+	active_voyage.recommended_level = int(plan.recommended_level)
 	if not active_voyage.has("stamina_cost"):
 		active_voyage.stamina_cost = int(plan.stamina_cost)
 	if not active_voyage.has("dive_chance"):
@@ -2267,6 +2349,18 @@ func _normalize_active_voyage():
 				migrated.defeated = bool(active_voyage.get("pirate_defeated", false)) or str(migrated.id) in defeated_ids
 				cleared.append(migrated)
 			active_voyage.encounters = cleared
+	else:
+		var normalized_encounters = []
+		for saved_encounter in Array(saved_encounters):
+			var normalized = Dictionary(saved_encounter)
+			var zone_id = str(normalized.get("zone_id", "mediterranean"))
+			var enemy_id = str(normalized.get("enemy_id", "coastal_pirate"))
+			if not normalized.has("threat_level"):
+				normalized.threat_level = sea_encounter_level(enemy_id, zone_id)
+			if not normalized.has("loot_tier_name"):
+				normalized.loot_tier_name = str(GameData.sea_equipment_tier(int(normalized.threat_level)).name)
+			normalized_encounters.append(normalized)
+		active_voyage.encounters = normalized_encounters
 	if not active_voyage.has("current_encounter_id"):
 		active_voyage.current_encounter_id = ""
 	if not active_voyage.has("escorted"):
@@ -2434,6 +2528,18 @@ func load_game():
 		active_battle = {}
 	elif not active_battle.is_empty() and not active_battle.has("sea_battle"):
 		active_battle.sea_battle = not active_voyage.is_empty() and bool(GameData.ENEMIES[str(active_battle.enemy_id)].get("sea_enemy", false))
+	if not active_battle.is_empty() and bool(active_battle.get("sea_battle", false)) and not active_battle.has("enemy_profile"):
+		var migrated_encounter = sea_encounter(str(active_voyage.get("current_encounter_id", "")))
+		var migrated_zone_id = str(migrated_encounter.get("zone_id", "mediterranean"))
+		var migrated_level = int(migrated_encounter.get("threat_level", sea_encounter_level(str(active_battle.enemy_id), migrated_zone_id)))
+		var old_max_hp = max(1, int(active_battle.get("enemy_max_hp", GameData.ENEMIES[str(active_battle.enemy_id)].hp)))
+		var old_hp_ratio = clamp(float(active_battle.get("enemy_hp", old_max_hp)) / float(old_max_hp), 0.0, 1.0)
+		active_battle.enemy_profile = _scaled_sea_enemy_profile(str(active_battle.enemy_id), migrated_level)
+		active_battle.enemy_max_hp = difficulty_enemy_hp(int(active_battle.enemy_profile.hp))
+		active_battle.enemy_hp = max(1, int(round(float(active_battle.enemy_max_hp) * old_hp_ratio)))
+		active_battle.sea_zone_id = migrated_zone_id
+		active_battle.sea_zone_name = str(GameData.SEA_REGIONS.get(migrated_zone_id, {}).get("name", ""))
+		active_battle.loot_tier_name = str(GameData.sea_equipment_tier(migrated_level).name)
 	if int(player.level) >= GameData.MAX_LEVEL:
 		player.level = GameData.MAX_LEVEL
 		player.xp = 0
