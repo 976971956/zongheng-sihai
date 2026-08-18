@@ -672,15 +672,24 @@ const SEA_REGIONS = {
 }
 
 const SEA_ZONE_RISK = {
-	"mediterranean": 0, "north_sea": 3, "atlantic": 5,
-	"africa": 3, "indian_ocean": 5, "east_asia": 2
+	"mediterranean": 0, "north_sea": 9, "atlantic": 6,
+	"africa": 3, "indian_ocean": 8, "east_asia": 7
 }
 
-# 海域决定敌群与同级强度，敌人的最终等级仍会结合玩家等级和当前主线阶段。
-# 偏移保持在小范围内，避免跨过海域边界时出现无法预警的难度断层。
+# 海域等级段是航海难度的第一约束；玩家和任务进度只在区间内修正强度。
+const SEA_BALANCE_VERSION = 2
+const SEA_ZONE_LEVEL_BANDS = {
+	"mediterranean": {"min": 5, "max": 24},
+	"africa": {"min": 22, "max": 42},
+	"atlantic": {"min": 32, "max": 64},
+	"indian_ocean": {"min": 38, "max": 80},
+	"east_asia": {"min": 42, "max": 96},
+	"north_sea": {"min": 55, "max": 96}
+}
+
 const SEA_ZONE_LEVEL_OFFSETS = {
-	"mediterranean": -2, "north_sea": 1, "atlantic": 2,
-	"africa": 1, "indian_ocean": 2, "east_asia": 0
+	"mediterranean": -6, "africa": -2, "atlantic": 2,
+	"indian_ocean": 5, "east_asia": 8, "north_sea": 12
 }
 
 const SEA_ZONE_ENEMIES = {
@@ -737,6 +746,18 @@ static func sea_equipment_pool(zone_id, threat_level):
 			# 重复加入代表海域偏好，不会改变装备阶位。
 			pool.append(str(item_id))
 	return pool
+
+static func sea_zone_level_band(zone_id):
+	return Dictionary(SEA_ZONE_LEVEL_BANDS.get(str(zone_id), SEA_ZONE_LEVEL_BANDS.mediterranean))
+
+static func sea_level_band_text(zone_ids):
+	var parts = []
+	for zone_id in Array(zone_ids):
+		var resolved_zone = str(zone_id)
+		var band = sea_zone_level_band(resolved_zone)
+		var region_name = str(SEA_REGIONS.get(resolved_zone, SEA_REGIONS.mediterranean).name)
+		parts.append("%s Lv.%d–%d" % [region_name, int(band.min), int(band.max)])
+	return " → ".join(parts)
 
 static func sea_zone_for_port(port_id):
 	return str(PORT_NAVIGATION.get(str(port_id), {}).get("zone", "mediterranean"))

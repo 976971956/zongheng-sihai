@@ -45,9 +45,8 @@ func set_battle_values(view):
 	sea_battle = bool(view.get("sea_battle", sea_battle))
 	ship_hull_id = str(view.get("ship_hull_id", ship_hull_id))
 	if is_instance_valid(player_model):
-		player_model.configure("player", Color("278e93"), Color("f1c66d"), "player_ship" if sea_battle else "player")
-		if sea_battle:
-			player_model.set_ship_hull(ship_hull_id)
+		# 航海地图用船体表示移动；进入战斗后展示船长本人，避免人物突然变成船。
+		player_model.configure("player", Color("278e93"), Color("f1c66d"), "player")
 	if is_instance_valid(enemy_model):
 		_configure_enemy_model()
 	queue_redraw()

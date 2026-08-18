@@ -705,13 +705,14 @@ func story_recommended_sea_level():
 
 func sea_encounter_level(enemy_id, zone_id):
 	var player_level = max(1, int(player.level))
-	var story_level = story_recommended_sea_level()
-	# 角色等级占主导，主线阶段负责防止压级刷穿或过早进入高危海域。
+	# 主线只做段内修正，避免异常存档让任务等级远超角色等级。
+	var story_level = clamp(story_recommended_sea_level(), max(1, player_level - 18), min(GameData.MAX_LEVEL, player_level + 10))
 	var blended = int(round(float(player_level) * 0.72 + float(story_level) * 0.28))
-	var matched_base = clamp(blended, max(1, player_level - 2), player_level + 3)
-	var zone_offset = int(GameData.SEA_ZONE_LEVEL_OFFSETS.get(str(zone_id), 0))
+	var resolved_zone = str(zone_id)
+	var band = GameData.sea_zone_level_band(resolved_zone)
+	var zone_offset = int(GameData.SEA_ZONE_LEVEL_OFFSETS.get(resolved_zone, 0))
 	var enemy_offset = int(GameData.SEA_ENEMY_LEVEL_OFFSETS.get(str(enemy_id), 0))
-	return clamp(matched_base + zone_offset + enemy_offset, max(1, player_level - 5), min(GameData.MAX_LEVEL, player_level + 6))
+	return clamp(blended + zone_offset + enemy_offset, int(band.min), int(band.max))
 
 func _scaled_sea_enemy_profile(enemy_id, threat_level):
 	var profile = Dictionary(GameData.ENEMIES[str(enemy_id)]).duplicate(true)
@@ -766,7 +767,7 @@ func start_battle(enemy_id):
 		"enemy_id": enemy_id, "enemy_hp": scaled_enemy_hp, "enemy_max_hp": scaled_enemy_hp,
 		"enemy_profile": enemy, "sea_zone_id": sea_zone_id,
 		"sea_zone_name": str(GameData.SEA_REGIONS.get(sea_zone_id, {}).get("name", "")),
-		"loot_tier_name": loot_tier_name,
+		"loot_tier_name": loot_tier_name, "sea_balance_version": GameData.SEA_BALANCE_VERSION,
 		"round": 1, "focus": 0, "skill_prepared": false, "sea_battle": sea_encounter, "log": [enemy.intro]
 	}
 	player.battles += 1
@@ -1705,6 +1706,7 @@ func voyage_plan(port_id, origin_override = ""):
 		"risk": risk, "threat_count": enemy_ids.size(), "enemy_ids": enemy_ids, "enemy_levels": enemy_levels,
 		"enemy_zones": Array(enemy_plan.enemy_zones), "zone_ids": zone_ids,
 		"waters_text": str(route.get("waters_text", GameData.sea_waters_text(zone_ids))),
+		"waters_level_text": GameData.sea_level_band_text(zone_ids),
 		"recommended_level": recommended_level, "description": str(tier.description)
 	}
 
@@ -1857,7 +1859,8 @@ func begin_voyage(port_id):
 		"region": GameData.sea_region_for_route(str(player.location), destination),
 		"days": int(plan.days), "risk": int(plan.risk),
 		"distance_nm": int(plan.distance_nm), "tier": str(plan.tier), "tier_name": str(plan.tier_name),
-		"zone_ids": Array(plan.zone_ids), "waters_text": str(plan.waters_text),
+		"zone_ids": Array(plan.zone_ids), "waters_text": str(plan.waters_text), "waters_level_text": str(plan.waters_level_text),
+		"sea_balance_version": GameData.SEA_BALANCE_VERSION,
 		"unlocked_ports": unlocked_ports,
 		"recommended_level": int(plan.recommended_level),
 		"stamina_cost": int(plan.stamina_cost), "dive_chance": int(plan.dive_chance),
@@ -2297,6 +2300,7 @@ func _normalize_active_voyage():
 		active_voyage.zone_ids = Array(plan.zone_ids)
 	if not active_voyage.has("waters_text"):
 		active_voyage.waters_text = str(plan.waters_text)
+	active_voyage.waters_level_text = str(plan.waters_level_text)
 	active_voyage.recommended_level = int(plan.recommended_level)
 	if not active_voyage.has("stamina_cost"):
 		active_voyage.stamina_cost = int(plan.stamina_cost)
@@ -2329,6 +2333,7 @@ func _normalize_active_voyage():
 		active_voyage.x = migrated_position.x
 		active_voyage.y = migrated_position.y
 	var saved_encounters = active_voyage.get("encounters", [])
+	var needs_balance_migration = int(active_voyage.get("sea_balance_version", 0)) < GameData.SEA_BALANCE_VERSION
 	var needs_encounter_migration = not had_dynamic_layout or typeof(saved_encounters) != TYPE_ARRAY or Array(saved_encounters).is_empty()
 	if not needs_encounter_migration:
 		for saved_encounter in Array(saved_encounters):
@@ -2355,12 +2360,13 @@ func _normalize_active_voyage():
 			var normalized = Dictionary(saved_encounter)
 			var zone_id = str(normalized.get("zone_id", "mediterranean"))
 			var enemy_id = str(normalized.get("enemy_id", "coastal_pirate"))
-			if not normalized.has("threat_level"):
+			if needs_balance_migration or not normalized.has("threat_level"):
 				normalized.threat_level = sea_encounter_level(enemy_id, zone_id)
-			if not normalized.has("loot_tier_name"):
+			if needs_balance_migration or not normalized.has("loot_tier_name"):
 				normalized.loot_tier_name = str(GameData.sea_equipment_tier(int(normalized.threat_level)).name)
 			normalized_encounters.append(normalized)
 		active_voyage.encounters = normalized_encounters
+	active_voyage.sea_balance_version = GameData.SEA_BALANCE_VERSION
 	if not active_voyage.has("current_encounter_id"):
 		active_voyage.current_encounter_id = ""
 	if not active_voyage.has("escorted"):
@@ -2528,7 +2534,7 @@ func load_game():
 		active_battle = {}
 	elif not active_battle.is_empty() and not active_battle.has("sea_battle"):
 		active_battle.sea_battle = not active_voyage.is_empty() and bool(GameData.ENEMIES[str(active_battle.enemy_id)].get("sea_enemy", false))
-	if not active_battle.is_empty() and bool(active_battle.get("sea_battle", false)) and not active_battle.has("enemy_profile"):
+	if not active_battle.is_empty() and bool(active_battle.get("sea_battle", false)) and (not active_battle.has("enemy_profile") or int(active_battle.get("sea_balance_version", 0)) < GameData.SEA_BALANCE_VERSION):
 		var migrated_encounter = sea_encounter(str(active_voyage.get("current_encounter_id", "")))
 		var migrated_zone_id = str(migrated_encounter.get("zone_id", "mediterranean"))
 		var migrated_level = int(migrated_encounter.get("threat_level", sea_encounter_level(str(active_battle.enemy_id), migrated_zone_id)))
@@ -2540,6 +2546,7 @@ func load_game():
 		active_battle.sea_zone_id = migrated_zone_id
 		active_battle.sea_zone_name = str(GameData.SEA_REGIONS.get(migrated_zone_id, {}).get("name", ""))
 		active_battle.loot_tier_name = str(GameData.sea_equipment_tier(migrated_level).name)
+		active_battle.sea_balance_version = GameData.SEA_BALANCE_VERSION
 	if int(player.level) >= GameData.MAX_LEVEL:
 		player.level = GameData.MAX_LEVEL
 		player.xp = 0

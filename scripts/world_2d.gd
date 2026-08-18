@@ -1550,7 +1550,9 @@ func _refresh_battle_info(view):
 		battle_player_info_label.text = "航者 Lv.%d\n体力 %d / %d" % [int(view.get("player_level", state.player.level)), int(view.get("player_hp", state.player.hp)), int(view.get("player_max_hp", state.get_stats().max_hp))]
 	var enemy_detail = "%s Lv.%d · %s\n体力 %d / %d" % [enemy_name, enemy_level, enemy_rank, int(view.get("enemy_hp", 0)), int(view.get("enemy_max_hp", enemy.get("hp", 1)))]
 	if bool(view.get("sea_battle", false)):
-		enemy_detail += "\n%s动态威胁 · 掉落%s" % [str(view.get("sea_zone_name", "未知海域")), str(view.get("loot_tier_name", "航海装备"))]
+		var sea_zone_id = str(view.get("sea_zone_id", "mediterranean"))
+		var sea_band = GameData.sea_zone_level_band(sea_zone_id)
+		enemy_detail += "\n%s Lv.%d–%d海域 · 掉落%s" % [str(view.get("sea_zone_name", "未知海域")), int(sea_band.min), int(sea_band.max), str(view.get("loot_tier_name", "航海装备"))]
 	battle_enemy_info_label.text = enemy_detail
 	if is_instance_valid(battle_intent_label):
 		battle_intent_label.text = "敌方意图｜%s" % str(view.get("enemy_intent", "战斗已经结束")) if not bool(view.get("battle_over", false)) else "战斗已经结束"
@@ -2835,7 +2837,7 @@ func _select_sailing_destination(port_id):
 	var stamina_cost = int(plan.stamina_cost)
 	var hp_after = int(state.player.hp) - stamina_cost
 	var storm_loss = 2 if str(plan.tier) == "oceanic" else 1
-	sailing_route_label.text = "%s → %s｜九港大地图 · %s｜%d海里 · 预计%d日｜风险%d%%\n%s · 帆装Lv.%d · %.1f节 · %d海里/日｜货舱%d格 · 船甲%d\n航经：%s｜威胁情报：%s｜动态建议Lv.%d（随角色与任务阶段匹配）；附近敌人会主动追击\n正常出航免费：消耗%d体力（%d→%d）｜潜水寻宝%d%%｜无护航遇风暴最多损失%d单位货物\n付费传送：%d银币 · 1日直达 · 无海战/打捞｜特产：%s" % [GameData.TRADE_PORTS[str(state.player.location)].name, destination.name, str(plan.tier_name), int(plan.distance_nm), days, risk, str(state.ship.name), int(plan.ship_level), float(plan.speed_knots), int(plan.nm_per_day), state.cargo_capacity(), state.ship_armor(), str(plan.waters_text), "、".join(threats), int(plan.recommended_level), stamina_cost, int(state.player.hp), max(0, hp_after), int(plan.dive_chance), storm_loss, int(route.fee), destination.specialty]
+	sailing_route_label.text = "%s → %s｜九港大地图 · %s｜%d海里 · 预计%d日｜风险%d%%\n%s · 帆装Lv.%d · %.1f节 · %d海里/日｜货舱%d格 · 船甲%d\n航经：%s｜海域等级：%s\n威胁情报：%s｜本航程建议Lv.%d（海域等级段优先）；附近敌人会主动追击\n正常出航免费：消耗%d体力（%d→%d）｜潜水寻宝%d%%｜无护航遇风暴最多损失%d单位货物\n付费传送：%d银币 · 1日直达 · 无海战/打捞｜特产：%s" % [GameData.TRADE_PORTS[str(state.player.location)].name, destination.name, str(plan.tier_name), int(plan.distance_nm), days, risk, str(state.ship.name), int(plan.ship_level), float(plan.speed_knots), int(plan.nm_per_day), state.cargo_capacity(), state.ship_armor(), str(plan.waters_text), str(plan.waters_level_text), "、".join(threats), int(plan.recommended_level), stamina_cost, int(state.player.hp), max(0, hp_after), int(plan.dive_chance), storm_loss, int(route.fee), destination.specialty]
 	if int(state.player.level) + 5 < int(plan.recommended_level):
 		sailing_route_label.text += "\n⚠ 当前等级偏低：建议手动绕开强敌、强化装备，或使用付费传送。"
 	elif state.voyage_protection > 0:

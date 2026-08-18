@@ -550,7 +550,7 @@ func _run():
 	_check(not scene.sailing_map.port_buttons["amsterdam_dock"].disabled, "主线完成后九座港口必须全部在海图上解锁")
 	scene.sailing_map.select_port("venice_dock")
 	var selected_voyage_distance = int(GameData.trade_route("alexandria_dock", "venice_dock").distance_nm)
-	_check("亚历山大" in scene.sailing_route_label.text and "威尼斯" in scene.sailing_route_label.text and ("%d海里" % selected_voyage_distance) in scene.sailing_route_label.text and "8.0节" in scene.sailing_route_label.text and "九港大地图" in scene.sailing_route_label.text and "航经" in scene.sailing_route_label.text and "威胁情报" in scene.sailing_route_label.text and "动态建议Lv." in scene.sailing_route_label.text and "随角色与任务阶段匹配" in scene.sailing_route_label.text and "正常出航免费" in scene.sailing_route_label.text and "付费传送" in scene.sailing_route_label.text and not scene.sailing_confirm_button.disabled, "选择港口后必须显示动态距离、船体与帆装合成船速、九港大地图、途经海域与动态威胁")
+	_check("亚历山大" in scene.sailing_route_label.text and "威尼斯" in scene.sailing_route_label.text and ("%d海里" % selected_voyage_distance) in scene.sailing_route_label.text and "8.0节" in scene.sailing_route_label.text and "九港大地图" in scene.sailing_route_label.text and "航经" in scene.sailing_route_label.text and "海域等级" in scene.sailing_route_label.text and "海域等级段优先" in scene.sailing_route_label.text and "威胁情报" in scene.sailing_route_label.text and "正常出航免费" in scene.sailing_route_label.text and "付费传送" in scene.sailing_route_label.text and not scene.sailing_confirm_button.disabled, "选择港口后必须显示动态距离、船速、途经海域等级段与实际威胁")
 	var origin_before_departure = str(scene.state.player.location)
 	var silver_before_departure = int(scene.state.player.silver)
 	scene._start_sailing_voyage()
@@ -578,6 +578,13 @@ func _run():
 			break
 	_check(not retreat_enemy.is_empty(), "海域必须存在可用于撤退测试的威胁")
 	if not retreat_enemy.is_empty():
+		scene.active_enemy_actor = retreat_enemy
+		var encounter_battle = scene.state.start_sea_encounter(str(retreat_enemy.get("encounter_id", "")))
+		scene._open_battle(encounter_battle)
+		_check(scene.battle_stage.player_model.display_id == "player" and scene.player_actor.display_id == "player_ship", "大航海遇敌后战斗舞台必须显示船长人物，航海地图仍保持当前船型，不能把人物直接变成船")
+		scene.state.active_battle = {}
+		scene.state.active_voyage.current_encounter_id = ""
+		scene._close_overlay()
 		var harbor_enemy_position = scene._sea_origin_position() + Vector2(260, 0)
 		scene.player_actor.position = scene._sea_origin_position()
 		retreat_enemy.node.position = harbor_enemy_position
@@ -599,7 +606,7 @@ func _run():
 	scene._spawn_world_actors()
 	scene.player_actor.position = scene._sea_destination_position()
 	scene._update_sea_voyage(0.1)
-	_check(str(scene.state.player.location) == "venice_dock" and scene.current_region == "city" and _has_actor(scene, "ship_owner"), "船只驶入目的港后才可结算抵港并重建当地NPC")
+	_check(str(scene.state.player.location) == "venice_dock" and scene.current_region == "city" and scene.player_actor.display_id == "player" and _has_actor(scene, "ship_owner"), "船只驶入目的港后才可结算抵港，并把地图模型恢复成人物后重建当地NPC")
 	_check(_has_label_text(scene.overlay, "航行抵达") and _has_label_text(scene.overlay, "完成%d海里航程" % selected_voyage_distance), "抵港后必须显示动态计算的实际航程和航期结算")
 	scene._close_overlay()
 
