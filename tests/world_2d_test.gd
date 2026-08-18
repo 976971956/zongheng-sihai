@@ -629,11 +629,16 @@ func _run():
 	hull_model._process(0.18)
 	_check(hull_model.ship_target_heading < -1.5 and hull_model.rotation < -0.05 and hull_model.rotation > hull_model.ship_target_heading and hull_model.ship_motion_blend > 0.1, "船首必须朝实际航向平滑转舵，不能继续反向或瞬间旋转")
 	_check(abs(hull_model.art_sprite.skew) > 0.001 and hull_model.art_sprite.position.length() > 0.1, "航行船体必须产生波浪俯仰、转弯侧倾与位移反馈，不能只做平面贴图滑动")
+	_check(is_instance_valid(hull_model.ship_depth_sprite) and is_instance_valid(hull_model.ship_bow_foam) and hull_model.ship_depth_sprite.position.y > hull_model.art_sprite.position.y and hull_model.ship_bow_foam.default_color.a > 0.0 and hull_model.ship_bow_foam.points[0].distance_to(hull_model.ship_bow_foam.points[-1]) <= 33.0, "船体必须使用贴合外形的厚度暗层和只包裹船首的前景破浪水线，不能只靠平面椭圆阴影或让水线横跨甲板")
 	var moving_wake_strength = hull_model.ship_motion_blend
 	hull_model.set_motion(Vector2.ZERO)
 	hull_model._process(0.50)
 	_check(hull_model.ship_motion_blend < moving_wake_strength, "停船后尾浪必须逐渐消退，不能保持全速航行效果")
-	hull_model.queue_free()
+	hull_model._process(0.50)
+	var stopped_transform = Transform2D(hull_model.art_sprite.transform)
+	hull_model._process(0.35)
+	_check(hull_model.ship_motion_blend == 0.0 and hull_model.ship_turn_lean == 0.0 and hull_model.art_sprite.transform == stopped_transform and hull_model.art_sprite.position == Vector2.ZERO and is_zero_approx(hull_model.art_sprite.skew) and is_zero_approx(hull_model.ship_bow_foam.default_color.a), "船只完全停稳后必须保持静止，不能继续俯仰、缩放或水花抖动")
+	hull_model.free()
 	var capacity_before_hold = ship_state.cargo_capacity()
 	ship_state.player.silver = 1000
 	var hold_upgrade = ship_state.upgrade_ship("hold")

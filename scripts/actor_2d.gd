@@ -117,6 +117,8 @@ var display_id = "player"
 var selected = false
 var bob_time = 0.0
 var art_sprite
+var ship_depth_sprite
+var ship_bow_foam
 var motion_direction = Vector2.ZERO
 var walk_time = 0.0
 var last_facing = "down"
@@ -193,22 +195,52 @@ func _update_player_ship_motion(delta, moving):
 		rotation = lerp_angle(rotation, ship_target_heading, turn_response)
 	var heading_delta = wrapf(rotation - previous_heading, -PI, PI)
 	var target_lean = clamp(heading_delta / max(0.001, float(delta)) * 0.18, -1.0, 1.0) if moving else 0.0
-	ship_turn_lean = lerp(ship_turn_lean, target_lean, 1.0 - exp(-float(delta) * 5.0))
+	if moving:
+		ship_turn_lean = lerp(ship_turn_lean, target_lean, 1.0 - exp(-float(delta) * 5.0))
+	else:
+		ship_turn_lean = move_toward(ship_turn_lean, 0.0, float(delta) * 3.8)
+	if not moving and ship_motion_blend <= 0.001:
+		ship_motion_blend = 0.0
+		ship_turn_lean = 0.0
 
-	# 贴图本身保持清晰，只用极小的非均匀缩放、错切和位移模拟船体在
-	# 浪峰上的俯仰与侧倾；不会改变碰撞或实际航速。
-	var heave = sin(bob_time * (2.45 + ship_motion_blend * 0.55)) * (1.6 + ship_motion_blend * 1.5)
-	var swell_roll = sin(bob_time * 1.72 + 0.8) * (0.42 + ship_motion_blend * 0.58)
+	# 所有海浪形变都由航速权重驱动。停稳后权重精确归零，杜绝贴图在
+	# 原地持续缩放、错切产生的“抖动”；航行时仍保留俯仰和侧倾。
+	var wave_weight = ship_motion_blend * ship_motion_blend
+	var heave = sin(bob_time * (2.45 + ship_motion_blend * 0.55)) * 3.1 * wave_weight
+	var swell_roll = sin(bob_time * 1.72 + 0.8) * wave_weight
 	var roll = clamp(swell_roll * 0.42 + ship_turn_lean * 0.82, -1.0, 1.0)
 	art_sprite.position = Vector2(roll * 2.2, heave)
 	art_sprite.rotation = roll * 0.032
 	art_sprite.skew = -roll * 0.026
-	art_sprite.scale = Vector2(0.50 * (1.0 + abs(roll) * 0.035), 0.50 * (1.0 - abs(roll) * 0.022 + sin(bob_time * 2.45) * 0.012))
+	art_sprite.scale = Vector2(0.50 * (1.0 + abs(roll) * 0.035), 0.50 * (1.0 - abs(roll) * 0.022 + sin(bob_time * 2.45) * 0.012 * wave_weight))
+	_update_player_ship_depth(roll, heave)
+
+func _update_player_ship_depth(roll, heave):
+	if is_instance_valid(ship_depth_sprite):
+		# 同轮廓暗层只露出船体下缘，模拟船舷厚度和离水高度，比椭圆阴影
+		# 更贴合每一种已购买船型的真实外形。
+		ship_depth_sprite.position = Vector2(-float(roll) * 1.0, 4.2 + float(heave) * 0.18)
+		ship_depth_sprite.rotation = float(roll) * 0.018
+		ship_depth_sprite.skew = -float(roll) * 0.018
+		ship_depth_sprite.scale = art_sprite.scale * Vector2(1.012, 1.01)
+		ship_depth_sprite.modulate = Color(0.04, 0.14, 0.18, 0.25 + ship_motion_blend * 0.05)
+	if is_instance_valid(ship_bow_foam):
+		ship_bow_foam.position = art_sprite.position
+		ship_bow_foam.rotation = art_sprite.rotation
+		ship_bow_foam.skew = art_sprite.skew
+		ship_bow_foam.width = 2.8 + ship_motion_blend * 2.2
+		ship_bow_foam.default_color = Color(0.78, 0.97, 1.0, ship_motion_blend * 0.72)
 
 func _refresh_art_sprite():
 	if is_instance_valid(art_sprite):
 		art_sprite.queue_free()
+	if is_instance_valid(ship_depth_sprite):
+		ship_depth_sprite.queue_free()
+	if is_instance_valid(ship_bow_foam):
+		ship_bow_foam.queue_free()
 	art_sprite = null
+	ship_depth_sprite = null
+	ship_bow_foam = null
 	if display_id == "player":
 		art_sprite = Sprite2D.new()
 		art_sprite.texture = PLAYER_WALK
@@ -225,11 +257,30 @@ func _refresh_art_sprite():
 		ship_texture.atlas = PLAYER_SHIP_ATLAS
 		var hull = Dictionary(GameData.SHIP_HULLS.get(ship_hull_id, GameData.SHIP_HULLS.sea_swallow))
 		ship_texture.region = Rect2(Vector2(hull.get("visual_cell", Vector2i.ZERO)) * ship_cell_size, ship_cell_size)
+		ship_depth_sprite = Sprite2D.new()
+		ship_depth_sprite.texture = ship_texture
+		ship_depth_sprite.scale = Vector2.ONE * 0.505
+		ship_depth_sprite.position = Vector2(0, 4.2)
+		ship_depth_sprite.modulate = Color(0.04, 0.14, 0.18, 0.25)
+		ship_depth_sprite.z_index = 1
+		add_child(ship_depth_sprite)
 		art_sprite = Sprite2D.new()
 		art_sprite.texture = ship_texture
 		art_sprite.scale = Vector2.ONE * 0.50
-		art_sprite.z_index = 1
+		art_sprite.z_index = 2
 		add_child(art_sprite)
+		ship_bow_foam = Line2D.new()
+		var foam_points = PackedVector2Array()
+		for point_index in range(13):
+			var foam_x = lerp(-16.0, 16.0, float(point_index) / 12.0)
+			var bow_curve = 1.0 - pow(foam_x / 16.0, 2.0)
+			foam_points.append(Vector2(foam_x, 58.0 + bow_curve * 7.0))
+		ship_bow_foam.points = foam_points
+		ship_bow_foam.width = 2.8
+		ship_bow_foam.default_color = Color(0.78, 0.97, 1.0, 0.0)
+		ship_bow_foam.antialiased = true
+		ship_bow_foam.z_index = 3
+		add_child(ship_bow_foam)
 		return
 	if not _has_raster_art(display_id):
 		return
@@ -367,7 +418,7 @@ func _draw_ship():
 	draw_set_transform(Vector2.ZERO)
 
 func _draw_player_ship_marker():
-	var bob = sin(bob_time * (2.45 + ship_motion_blend * 0.55)) * (1.6 + ship_motion_blend * 1.5)
+	var bob = sin(bob_time * (2.45 + ship_motion_blend * 0.55)) * 3.1 * ship_motion_blend * ship_motion_blend
 	_draw_ship_wake()
 	# 投影与船体错开并随浪高轻微压缩，让船体看起来浮在水面之上。
 	var shadow_squash = 1.0 - abs(bob) * 0.025
