@@ -562,7 +562,7 @@ func _run():
 	scene.joystick_direction = Vector2.ZERO
 	_check(scene.player_actor.position.distance_to(alexandria_departure_position) > 1.0, "亚历山大等港口出航后必须能立即驾船移动，不能被港内礁区卡住")
 	_check(str(scene.state.player.location) == origin_before_departure and int(scene.state.player.silver) == silver_before_departure, "海上航行未靠港前不能提前改写位置或扣传送费")
-	_check(scene.player_actor.display_id == "player_ship" and is_instance_valid(scene.player_actor.art_sprite) and "player_ship_atlas_v1" in _actor_art_signature(scene.player_actor) and _has_actor(scene, scene.state.sea_enemy_id()) and _has_actor(scene, "drifting_cargo"), "海域必须生成当前船体的可驾驶模型、航路海盗和漂流货箱")
+	_check(scene.player_actor.display_id == "player_ship" and is_instance_valid(scene.player_actor.art_sprite) and "directions_v1" in _actor_art_signature(scene.player_actor) and _has_actor(scene, scene.state.sea_enemy_id()) and _has_actor(scene, "drifting_cargo"), "海域必须生成当前船体的四方向可驾驶模型、航路海盗和漂流货箱")
 	var visible_sea_ports = 0
 	var visible_sea_threats = 0
 	for sea_map_actor in scene.actors:
@@ -624,10 +624,24 @@ func _run():
 	var starter_hull_art = _actor_art_signature(hull_model)
 	hull_model.set_ship_hull("alex_caravel")
 	var purchased_hull_art = _actor_art_signature(hull_model)
-	_check("player_ship_atlas_v1" in starter_hull_art and "player_ship_atlas_v1" in purchased_hull_art and starter_hull_art != purchased_hull_art, "航海大地图船只必须根据玩家购买的船体切换独立模型")
+	_check("sea_swallow_directions_v1" in starter_hull_art and "alex_caravel_directions_v1" in purchased_hull_art and starter_hull_art != purchased_hull_art, "航海大地图船只必须根据玩家购买的船体切换独立四方向模型")
 	hull_model.set_motion(Vector2.RIGHT)
 	hull_model._process(0.18)
 	_check(hull_model.ship_target_heading < -1.5 and hull_model.rotation < -0.05 and hull_model.rotation > hull_model.ship_target_heading and hull_model.ship_motion_blend > 0.1, "船首必须朝实际航向平滑转舵，不能继续反向或瞬间旋转")
+	_check(hull_model.ship_facing == "right" and hull_model.art_sprite.texture.region.position == Vector2(256, 256), "船向右航行时必须切换为真实右舷立体图，不能继续旋转同一张俯视图")
+	var directional_signatures = []
+	for facing in ["down", "left", "up", "right"]:
+		match facing:
+			"down": hull_model.rotation = 0.0
+			"left": hull_model.rotation = PI * 0.5
+			"up": hull_model.rotation = PI
+			"right": hull_model.rotation = -PI * 0.5
+		hull_model._update_player_ship_direction(true)
+		directional_signatures.append(_actor_art_signature(hull_model))
+	var unique_directional_signatures = {}
+	for direction_signature in directional_signatures:
+		unique_directional_signatures[direction_signature] = true
+	_check(unique_directional_signatures.size() == 4, "同一艘船的上下左右必须使用四个独立图格")
 	_check(abs(hull_model.art_sprite.skew) > 0.001 and hull_model.art_sprite.position.length() > 0.1, "航行船体必须产生波浪俯仰、转弯侧倾与位移反馈，不能只做平面贴图滑动")
 	_check(is_instance_valid(hull_model.ship_depth_sprite) and is_instance_valid(hull_model.ship_bow_foam) and hull_model.ship_depth_sprite.position.y > hull_model.art_sprite.position.y and hull_model.ship_bow_foam.default_color.a > 0.0 and hull_model.ship_bow_foam.points[0].distance_to(hull_model.ship_bow_foam.points[-1]) <= 33.0, "船体必须使用贴合外形的厚度暗层和只包裹船首的前景破浪水线，不能只靠平面椭圆阴影或让水线横跨甲板")
 	var moving_wake_strength = hull_model.ship_motion_blend

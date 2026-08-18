@@ -6,7 +6,23 @@ const NPC_ATLAS_B = preload("res://assets/art/characters/npc_profession_atlas_b_
 const NPC_ATLAS_C = preload("res://assets/art/characters/npc_profession_atlas_c_v2.png")
 const NPC_ATLAS_D = preload("res://assets/art/characters/npc_profession_atlas_d_v2.png")
 const NPC_ATLAS_E = preload("res://assets/art/characters/npc_profession_atlas_e_v2.png")
-const PLAYER_SHIP_ATLAS = preload("res://assets/art/ships/player_ship_atlas_v1.png")
+const PLAYER_SHIP_DIRECTION_ATLASES = {
+	"sea_swallow": preload("res://assets/art/ships/directional/sea_swallow_directions_v1.png"),
+	"adriatic_cog": preload("res://assets/art/ships/directional/adriatic_cog_directions_v1.png"),
+	"alex_caravel": preload("res://assets/art/ships/directional/alex_caravel_directions_v1.png"),
+	"malta_galley": preload("res://assets/art/ships/directional/malta_galley_directions_v1.png"),
+	"cape_carrack": preload("res://assets/art/ships/directional/cape_carrack_directions_v1.png"),
+	"quanzhou_junk": preload("res://assets/art/ships/directional/quanzhou_junk_directions_v1.png"),
+	"athens_trireme": preload("res://assets/art/ships/directional/athens_trireme_directions_v1.png"),
+	"yangzhou_treasure": preload("res://assets/art/ships/directional/yangzhou_treasure_directions_v1.png"),
+	"amsterdam_clipper": preload("res://assets/art/ships/directional/amsterdam_clipper_directions_v1.png")
+}
+const SHIP_DIRECTION_CELLS = {
+	"down": Vector2i(0, 0),
+	"left": Vector2i(1, 0),
+	"up": Vector2i(0, 1),
+	"right": Vector2i(1, 1)
+}
 const ENEMY_ATLAS = preload("res://assets/art/characters/enemy_atlas_v2.png")
 const LEGACY_BOSS_ATLAS_A = preload("res://assets/art/characters/legacy_boss_atlas_a_v1.png")
 const LEGACY_BOSS_ATLAS_B = preload("res://assets/art/characters/legacy_boss_atlas_b_v1.png")
@@ -123,6 +139,7 @@ var motion_direction = Vector2.ZERO
 var walk_time = 0.0
 var last_facing = "down"
 var ship_hull_id = "sea_swallow"
+var ship_facing = "down"
 var ship_target_heading = 0.0
 var ship_motion_blend = 0.0
 var ship_turn_lean = 0.0
@@ -202,6 +219,7 @@ func _update_player_ship_motion(delta, moving):
 	if not moving and ship_motion_blend <= 0.001:
 		ship_motion_blend = 0.0
 		ship_turn_lean = 0.0
+	_update_player_ship_direction()
 
 	# 所有海浪形变都由航速权重驱动。停稳后权重精确归零，杜绝贴图在
 	# 原地持续缩放、错切产生的“抖动”；航行时仍保留俯仰和侧倾。
@@ -210,7 +228,10 @@ func _update_player_ship_motion(delta, moving):
 	var swell_roll = sin(bob_time * 1.72 + 0.8) * wave_weight
 	var roll = clamp(swell_roll * 0.42 + ship_turn_lean * 0.82, -1.0, 1.0)
 	art_sprite.position = Vector2(roll * 2.2, heave)
-	art_sprite.rotation = roll * 0.032
+	# 父节点继续平滑转舵，负责尾流、阴影与碰撞朝向；四方向船体贴图则
+	# 抵消父节点旋转，只展示真正对应航向的船首/船尾/左右舷立体视角。
+	var visual_rotation = -rotation
+	art_sprite.rotation = visual_rotation + roll * 0.032
 	art_sprite.skew = -roll * 0.026
 	art_sprite.scale = Vector2(0.50 * (1.0 + abs(roll) * 0.035), 0.50 * (1.0 - abs(roll) * 0.022 + sin(bob_time * 2.45) * 0.012 * wave_weight))
 	_update_player_ship_depth(roll, heave)
@@ -220,14 +241,15 @@ func _update_player_ship_depth(roll, heave):
 		# 同轮廓暗层只露出船体下缘，模拟船舷厚度和离水高度，比椭圆阴影
 		# 更贴合每一种已购买船型的真实外形。
 		ship_depth_sprite.position = Vector2(-float(roll) * 1.0, 4.2 + float(heave) * 0.18)
-		ship_depth_sprite.rotation = float(roll) * 0.018
+		ship_depth_sprite.rotation = -rotation + float(roll) * 0.018
 		ship_depth_sprite.skew = -float(roll) * 0.018
 		ship_depth_sprite.scale = art_sprite.scale * Vector2(1.012, 1.01)
 		ship_depth_sprite.modulate = Color(0.04, 0.14, 0.18, 0.25 + ship_motion_blend * 0.05)
 	if is_instance_valid(ship_bow_foam):
 		ship_bow_foam.position = art_sprite.position
-		ship_bow_foam.rotation = art_sprite.rotation
-		ship_bow_foam.skew = art_sprite.skew
+		# 水线随父节点朝向真实船首，不跟随被反向抵消旋转的显示贴图。
+		ship_bow_foam.rotation = 0.0
+		ship_bow_foam.skew = 0.0
 		ship_bow_foam.width = 2.8 + ship_motion_blend * 2.2
 		ship_bow_foam.default_color = Color(0.78, 0.97, 1.0, ship_motion_blend * 0.72)
 
@@ -252,20 +274,13 @@ func _refresh_art_sprite():
 		add_child(art_sprite)
 		return
 	if display_id == "player_ship":
-		var ship_texture = AtlasTexture.new()
-		var ship_cell_size = Vector2(PLAYER_SHIP_ATLAS.get_width(), PLAYER_SHIP_ATLAS.get_height()) / 3.0
-		ship_texture.atlas = PLAYER_SHIP_ATLAS
-		var hull = Dictionary(GameData.SHIP_HULLS.get(ship_hull_id, GameData.SHIP_HULLS.sea_swallow))
-		ship_texture.region = Rect2(Vector2(hull.get("visual_cell", Vector2i.ZERO)) * ship_cell_size, ship_cell_size)
 		ship_depth_sprite = Sprite2D.new()
-		ship_depth_sprite.texture = ship_texture
 		ship_depth_sprite.scale = Vector2.ONE * 0.505
 		ship_depth_sprite.position = Vector2(0, 4.2)
 		ship_depth_sprite.modulate = Color(0.04, 0.14, 0.18, 0.25)
 		ship_depth_sprite.z_index = 1
 		add_child(ship_depth_sprite)
 		art_sprite = Sprite2D.new()
-		art_sprite.texture = ship_texture
 		art_sprite.scale = Vector2.ONE * 0.50
 		art_sprite.z_index = 2
 		add_child(art_sprite)
@@ -281,6 +296,7 @@ func _refresh_art_sprite():
 		ship_bow_foam.antialiased = true
 		ship_bow_foam.z_index = 3
 		add_child(ship_bow_foam)
+		_update_player_ship_direction(true)
 		return
 	if not _has_raster_art(display_id):
 		return
@@ -313,6 +329,28 @@ func _refresh_art_sprite():
 	art_sprite.scale = Vector2.ONE * _art_scale()
 	art_sprite.z_index = 1
 	add_child(art_sprite)
+
+func _update_player_ship_direction(force = false):
+	if display_id != "player_ship":
+		return
+	var heading = Vector2.DOWN.rotated(rotation)
+	var next_facing = "down"
+	if abs(heading.x) > abs(heading.y):
+		next_facing = "right" if heading.x > 0.0 else "left"
+	else:
+		next_facing = "down" if heading.y >= 0.0 else "up"
+	if not force and next_facing == ship_facing:
+		return
+	ship_facing = next_facing
+	var atlas = PLAYER_SHIP_DIRECTION_ATLASES.get(ship_hull_id, PLAYER_SHIP_DIRECTION_ATLASES.sea_swallow)
+	var ship_texture = AtlasTexture.new()
+	ship_texture.atlas = atlas
+	var cell_size = Vector2(atlas.get_width(), atlas.get_height()) / 2.0
+	ship_texture.region = Rect2(Vector2(SHIP_DIRECTION_CELLS.get(ship_facing, Vector2i.ZERO)) * cell_size, cell_size)
+	if is_instance_valid(art_sprite):
+		art_sprite.texture = ship_texture
+	if is_instance_valid(ship_depth_sprite):
+		ship_depth_sprite.texture = ship_texture
 
 func _has_raster_art(identity):
 	return ATLAS_CELLS.has(identity) or NPC_ATLAS_CELLS.has(identity) or ENEMY_ATLAS_CELLS.has(identity) or LEGACY_BOSS_ATLAS_A_CELLS.has(identity) or LEGACY_BOSS_ATLAS_B_CELLS.has(identity)
