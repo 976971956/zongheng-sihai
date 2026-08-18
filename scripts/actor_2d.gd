@@ -7,22 +7,17 @@ const NPC_ATLAS_C = preload("res://assets/art/characters/npc_profession_atlas_c_
 const NPC_ATLAS_D = preload("res://assets/art/characters/npc_profession_atlas_d_v2.png")
 const NPC_ATLAS_E = preload("res://assets/art/characters/npc_profession_atlas_e_v2.png")
 const PLAYER_SHIP_DIRECTION_ATLASES = {
-	"sea_swallow": preload("res://assets/art/ships/directional/sea_swallow_directions_v1.png"),
-	"adriatic_cog": preload("res://assets/art/ships/directional/adriatic_cog_directions_v1.png"),
-	"alex_caravel": preload("res://assets/art/ships/directional/alex_caravel_directions_v1.png"),
-	"malta_galley": preload("res://assets/art/ships/directional/malta_galley_directions_v1.png"),
-	"cape_carrack": preload("res://assets/art/ships/directional/cape_carrack_directions_v1.png"),
-	"quanzhou_junk": preload("res://assets/art/ships/directional/quanzhou_junk_directions_v1.png"),
-	"athens_trireme": preload("res://assets/art/ships/directional/athens_trireme_directions_v1.png"),
-	"yangzhou_treasure": preload("res://assets/art/ships/directional/yangzhou_treasure_directions_v1.png"),
-	"amsterdam_clipper": preload("res://assets/art/ships/directional/amsterdam_clipper_directions_v1.png")
+	"sea_swallow": preload("res://assets/art/ships/directional/sea_swallow_directions_8x8_v2.png"),
+	"adriatic_cog": preload("res://assets/art/ships/directional/adriatic_cog_directions_8x8_v2.png"),
+	"alex_caravel": preload("res://assets/art/ships/directional/alex_caravel_directions_8x8_v2.png"),
+	"malta_galley": preload("res://assets/art/ships/directional/malta_galley_directions_8x8_v2.png"),
+	"cape_carrack": preload("res://assets/art/ships/directional/cape_carrack_directions_8x8_v2.png"),
+	"quanzhou_junk": preload("res://assets/art/ships/directional/quanzhou_junk_directions_8x8_v2.png"),
+	"athens_trireme": preload("res://assets/art/ships/directional/athens_trireme_directions_8x8_v2.png"),
+	"yangzhou_treasure": preload("res://assets/art/ships/directional/yangzhou_treasure_directions_8x8_v2.png"),
+	"amsterdam_clipper": preload("res://assets/art/ships/directional/amsterdam_clipper_directions_8x8_v2.png")
 }
-const SHIP_DIRECTION_CELLS = {
-	"down": Vector2i(0, 0),
-	"left": Vector2i(1, 0),
-	"up": Vector2i(0, 1),
-	"right": Vector2i(1, 1)
-}
+const SHIP_DIRECTION_ROWS = ["down", "down_right", "right", "up_right", "up", "up_left", "left", "down_left"]
 const ENEMY_ATLAS = preload("res://assets/art/characters/enemy_atlas_v2.png")
 const LEGACY_BOSS_ATLAS_A = preload("res://assets/art/characters/legacy_boss_atlas_a_v1.png")
 const LEGACY_BOSS_ATLAS_B = preload("res://assets/art/characters/legacy_boss_atlas_b_v1.png")
@@ -140,6 +135,8 @@ var walk_time = 0.0
 var last_facing = "down"
 var ship_hull_id = "sea_swallow"
 var ship_facing = "down"
+var ship_animation_frame = 0
+var ship_animation_time = 0.0
 var ship_target_heading = 0.0
 var ship_motion_blend = 0.0
 var ship_turn_lean = 0.0
@@ -219,6 +216,10 @@ func _update_player_ship_motion(delta, moving):
 	if not moving and ship_motion_blend <= 0.001:
 		ship_motion_blend = 0.0
 		ship_turn_lean = 0.0
+	if ship_motion_blend > 0.015:
+		ship_animation_time += float(delta) * (4.0 + ship_motion_blend * 4.0)
+	else:
+		ship_animation_time = 0.0
 	_update_player_ship_direction()
 
 	# 所有海浪形变都由航速权重驱动。停稳后权重精确归零，杜绝贴图在
@@ -228,12 +229,12 @@ func _update_player_ship_motion(delta, moving):
 	var swell_roll = sin(bob_time * 1.72 + 0.8) * wave_weight
 	var roll = clamp(swell_roll * 0.42 + ship_turn_lean * 0.82, -1.0, 1.0)
 	art_sprite.position = Vector2(roll * 2.2, heave)
-	# 父节点继续平滑转舵，负责尾流、阴影与碰撞朝向；四方向船体贴图则
-	# 抵消父节点旋转，只展示真正对应航向的船首/船尾/左右舷立体视角。
+	# 父节点继续平滑转舵，负责尾流、阴影与碰撞朝向；八方向船体贴图则
+	# 抵消父节点旋转，展示真正对应航向的立体透视。
 	var visual_rotation = -rotation
 	art_sprite.rotation = visual_rotation + roll * 0.032
 	art_sprite.skew = -roll * 0.026
-	art_sprite.scale = Vector2(0.50 * (1.0 + abs(roll) * 0.035), 0.50 * (1.0 - abs(roll) * 0.022 + sin(bob_time * 2.45) * 0.012 * wave_weight))
+	art_sprite.scale = Vector2(1.0 * (1.0 + abs(roll) * 0.035), 1.0 * (1.0 - abs(roll) * 0.022 + sin(bob_time * 2.45) * 0.012 * wave_weight))
 	_update_player_ship_depth(roll, heave)
 
 func _update_player_ship_depth(roll, heave):
@@ -275,13 +276,13 @@ func _refresh_art_sprite():
 		return
 	if display_id == "player_ship":
 		ship_depth_sprite = Sprite2D.new()
-		ship_depth_sprite.scale = Vector2.ONE * 0.505
+		ship_depth_sprite.scale = Vector2.ONE * 1.01
 		ship_depth_sprite.position = Vector2(0, 4.2)
 		ship_depth_sprite.modulate = Color(0.04, 0.14, 0.18, 0.25)
 		ship_depth_sprite.z_index = 1
 		add_child(ship_depth_sprite)
 		art_sprite = Sprite2D.new()
-		art_sprite.scale = Vector2.ONE * 0.50
+		art_sprite.scale = Vector2.ONE
 		art_sprite.z_index = 2
 		add_child(art_sprite)
 		ship_bow_foam = Line2D.new()
@@ -334,19 +335,20 @@ func _update_player_ship_direction(force = false):
 	if display_id != "player_ship":
 		return
 	var heading = Vector2.DOWN.rotated(rotation)
-	var next_facing = "down"
-	if abs(heading.x) > abs(heading.y):
-		next_facing = "right" if heading.x > 0.0 else "left"
-	else:
-		next_facing = "down" if heading.y >= 0.0 else "up"
-	if not force and next_facing == ship_facing:
+	# atan2(x, y) 让 0 对应屏幕向下，再按 45° 就近吸附到八个航向。
+	var direction_angle = wrapf(atan2(heading.x, heading.y), 0.0, TAU)
+	var direction_index = int(floor(direction_angle / (PI * 0.25) + 0.5)) % 8
+	var next_facing = str(SHIP_DIRECTION_ROWS[direction_index])
+	var next_frame = int(floor(ship_animation_time)) % 8 if ship_motion_blend > 0.015 else 0
+	if not force and next_facing == ship_facing and next_frame == ship_animation_frame:
 		return
 	ship_facing = next_facing
+	ship_animation_frame = next_frame
 	var atlas = PLAYER_SHIP_DIRECTION_ATLASES.get(ship_hull_id, PLAYER_SHIP_DIRECTION_ATLASES.sea_swallow)
 	var ship_texture = AtlasTexture.new()
 	ship_texture.atlas = atlas
-	var cell_size = Vector2(atlas.get_width(), atlas.get_height()) / 2.0
-	ship_texture.region = Rect2(Vector2(SHIP_DIRECTION_CELLS.get(ship_facing, Vector2i.ZERO)) * cell_size, cell_size)
+	var cell_size = Vector2(atlas.get_width(), atlas.get_height()) / 8.0
+	ship_texture.region = Rect2(Vector2(ship_animation_frame, direction_index) * cell_size, cell_size)
 	if is_instance_valid(art_sprite):
 		art_sprite.texture = ship_texture
 	if is_instance_valid(ship_depth_sprite):
