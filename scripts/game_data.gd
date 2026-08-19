@@ -716,14 +716,26 @@ const SEA_ENEMY_LEVEL_OFFSETS = {
 	"abyss_kraken": 3, "black_flag_privateer": 4
 }
 
-# 航海掉落只使用通用装备和航海套装。主线 Boss 的唯一遗物不进入随机池。
+# 普通海怪只掉落每套的入门件；完整套装与关键缺件只进入对应海域 Boss 池。
 const SEA_EQUIPMENT_TIERS = [
 	{"min_level": 1, "name": "近海水手装", "items": ["linen_cap", "traveler_boots", "bronze_charm", "guard_belt", "spider_knife"]},
-	{"min_level": 10, "name": "武士套装", "items": ["warrior_blade", "warrior_coat", "warrior_circlet", "warrior_belt", "warrior_boots"]},
-	{"min_level": 22, "name": "黑帆征服套", "items": ["corsair_cutlass", "gunner_coat", "captain_hat", "black_sail_charm"]},
-	{"min_level": 36, "name": "白鲸遗航套", "items": ["whale_bone_sabre", "survivor_coat", "siren_charm", "white_whale_coat"]},
-	{"min_level": 52, "name": "七海巡游套", "items": ["stormsteel_cutlass", "stormwatch_coat", "chartmaster_hat", "leviathan_belt", "monsoon_boots"]}
+	{"min_level": 10, "name": "武士入门装备", "items": ["warrior_blade", "warrior_coat", "linen_cap", "traveler_boots"]},
+	{"min_level": 22, "name": "黑帆入门装备", "items": ["corsair_cutlass", "gunner_coat", "bronze_charm", "guard_belt"]},
+	{"min_level": 36, "name": "白鲸入门装备", "items": ["whale_bone_sabre", "white_whale_coat", "survivor_coat", "stamina_tonic"]},
+	{"min_level": 52, "name": "七海入门装备", "items": ["stormsteel_cutlass", "stormwatch_coat", "chartmaster_hat", "stamina_tonic"]},
+	{"min_level": 64, "name": "地魔入门装备", "items": ["demon_mask", "earth_armor", "stamina_tonic", "unknown_equipment"]},
+	{"min_level": 84, "name": "守潮入门装备", "items": ["demon_crown", "tidekeeper_regalia", "stamina_tonic", "unknown_equipment"]}
 ]
+
+# 每个海域只有一名套装猎场 Boss。主线会给入门件，Boss 池才包含该套的六个部位。
+const SEA_SET_BOSSES = {
+	"mediterranean": {"enemy_id": "reef_serpent", "boss_name": "赤潮礁王·阿刻隆", "set_id": "warrior", "unlock_level": 10, "drop_rate": 0.62},
+	"atlantic": {"enemy_id": "ocean_raider", "boss_name": "黑旗舰队提督·雷德", "set_id": "black_sail", "unlock_level": 22, "drop_rate": 0.60},
+	"north_sea": {"enemy_id": "fog_siren", "boss_name": "白鲸雾歌女王·塞壬娜", "set_id": "white_whale", "unlock_level": 36, "drop_rate": 0.58},
+	"africa": {"enemy_id": "abyss_kraken", "boss_name": "风暴角深渊巨章", "set_id": "seven_seas", "unlock_level": 40, "drop_rate": 0.56},
+	"indian_ocean": {"enemy_id": "abyss_kraken", "boss_name": "季风海眼镇界王", "set_id": "earth_legacy", "unlock_level": 64, "drop_rate": 0.54},
+	"east_asia": {"enemy_id": "reef_serpent", "boss_name": "归潮龙王·沧溟", "set_id": "tidekeeper", "unlock_level": 84, "drop_rate": 0.52}
+}
 
 const SEA_ZONE_PREFERRED_SLOTS = {
 	"mediterranean": "charm", "north_sea": "head", "atlantic": "body",
@@ -746,6 +758,34 @@ static func sea_equipment_pool(zone_id, threat_level):
 			# 重复加入代表海域偏好，不会改变装备阶位。
 			pool.append(str(item_id))
 	return pool
+
+static func sea_set_boss(zone_id, enemy_id = ""):
+	var boss = Dictionary(SEA_SET_BOSSES.get(str(zone_id), {}))
+	if boss.is_empty() or (str(enemy_id) != "" and str(boss.enemy_id) != str(enemy_id)):
+		return {}
+	return boss
+
+static func sea_set_boss_for_route(zone_ids, player_level):
+	var selected = {}
+	for zone_id in Array(zone_ids):
+		var boss = sea_set_boss(str(zone_id))
+		if boss.is_empty() or int(player_level) < int(boss.unlock_level):
+			continue
+		if selected.is_empty() or int(boss.unlock_level) > int(selected.unlock_level):
+			selected = boss.duplicate(true)
+			selected["zone_id"] = str(zone_id)
+	return selected
+
+static func equipment_set_items(set_id):
+	var result = []
+	for item_id in ITEMS:
+		if str(ITEMS[item_id].get("set", "")) == str(set_id):
+			result.append(str(item_id))
+	return result
+
+static func sea_set_drop_pool(zone_id, enemy_id):
+	var boss = sea_set_boss(zone_id, enemy_id)
+	return equipment_set_items(str(boss.get("set_id", ""))) if not boss.is_empty() else []
 
 static func sea_zone_level_band(zone_id):
 	return Dictionary(SEA_ZONE_LEVEL_BANDS.get(str(zone_id), SEA_ZONE_LEVEL_BANDS.mediterranean))
@@ -889,11 +929,11 @@ const ENEMIES = {
 	"dungeon_guard": {"name": "一层训练卫兵", "level": 3, "rank": "副本", "hp": 92, "attack": 14, "defense": 6, "speed": 7, "exp": 48, "silver": [16, 24], "drops": ["unknown_equipment", "small_milk"], "intro": "卫兵幻影举起长矛，试炼开始。"},
 	"stone_puppet": {"name": "二层石傀儡", "level": 3, "rank": "副本", "hp": 126, "attack": 15, "defense": 10, "speed": 3, "exp": 61, "silver": [19, 28], "drops": ["warrior_belt", "unknown_equipment"], "intro": "石傀儡胸前的符文依次亮起。"},
 	"tide_beast": {"name": "三层潮汐兽", "level": 4, "rank": "副本精英", "hp": 158, "attack": 20, "defense": 9, "speed": 10, "exp": 82, "silver": [27, 39], "drops": ["warrior_circlet", "warrior_boots", "stamina_tonic", "tide_card"], "effect": {"name": "缓慢", "chance": 0.20, "rounds": 2}, "special": {"name": "潮汐突袭", "every": 3, "damage_multiplier": 1.35}, "intro": "潮汐兽跃出积水，鳞片像刀刃般张开。"},
-	"vermilion_phantom": {"name": "朱雀幻影", "level": 4, "rank": "副本 Boss", "hp": 218, "attack": 22, "defense": 11, "speed": 12, "exp": 150, "silver": [58, 82], "drops": ["warrior_blade", "warrior_coat", "warrior_circlet", "warrior_belt", "warrior_boots"], "effect": {"name": "中毒", "chance": 0.18, "rounds": 3}, "special": {"name": "赤焰风暴", "every": 3, "damage_multiplier": 1.55}, "intro": "赤色双翼遮住穹顶，朱雀幻影发出清越长鸣。"}
+	"vermilion_phantom": {"name": "朱雀幻影", "level": 4, "rank": "副本 Boss", "hp": 218, "attack": 22, "defense": 11, "speed": 12, "exp": 150, "silver": [58, 82], "drops": ["warrior_blade", "warrior_coat"], "effect": {"name": "中毒", "chance": 0.18, "rounds": 3}, "special": {"name": "赤焰风暴", "every": 3, "damage_multiplier": 1.55}, "intro": "赤色双翼遮住穹顶，朱雀幻影发出清越长鸣。"}
 	,"corsair_deckhand": {"name": "黑帆水手", "level": 6, "rank": "副本", "hp": 190, "attack": 25, "defense": 12, "speed": 11, "exp": 150, "silver": [42, 58], "drops": ["unknown_equipment", "small_milk", "corsair_cutlass"], "intro": "黑帆水手踢开货箱，拔出弯刀封住码头。"}
 	,"corsair_raider": {"name": "黑帆袭击者", "level": 8, "rank": "副本精英", "hp": 260, "attack": 31, "defense": 16, "speed": 16, "exp": 230, "silver": [58, 78], "drops": ["corsair_cutlass", "gunner_coat", "universal_medicine", "corsair_card"], "effect": {"name": "中毒", "chance": 0.16, "rounds": 3}, "intro": "袭击者在火药桶之间疾行，淬毒短刃闪着冷光。"}
 	,"corsair_guard": {"name": "黑帆重卫", "level": 10, "rank": "副本精英", "hp": 380, "attack": 38, "defense": 24, "speed": 12, "exp": 340, "silver": [78, 108], "drops": ["gunner_coat", "captain_hat", "stamina_tonic"], "special": {"name": "破阵冲锋", "every": 3, "damage_multiplier": 1.40}, "intro": "重卫架起盾牌，沉重脚步震落洞顶的细沙。"}
-	,"corsair_captain": {"name": "黑帆船长雷蒙", "level": 12, "rank": "副本 Boss", "hp": 620, "attack": 48, "defense": 29, "speed": 18, "exp": 620, "silver": [150, 210], "drops": ["corsair_cutlass", "gunner_coat", "captain_hat", "black_sail_charm"], "effect": {"name": "诅咒", "chance": 0.20, "rounds": 3}, "special": {"name": "黑潮连斩", "every": 3, "damage_multiplier": 1.60}, "intro": "雷蒙展开黑帆海图，拔剑宣告这里将是你的终点。"}
+	,"corsair_captain": {"name": "黑帆船长雷蒙", "level": 12, "rank": "副本 Boss", "hp": 620, "attack": 48, "defense": 29, "speed": 18, "exp": 620, "silver": [150, 210], "drops": ["corsair_cutlass", "gunner_coat"], "effect": {"name": "诅咒", "chance": 0.20, "rounds": 3}, "special": {"name": "黑潮连斩", "every": 3, "damage_multiplier": 1.60}, "intro": "雷蒙展开黑帆海图，拔剑宣告这里将是你的终点。"}
 	,"coastal_pirate": {"name": "近海海盗", "level": 5, "rank": "海上敌人", "sea_enemy": true, "hp": 148, "attack": 20, "defense": 8, "speed": 12, "exp": 95, "silver": [34, 52], "drops": ["unknown_equipment", "sea_salt_bread", "small_milk"], "intro": "一艘挂着旧黑旗的快艇切入航道，海盗抛钩准备登船。"}
 	,"reef_serpent": {"name": "礁海长蛇", "level": 12, "rank": "海上怪物", "sea_enemy": true, "hp": 360, "attack": 34, "defense": 18, "speed": 22, "exp": 420, "silver": [72, 104], "drops": ["unknown_equipment", "universal_medicine", "sea_salt_bread"], "effect": {"name": "中毒", "chance": 0.16, "rounds": 3}, "intro": "海面像被刀切开，盘踞礁群的长蛇昂首缠向船舷。"}
 	,"ocean_raider": {"name": "远洋掠夺者", "level": 24, "rank": "海上精英", "sea_enemy": true, "hp": 720, "attack": 54, "defense": 34, "speed": 28, "exp": 1450, "silver": [170, 240], "drops": ["unknown_equipment", "universal_medicine", "corsair_card"], "effect": {"name": "缓慢", "chance": 0.18, "rounds": 2}, "intro": "远洋掠夺船借着逆光逼近，弩手已经占据上风位。"}
@@ -902,7 +942,7 @@ const ENEMIES = {
 	,"wreck_crab": {"name": "覆甲礁蟹", "level": 21, "rank": "副本", "sea_enemy": true, "hp": 640, "attack": 48, "defense": 32, "speed": 16, "exp": 1100, "silver": [120, 170], "drops": ["stamina_tonic", "whale_bone_sabre"], "intro": "覆满船钉的巨蟹从白鲸号龙骨下爬出，铁螯砸向礁石。"}
 	,"drowned_sailor": {"name": "溺潮水手", "level": 24, "rank": "副本精英", "sea_enemy": true, "hp": 760, "attack": 54, "defense": 36, "speed": 23, "exp": 1500, "silver": [150, 210], "drops": ["survivor_coat", "universal_medicine"], "effect": {"name": "缓慢", "chance": 0.20, "rounds": 2}, "intro": "水手幻影攥着腐朽缆绳，仍在执行二十年前没有完成的封舱命令。"}
 	,"fog_siren": {"name": "雾歌海妖", "level": 27, "rank": "副本精英", "sea_enemy": true, "hp": 900, "attack": 60, "defense": 40, "speed": 31, "exp": 2100, "silver": [190, 260], "drops": ["siren_charm", "stamina_tonic"], "effect": {"name": "诅咒", "chance": 0.24, "rounds": 3}, "intro": "白雾凝成披着船帆的身影，歌声正一点点抹去你的名字。"}
-	,"abyss_siren": {"name": "深渊海妖·涅瑞娅", "level": 29, "rank": "副本 Boss", "hp": 1120, "attack": 68, "defense": 45, "speed": 36, "exp": 3500, "silver": [320, 430], "drops": ["whale_bone_sabre", "survivor_coat", "siren_charm"], "effect": {"name": "诅咒", "chance": 0.28, "rounds": 3}, "special": {"name": "鲸落挽歌", "every": 3, "damage_multiplier": 1.48}, "intro": "涅瑞娅从鲸心船舱升起。她身后的潮水里，映出白鲸号沉没的最后一夜。"}
+	,"abyss_siren": {"name": "深渊海妖·涅瑞娅", "level": 29, "rank": "副本 Boss", "hp": 1120, "attack": 68, "defense": 45, "speed": 36, "exp": 3500, "silver": [320, 430], "drops": ["whale_bone_sabre", "survivor_coat", "white_whale_coat"], "effect": {"name": "诅咒", "chance": 0.28, "rounds": 3}, "special": {"name": "鲸落挽歌", "every": 3, "damage_multiplier": 1.48}, "intro": "涅瑞娅从鲸心船舱升起。她身后的潮水里，映出白鲸号沉没的最后一夜。"}
 	,"basin_leviathan": {"name": "北河吞金兽", "level": 36, "rank": "副本 Boss", "hp": 1500, "attack": 78, "defense": 55, "speed": 39, "exp": 9000, "silver": [520, 680], "drops": ["basin_charm"], "effect": {"name": "中毒", "chance": 0.20, "rounds": 3}, "special": {"name": "金砂洪流", "every": 3, "damage_multiplier": 1.42}, "intro": "吞金兽卷起整条北河的金砂，聚宝盆在它胸口像第二颗心脏般搏动。"}
 	,"nine_tail_fox": {"name": "九尾灯妖·妲罗", "level": 43, "rank": "副本 Boss", "hp": 1800, "attack": 90, "defense": 65, "speed": 48, "exp": 12000, "silver": [680, 860], "drops": ["demon_mask"], "effect": {"name": "诅咒", "chance": 0.24, "rounds": 3}, "special": {"name": "长安幻夜", "every": 3, "damage_multiplier": 1.44}, "intro": "九盏妖灯同时亮起，妲罗用你最珍惜的记忆编织出第十条尾巴。"}
 	,"earth_demon_king": {"name": "地魔王·摩罗", "level": 50, "rank": "副本 Boss", "hp": 2200, "attack": 103, "defense": 76, "speed": 51, "exp": 15000, "silver": [850, 1050], "drops": ["earth_armor"], "effect": {"name": "缓慢", "chance": 0.25, "rounds": 2}, "special": {"name": "王陵崩塌", "every": 3, "damage_multiplier": 1.46}, "intro": "倒悬王陵落下碎石，摩罗拖着由黄金与誓言熔成的锁链走出黑暗。"}
@@ -919,37 +959,39 @@ const ENEMIES = {
 # 提供额外攻防与特殊属性。当前单机版压缩到 Lv.1–100，以分段共鸣保留换装取舍。
 const EQUIPMENT_SETS = {
 	"warrior": {
-		"name": "武士套装", "total": 5,
+		"name": "武士套装", "total": 6, "sea_zone": "mediterranean", "sea_boss": "赤潮礁王·阿刻隆", "story_source": "朱雀试炼", "boss_only": ["warrior_talisman"],
 		"bonuses": [
 			{"pieces": 2, "stats": {"attack": 3, "defense": 2}, "drop_bonus": 0.08, "text": "攻击+3、防御+2、寻宝+8%"},
 			{"pieces": 4, "stats": {"max_hp": 24, "speed": 3}, "drop_bonus": 0.12, "text": "体力+24、速度+3、寻宝+12%"},
-			{"pieces": 5, "stats": {"attack": 5, "defense": 4, "speed": 2}, "text": "攻击+5、防御+4、速度+2"}
+			{"pieces": 6, "stats": {"attack": 5, "defense": 4, "speed": 2}, "text": "攻击+5、防御+4、速度+2"}
 		]
 	},
 	"black_sail": {
-		"name": "黑帆征服套", "total": 4,
+		"name": "黑帆征服套", "total": 6, "sea_zone": "atlantic", "sea_boss": "黑旗舰队提督·雷德", "story_source": "黑帆船长", "boss_only": ["corsair_sash", "deckwalker_boots"],
 		"bonuses": [
 			{"pieces": 2, "stats": {"attack": 6, "speed": 3}, "text": "攻击+6、速度+3"},
-			{"pieces": 4, "stats": {"max_hp": 55, "attack": 8, "defense": 6}, "text": "体力+55、攻击+8、防御+6"}
+			{"pieces": 4, "stats": {"max_hp": 55, "attack": 8, "defense": 6}, "text": "体力+55、攻击+8、防御+6"},
+			{"pieces": 6, "stats": {"attack": 12, "speed": 8}, "drop_bonus": 0.08, "text": "攻击+12、速度+8、寻宝+8%"}
 		]
 	},
 	"white_whale": {
-		"name": "白鲸遗航套", "total": 3,
+		"name": "白鲸遗航套", "total": 6, "sea_zone": "north_sea", "sea_boss": "白鲸雾歌女王·塞壬娜", "story_source": "深渊海妖", "boss_only": ["whale_watch_cap", "whale_rope_belt", "whale_wake_boots"],
 		"bonuses": [
 			{"pieces": 2, "stats": {"max_hp": 60, "defense": 8}, "text": "体力+60、防御+8"},
-			{"pieces": 3, "stats": {"attack": 12, "speed": 6}, "text": "攻击+12、速度+6"}
+			{"pieces": 4, "stats": {"attack": 12, "speed": 6}, "text": "攻击+12、速度+6"},
+			{"pieces": 6, "stats": {"max_hp": 110, "attack": 14, "defense": 12}, "text": "体力+110、攻击+14、防御+12"}
 		]
 	},
 	"seven_seas": {
-		"name": "七海巡游套", "total": 5,
+		"name": "七海巡游套", "total": 6, "sea_zone": "africa", "sea_boss": "风暴角深渊巨章", "story_source": "远洋海怪", "boss_only": ["seven_seas_compass"],
 		"bonuses": [
 			{"pieces": 2, "stats": {"max_hp": 70, "defense": 10}, "text": "体力+70、防御+10"},
 			{"pieces": 4, "stats": {"attack": 18, "speed": 10}, "drop_bonus": 0.10, "text": "攻击+18、速度+10、寻宝+10%"},
-			{"pieces": 5, "stats": {"max_hp": 120, "attack": 16, "defense": 16}, "text": "体力+120、攻击+16、防御+16"}
+			{"pieces": 6, "stats": {"max_hp": 120, "attack": 16, "defense": 16}, "text": "体力+120、攻击+16、防御+16"}
 		]
 	},
 	"earth_legacy": {
-		"name": "地魔遗珍套", "total": 6,
+		"name": "地魔遗珍套", "total": 6, "sea_zone": "indian_ocean", "sea_boss": "季风海眼镇界王", "story_source": "第五至十卷强敌", "boss_only": ["earth_heart_charm"],
 		"bonuses": [
 			{"pieces": 2, "stats": {"max_hp": 80, "defense": 10}, "text": "体力+80、防御+10"},
 			{"pieces": 4, "stats": {"attack": 18, "speed": 8}, "text": "攻击+18、速度+8"},
@@ -957,10 +999,11 @@ const EQUIPMENT_SETS = {
 		]
 	},
 	"tidekeeper": {
-		"name": "四海守潮套", "total": 3,
+		"name": "四海守潮套", "total": 6, "sea_zone": "east_asia", "sea_boss": "归潮龙王·沧溟", "story_source": "终局三卷强敌", "boss_only": ["tidekeeper_belt", "tidekeeper_boots", "tidekeeper_charm"],
 		"bonuses": [
 			{"pieces": 2, "stats": {"max_hp": 180, "attack": 24, "defense": 18}, "text": "体力+180、攻击+24、防御+18"},
-			{"pieces": 3, "stats": {"attack": 36, "defense": 28, "speed": 18}, "text": "攻击+36、防御+28、速度+18"}
+			{"pieces": 4, "stats": {"attack": 36, "defense": 28, "speed": 18}, "text": "攻击+36、防御+28、速度+18"},
+			{"pieces": 6, "stats": {"max_hp": 240, "attack": 46, "defense": 36, "speed": 24}, "text": "体力+240、攻击+46、防御+36、速度+24"}
 		]
 	}
 }
@@ -977,6 +1020,7 @@ const ITEMS = {
 	"warrior_circlet": {"name": "武士额冠", "type": "equipment", "slot": "head", "rarity": "珍稀", "set": "warrior", "description": "嵌着淡蓝玻璃珠。", "stats": {"max_hp": 18, "defense": 4}, "drop_bonus": 0.04, "price": 150},
 	"warrior_belt": {"name": "武士绑腿", "type": "equipment", "slot": "waist", "rarity": "珍稀", "set": "warrior", "description": "便于长途跋涉的轻便护具。", "stats": {"max_hp": 12, "defense": 3}, "drop_bonus": 0.04, "price": 150},
 	"warrior_boots": {"name": "武士战靴", "type": "equipment", "slot": "boots", "rarity": "珍稀", "set": "warrior", "description": "落步几乎无声。", "stats": {"defense": 3, "speed": 5}, "drop_bonus": 0.04, "price": 150},
+	"warrior_talisman": {"name": "翼狮潮誓符", "type": "equipment", "slot": "charm", "rarity": "史诗", "set": "warrior", "description": "赤潮礁王守护的武士套关键部件，翼狮与潮纹会在战斗中同时亮起。", "stats": {"max_hp": 34, "attack": 6, "defense": 4}, "drop_bonus": 0.05, "price": 360},
 	"lion_charm": {"name": "翼狮之誓", "type": "equipment", "slot": "charm", "rarity": "史诗", "description": "完成威尼斯试炼的证明。", "stats": {"max_hp": 28, "attack": 5, "defense": 3}, "price": 320},
 	"ghost_card": {"name": "普通·幽灵卡片", "type": "card", "rarity": "珍稀", "description": "启用后抗诅咒几率提高50%，并提高3点防御。", "card_effect": "ghost", "price": 120},
 	"bear_card": {"name": "精英·巨熊卡片", "type": "card", "rarity": "史诗", "description": "启用后最大体力提高8%，适合坚守与Boss战。", "card_effect": "bear", "price": 220},
@@ -994,28 +1038,38 @@ const ITEMS = {
 	,"gunner_coat": {"name": "炮手皮甲", "type": "equipment", "slot": "body", "rarity": "史诗", "set": "black_sail", "description": "内衬缝有防止火星灼伤的厚皮。", "stats": {"max_hp": 48, "defense": 12}, "price": 390}
 	,"captain_hat": {"name": "黑帆船长帽", "type": "equipment", "slot": "head", "rarity": "史诗", "set": "black_sail", "description": "帽檐下藏着一枚被刮去图案的徽章。", "stats": {"max_hp": 26, "defense": 7, "speed": 4}, "price": 420}
 	,"black_sail_charm": {"name": "黑帆航路仪", "type": "equipment", "slot": "charm", "rarity": "传说", "set": "black_sail", "description": "记录神秘鳞片航路的精密仪器。", "stats": {"max_hp": 55, "attack": 9, "defense": 7, "speed": 5}, "price": 680}
+	,"corsair_sash": {"name": "赤绳私掠腰带", "type": "equipment", "slot": "waist", "rarity": "传说", "set": "black_sail", "description": "黑旗舰队提督的战利品腰带，是凑齐征服套的关键部件。", "stats": {"max_hp": 46, "attack": 7, "defense": 10, "speed": 4}, "price": 720}
+	,"deckwalker_boots": {"name": "踏桅甲板靴", "type": "equipment", "slot": "boots", "rarity": "传说", "set": "black_sail", "description": "鞋底嵌着防滑铆钉，只有黑旗舰队提督掌握完整图样。", "stats": {"max_hp": 38, "defense": 8, "speed": 12}, "price": 760}
 	,"tide_seal": {"name": "潮纹银章", "type": "equipment", "slot": "charm", "rarity": "传说", "description": "艾丽莎父亲留下的银章，背面刻着你失去的名字。", "stats": {"max_hp": 70, "attack": 12, "defense": 8, "speed": 6}, "price": 880}
 	,"lighthouse_compass": {"name": "灯塔星盘", "type": "equipment", "slot": "charm", "rarity": "传说", "description": "萨米尔从灯塔密室取出的星盘，指针会追随发光鳞片的潮汐。", "stats": {"max_hp": 92, "attack": 16, "defense": 11, "speed": 9}, "price": 1280}
 	,"maltese_stew": {"name": "马耳他海风炖汤", "type": "consumable", "rarity": "远航餐食", "description": "恢复160点体力；接下来3场战斗最大体力+45、攻击+6、防御+3。", "heal": 160, "meal_battles": 3, "price": 120}
 	,"whale_bone_sabre": {"name": "白鲸骨刃", "type": "equipment", "slot": "weapon", "rarity": "传说", "set": "white_whale", "description": "以白鲸号断裂龙骨与潮纹钢重铸的长刃。", "stats": {"attack": 26, "speed": 5}, "price": 1450}
-	,"survivor_coat": {"name": "遗航者外套", "type": "equipment", "slot": "body", "rarity": "传说", "set": "white_whale", "description": "衣袋里仍缝着白鲸号船员名册的一角。", "stats": {"max_hp": 78, "defense": 18, "speed": 3}, "price": 1520}
+	,"survivor_coat": {"name": "遗航者外套", "type": "equipment", "slot": "body", "rarity": "传说", "description": "衣袋里仍缝着白鲸号船员名册的一角，是独立的剧情纪念装备。", "stats": {"max_hp": 78, "defense": 18, "speed": 3}, "price": 1520}
 	,"siren_charm": {"name": "雾歌耳坠", "type": "equipment", "slot": "charm", "rarity": "传说", "set": "white_whale", "description": "雾歌海妖凝成的水晶，使持有者不再迷失于海雾。", "stats": {"max_hp": 105, "attack": 19, "defense": 14, "speed": 11}, "price": 1780}
 	,"white_whale_coat": {"name": "白鲸守望衣", "type": "equipment", "slot": "body", "rarity": "神话", "set": "white_whale", "description": "伊莎贝拉依照先祖遗图缝制的航海衣，内衬记录着下一段北河航路。", "stats": {"max_hp": 120, "attack": 7, "defense": 24, "speed": 5}, "price": 2280}
+	,"whale_watch_cap": {"name": "白鲸守望帽", "type": "equipment", "slot": "head", "rarity": "神话", "set": "white_whale", "description": "雾歌女王收藏的白鲸号领航帽，帽檐刻有北海星位。", "stats": {"max_hp": 82, "attack": 8, "defense": 17, "speed": 9}, "price": 2150}
+	,"whale_rope_belt": {"name": "鲸骨缆绳带", "type": "equipment", "slot": "waist", "rarity": "神话", "set": "white_whale", "description": "由鲸骨扣与不沉缆绳编成，是白鲸遗航套的关键部件。", "stats": {"max_hp": 76, "attack": 10, "defense": 20, "speed": 7}, "price": 2240}
+	,"whale_wake_boots": {"name": "踏鲸尾流靴", "type": "equipment", "slot": "boots", "rarity": "神话", "set": "white_whale", "description": "鞋边凝着不会融化的北海潮霜。", "stats": {"max_hp": 68, "defense": 15, "speed": 22}, "price": 2320}
 	,"basin_charm": {"name": "聚宝潮盆", "type": "equipment", "slot": "charm", "rarity": "神话", "description": "不再吞噬欲望的聚宝盆，会把远征者的勇气化为潮光。", "stats": {"max_hp": 150, "attack": 28, "defense": 22, "speed": 12}, "price": 3200}
 	,"demon_mask": {"name": "镇妖明光冠", "type": "equipment", "slot": "head", "rarity": "神话", "set": "earth_legacy", "description": "由照妖镜片重铸，能让佩戴者看穿幻城。", "stats": {"max_hp": 115, "attack": 16, "defense": 28, "speed": 15}, "price": 3900}
 	,"earth_armor": {"name": "地魔镇岳甲", "type": "equipment", "slot": "body", "rarity": "神话", "set": "earth_legacy", "description": "卸去黄金锁链后留下的地脉重甲。", "stats": {"max_hp": 230, "attack": 12, "defense": 42, "speed": 6}, "price": 4700}
 	,"tira_sword": {"name": "蒂拉之剑", "type": "equipment", "slot": "weapon", "rarity": "神话", "set": "earth_legacy", "description": "只服从不被力量支配之人的潮刃。", "stats": {"attack": 54, "defense": 10, "speed": 17}, "price": 5600}
 	,"celestial_belt": {"name": "破军星环", "type": "equipment", "slot": "waist", "rarity": "神话", "set": "earth_legacy", "description": "天魔将坠落后留下的星轨腰环。", "stats": {"max_hp": 140, "attack": 24, "defense": 30, "speed": 19}, "price": 6600}
 	,"jade_boots": {"name": "玉历踏月靴", "type": "equipment", "slot": "boots", "rarity": "神话", "set": "earth_legacy", "description": "每一步都踏在真实发生过的历史上。", "stats": {"max_hp": 125, "attack": 15, "defense": 26, "speed": 34}, "price": 7700}
-	,"furnace_core": {"name": "熄火炉心", "type": "equipment", "slot": "charm", "rarity": "神话", "set": "earth_legacy", "description": "黑炉熄灭后凝成的冷核，蕴含被释放的潮能。", "stats": {"max_hp": 260, "attack": 45, "defense": 38, "speed": 22}, "price": 8900}
+	,"furnace_core": {"name": "熄火炉心", "type": "equipment", "slot": "charm", "rarity": "神话", "description": "黑炉熄灭后凝成的独立剧情遗物，蕴含被释放的潮能。", "stats": {"max_hp": 260, "attack": 45, "defense": 38, "speed": 22}, "price": 8900}
+	,"earth_heart_charm": {"name": "镇界地心印", "type": "equipment", "slot": "charm", "rarity": "唯一", "set": "earth_legacy", "description": "季风海眼镇界王随机掉落的地魔套关键部件，封存着不再暴走的地脉。", "stats": {"max_hp": 245, "attack": 42, "defense": 40, "speed": 24}, "price": 9300}
 	,"demon_crown": {"name": "九港守夜冠", "type": "equipment", "slot": "head", "rarity": "神话", "set": "tidekeeper", "description": "九港居民共同重铸的王冠，不属于任何一位国王。", "stats": {"max_hp": 210, "attack": 32, "defense": 48, "speed": 25}, "price": 10200}
 	,"divine_shears": {"name": "天工神剪", "type": "equipment", "slot": "weapon", "rarity": "神话", "set": "tidekeeper", "description": "能剪断谎言，也能把破裂的命运重新裁合。", "stats": {"max_hp": 160, "attack": 78, "defense": 20, "speed": 29}, "price": 11800}
 	,"tidekeeper_regalia": {"name": "四海守潮圣装", "type": "equipment", "slot": "body", "rarity": "唯一", "set": "tidekeeper", "description": "十三卷航海日志与九港誓言共同织成的最终圣装。", "stats": {"max_hp": 420, "attack": 42, "defense": 72, "speed": 32}, "price": 15000}
+	,"tidekeeper_belt": {"name": "九港潮环腰带", "type": "equipment", "slot": "waist", "rarity": "唯一", "set": "tidekeeper", "description": "归潮龙王守护的九港潮环，九枚宝石会依次回应港口灯火。", "stats": {"max_hp": 230, "attack": 38, "defense": 50, "speed": 28}, "price": 13200}
+	,"tidekeeper_boots": {"name": "沧溟逐浪靴", "type": "equipment", "slot": "boots", "rarity": "唯一", "set": "tidekeeper", "description": "踏浪时会展开水翼，是守潮套的关键部件。", "stats": {"max_hp": 190, "attack": 30, "defense": 38, "speed": 48}, "price": 13600}
+	,"tidekeeper_charm": {"name": "四海同心璧", "type": "equipment", "slot": "charm", "rarity": "唯一", "set": "tidekeeper", "description": "归潮龙王凝成的守潮誓约，只有挑战东亚海域 Boss 才能寻得。", "stats": {"max_hp": 280, "attack": 52, "defense": 44, "speed": 36}, "price": 14200}
 	,"stormsteel_cutlass": {"name": "风暴钢弯刀", "type": "equipment", "slot": "weapon", "rarity": "传说", "set": "seven_seas", "description": "由九港船匠共同锻造的巡海弯刀，适合中后期远洋战斗。", "stats": {"attack": 43, "defense": 5, "speed": 12}, "price": 3450}
 	,"stormwatch_coat": {"name": "守风者航海衣", "type": "equipment", "slot": "body", "rarity": "传说", "set": "seven_seas", "description": "多层油布与锁片缝合的远洋护衣，能抵御风暴和接舷箭雨。", "stats": {"max_hp": 165, "defense": 34, "speed": 8}, "price": 3720}
 	,"chartmaster_hat": {"name": "星图师船帽", "type": "equipment", "slot": "head", "rarity": "传说", "set": "seven_seas", "description": "帽檐刻着六大海域的星位，浓雾中也能辨清方向。", "stats": {"max_hp": 82, "attack": 9, "defense": 19, "speed": 15}, "price": 3280}
 	,"leviathan_belt": {"name": "镇浪龙骨带", "type": "equipment", "slot": "waist", "rarity": "传说", "set": "seven_seas", "description": "嵌入旧船龙骨碎片的宽腰带，接舷时稳如甲板桩。", "stats": {"max_hp": 105, "attack": 12, "defense": 22, "speed": 7}, "price": 3360}
 	,"monsoon_boots": {"name": "季风踏浪靴", "type": "equipment", "slot": "boots", "rarity": "传说", "set": "seven_seas", "description": "鞋底会顺着季风潮向发亮，是远洋巡游者的标志。", "stats": {"max_hp": 76, "defense": 15, "speed": 29}, "price": 3540}
+	,"seven_seas_compass": {"name": "七海风暴罗盘", "type": "equipment", "slot": "charm", "rarity": "神话", "set": "seven_seas", "description": "风暴角深渊巨章吞下的九港罗盘，是巡游套的关键部件。", "stats": {"max_hp": 118, "attack": 24, "defense": 18, "speed": 20}, "price": 4100}
 	,"dragon_spring_water": {"name": "龙泉水", "type": "material", "rarity": "锻造材料", "description": "装备强化至+4以上时用于稳定潮纹。", "price": 120}
 	,"forging_blueprint": {"name": "强化图纸", "type": "material", "rarity": "锻造材料", "description": "装备强化至+8以上时必须使用的通用图纸。", "price": 260}
 }

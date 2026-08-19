@@ -131,7 +131,7 @@ func _run():
 	scene.state.inventory["warrior_blade"] = 1
 	scene._open_inventory()
 	_check(_has_button_text(scene.overlay, "装备") and _has_button_text(scene.overlay, "使用"), "背包必须显示装备与使用按钮")
-	_check(_has_label_text(scene.overlay, "物品背包") and _has_label_text(scene.overlay, "背包物品") and not _has_label_text(scene.overlay, "当前已装备") and _count_visuals(scene.overlay, "equipment") >= 1 and _count_visuals(scene.overlay, "consumable") >= 1, "物品背包必须只展示带模型的未装备物品，不能继续混入角色装备槽")
+	_check(_has_label_text(scene.overlay, "物品背包") and _has_label_text(scene.overlay, "背包物品") and not _has_label_text(scene.overlay, "当前已装备") and _count_visuals(scene.overlay, "equipment") >= 1 and _count_visuals(scene.overlay, "consumable") >= 1 and _has_visual_set(scene.overlay, "warrior"), "物品背包必须展示新版套装图集，并只保留未装备物品")
 	scene._open_character()
 	_check(_has_label_text(scene.overlay, "角色信息 · 已装备") and _has_label_text(scene.overlay, "当前已装备") and _has_named_node(scene.overlay, "CharacterPortrait") and _has_named_node(scene.overlay, "CurrentShipModel") and _has_label_text(scene.overlay, "座舰系统") and _has_label_text(scene.overlay, "Lv.1  海燕号") and _has_label_text(scene.overlay, "九港船型图鉴") and _has_label_text(scene.overlay, "Lv.9 北海飞剪船") and _count_visuals(scene.overlay, "equipment") == 6 and not _has_label_text(scene.overlay, "背包物品"), "角色页必须独立展示人物、装备与当前座舰，并列出九港分级船型")
 	scene._open_inventory()
@@ -139,7 +139,7 @@ func _run():
 	await process_frame
 	_check(str(scene.state.equipment.weapon) == "warrior_blade", "点击装备必须更新角色装备槽")
 	scene._open_character()
-	_check(_has_label_text(scene.overlay, "武士套装") and _has_label_text(scene.overlay, "套装共鸣") and _has_button_text(scene.overlay, "强化至 +1"), "角色装备页必须显示套装进度、分段共鸣和+10强化入口")
+	_check(_has_label_text(scene.overlay, "武士套装") and _has_label_text(scene.overlay, "套装共鸣") and _has_label_text(scene.overlay, "套装猎场") and _has_label_text(scene.overlay, "赤潮礁王·阿刻隆") and _has_button_text(scene.overlay, "强化至 +1") and _named_node_meta(scene.overlay, "CharacterPortrait", "equipment_skin") == "warrior", "角色装备页必须切换新版套装皮肤，并显示共鸣、指定海域Boss、掉率和强化入口")
 	scene._open_inventory()
 	var item_count_before = int(scene.state.inventory.get("small_milk", 0))
 	var max_hp = int(scene.state.get_stats().max_hp)
@@ -728,6 +728,27 @@ func _has_named_node(node, target_name):
 		if _has_named_node(child, target_name):
 			return true
 	return false
+
+func _has_visual_set(node, set_id):
+	if not is_instance_valid(node):
+		return false
+	if node.has_meta("equipment_set_skin") and str(node.get_meta("equipment_set_skin")) == str(set_id):
+		return true
+	for child in node.get_children():
+		if _has_visual_set(child, set_id):
+			return true
+	return false
+
+func _named_node_meta(node, target_name, meta_name):
+	if not is_instance_valid(node):
+		return ""
+	if str(node.name) == str(target_name):
+		return str(node.get_meta(meta_name, ""))
+	for child in node.get_children():
+		var result = _named_node_meta(child, target_name, meta_name)
+		if result != "":
+			return result
+	return ""
 
 func _wait_for_auto_battle(scene):
 	for _step in range(160):

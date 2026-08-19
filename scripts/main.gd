@@ -13,6 +13,8 @@ const LINE = Color(0.18, 0.39, 0.45, 0.55)
 const DESKTOP_DESIGN_SIZE = Vector2i(1280, 720)
 const MOBILE_DESIGN_SIZE = Vector2i(720, 1280)
 const PlayerShipTexture = preload("res://assets/art/ships/player_ship_atlas_v1.png")
+const EquipmentSkinTexture = preload("res://assets/art/equipment/equipment_set_character_skins_v2.png")
+const EQUIPMENT_SKIN_INDEX = {"warrior": 0, "black_sail": 1, "white_whale": 2, "seven_seas": 3, "earth_legacy": 4, "tidekeeper": 5}
 
 var state = GameState.new()
 var main_margin
@@ -1585,6 +1587,7 @@ func _open_character():
 	summary_row.add_child(fill)
 	summary_row.add_child(_label("体力 %d  ·  攻击 %d  ·  防御 %d  ·  敏捷 %d" % [stats.max_hp, stats.attack, stats.defense, stats.speed], 12, MUTED))
 	content.add_child(summary)
+	content.add_child(_journal_equipment_skin_summary())
 	content.add_child(_journal_ship_summary())
 	content.add_child(_label("持有银币：%d｜装备最高可强化至+10" % int(state.player.silver), 12, GOLD))
 	var recommend = _button("一键穿戴推荐装备", "gold")
@@ -1633,12 +1636,46 @@ func _open_character():
 		content.add_child(set_label)
 	if visible_set_count == 0:
 		content.add_child(_label("尚未穿戴套装装备。", 11, MUTED))
+	content.add_child(_small_caption("套装猎场"))
+	for set_id in GameData.EQUIPMENT_SETS:
+		var set_definition = Dictionary(GameData.EQUIPMENT_SETS[set_id])
+		var boss = GameData.sea_set_boss(str(set_definition.sea_zone))
+		var zone_name = str(GameData.SEA_REGIONS[str(set_definition.sea_zone)].name)
+		content.add_child(_label("%s｜%s · %s｜Lv.%d｜基础掉率%d%%｜缺件三倍权重" % [str(set_definition.name), zone_name, str(set_definition.sea_boss), int(boss.unlock_level), int(round(float(boss.drop_rate) * 100.0))], 10, Color("8ecbd0")))
 	var social_parts = []
 	social_parts.append("队伍：独自冒险" if state.party_members.is_empty() else "队伍：%s（攻防+5%%）" % state.party_members[0])
 	social_parts.append("宠物：无" if state.pet.is_empty() else "宠物：%s（战斗自动协战）" % state.pet.name)
 	social_parts.append("当前物品掉落加成：%d%%" % int(round(float(stats.drop_bonus) * 100.0)))
 	content.add_child(_label("  ·  ".join(social_parts), 11, Color("8ecbd0")))
 	_open_modal("角色与装备", content, Vector2(740, 630))
+
+func _journal_equipment_skin_summary():
+	var panel = _panel_container(Color(0.025, 0.10, 0.14, 0.96), 11, Color(GOLD, 0.52), 1)
+	var margin = _inside_margin(10, 8)
+	panel.add_child(margin)
+	var row = HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	margin.add_child(row)
+	var dominant = state.dominant_equipment_set()
+	if not dominant.is_empty() and EQUIPMENT_SKIN_INDEX.has(str(dominant.id)):
+		var preview = TextureRect.new()
+		preview.name = "JournalEquipmentSkin"
+		preview.custom_minimum_size = Vector2(112, 150)
+		preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		var atlas = AtlasTexture.new()
+		var skin_index = int(EQUIPMENT_SKIN_INDEX[str(dominant.id)])
+		var cell = Vector2(float(EquipmentSkinTexture.get_width()) / 3.0, float(EquipmentSkinTexture.get_height()) / 2.0)
+		atlas.atlas = EquipmentSkinTexture
+		atlas.region = Rect2(Vector2((skin_index % 3) * cell.x, int(skin_index / 3) * cell.y), cell)
+		preview.texture = atlas
+		preview.set_meta("equipment_skin", str(dominant.id))
+		row.add_child(preview)
+	var copy = _label("当前套装外观｜%s\n%s\n主线获得入门部件；前往对应海域追猎指定 Boss，才可收集关键缺件。" % [str(dominant.name), "%d / %d 件" % [int(dominant.count), int(dominant.total)]] if not dominant.is_empty() else "当前套装外观｜初始航海装\n尚未穿戴套装\n主线会给第一批入门件，对应海域 Boss 才能凑齐整套。", 11, GOLD)
+	copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	row.add_child(copy)
+	return panel
 
 func _journal_ship_summary():
 	var hull_id = str(state.ship.get("hull_id", "sea_swallow"))

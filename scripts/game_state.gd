@@ -438,6 +438,34 @@ func equipment_set_name(item_id):
 	var set_id = str(GameData.ITEMS[str(item_id)].get("set", ""))
 	return str(GameData.EQUIPMENT_SETS[set_id].name) if GameData.EQUIPMENT_SETS.has(set_id) else ""
 
+func dominant_equipment_set():
+	var counts = equipment_set_counts()
+	var selected_id = ""
+	var selected_count = 0
+	for set_id in counts:
+		if int(counts[set_id]) > selected_count:
+			selected_id = str(set_id)
+			selected_count = int(counts[set_id])
+	if selected_id == "":
+		return {}
+	var definition = Dictionary(GameData.EQUIPMENT_SETS[selected_id])
+	return {"id": selected_id, "name": str(definition.name), "count": selected_count, "total": int(definition.total)}
+
+func owns_equipment_item(item_id):
+	if int(inventory.get(str(item_id), 0)) > 0:
+		return true
+	return str(item_id) in equipment.values()
+
+func sea_set_weighted_drop_pool(set_id):
+	var pool = []
+	for item_id in GameData.equipment_set_items(str(set_id)):
+		pool.append(str(item_id))
+		# 缺件拥有三倍权重；仍保留重复件，保证刷装与强化材料循环不会被切断。
+		if not owns_equipment_item(str(item_id)):
+			pool.append(str(item_id))
+			pool.append(str(item_id))
+	return pool
+
 func equipment_loadout_score(loadout = null):
 	var resolved_loadout = equipment if typeof(loadout) != TYPE_DICTIONARY else Dictionary(loadout)
 	var score = 0
@@ -758,18 +786,27 @@ func start_battle(enemy_id):
 	var enemy = Dictionary(GameData.ENEMIES[enemy_id])
 	var sea_zone_id = ""
 	var loot_tier_name = ""
+	var sea_set_boss = {}
 	if sea_encounter:
 		var encounter = sea_encounter(str(active_voyage.get("current_encounter_id", "")))
 		sea_zone_id = str(encounter.get("zone_id", GameData.sea_zone_for_port(str(active_voyage.get("origin", player.location)))))
 		var threat_level = int(encounter.get("threat_level", sea_encounter_level(enemy_id, sea_zone_id)))
 		enemy = _scaled_sea_enemy_profile(enemy_id, threat_level)
 		loot_tier_name = str(GameData.sea_equipment_tier(threat_level).name)
+		if bool(encounter.get("set_boss", false)):
+			sea_set_boss = GameData.sea_set_boss(sea_zone_id, enemy_id)
+			if not sea_set_boss.is_empty():
+				enemy.name = str(sea_set_boss.boss_name)
+				enemy.rank = "海域 Boss"
+				var set_definition = Dictionary(GameData.EQUIPMENT_SETS[str(sea_set_boss.set_id)])
+				loot_tier_name = "%s整套 · %d%%随机掉落" % [str(set_definition.name), int(round(float(sea_set_boss.drop_rate) * 100.0))]
 	var scaled_enemy_hp = difficulty_enemy_hp(int(enemy.hp))
 	active_battle = {
 		"enemy_id": enemy_id, "enemy_hp": scaled_enemy_hp, "enemy_max_hp": scaled_enemy_hp,
 		"enemy_profile": enemy, "sea_zone_id": sea_zone_id,
 		"sea_zone_name": str(GameData.SEA_REGIONS.get(sea_zone_id, {}).get("name", "")),
 		"loot_tier_name": loot_tier_name, "sea_balance_version": GameData.SEA_BALANCE_VERSION,
+		"sea_set_id": str(sea_set_boss.get("set_id", "")), "sea_set_drop_rate": float(sea_set_boss.get("drop_rate", 0.0)),
 		"round": 1, "focus": 0, "skill_prepared": false, "sea_battle": sea_encounter, "log": [enemy.intro]
 	}
 	player.battles += 1
@@ -796,6 +833,7 @@ func get_battle_view():
 		"battle_stance": battle_stance, "enemy_intent": get_enemy_intent(),
 		"sea_zone_id": str(active_battle.get("sea_zone_id", "")), "sea_zone_name": str(active_battle.get("sea_zone_name", "")),
 		"loot_tier_name": str(active_battle.get("loot_tier_name", "")), "dynamic_threat": sea_battle,
+		"sea_set_id": str(active_battle.get("sea_set_id", "")), "sea_set_drop_rate": float(active_battle.get("sea_set_drop_rate", 0.0)),
 		"auto_heal_threshold": auto_heal_threshold, "auto_cure_status": auto_cure_status,
 		"focus": battle_focus(), "focus_max": 3, "difficulty": difficulty, "difficulty_name": difficulty_name()
 	}
@@ -1058,16 +1096,24 @@ func _finish_battle_win(enemy_id, round_logs):
 	var stats = get_stats()
 	var stance_drop_bonus = 0.14 if finishing_stance == "plunder" else 0.0
 	var difficulty_drop_bonus = 0.10 if difficulty == DIFFICULTY_ADVENTURE else 0.0
+	var sea_set_id = str(active_battle.get("sea_set_id", ""))
+	var sea_set_drop_rate = float(active_battle.get("sea_set_drop_rate", 0.0))
 	var drop_chance = 1.0 if enemy.rank in ["首领", "副本 Boss"] else min(0.90, 0.22 + float(stats.drop_bonus) + stance_drop_bonus + difficulty_drop_bonus)
-	if rng.randf() <= drop_chance and enemy.drops.size() > 0:
-		var drop_pool = Array(enemy.drops)
-		if was_sea_battle and rng.randf() <= 0.45:
+	if sea_set_id != "":
+		# 套装 Boss 保持随机掉落；寻宝属性、冒险难度与掠夺姿态可把概率推高，但不会变成必掉。
+		drop_chance = min(0.92, sea_set_drop_rate + float(stats.drop_bonus) * 0.35 + stance_drop_bonus * 0.5 + difficulty_drop_bonus * 0.5)
+	if rng.randf() <= drop_chance:
+		var drop_pool = sea_set_weighted_drop_pool(sea_set_id) if sea_set_id != "" else Array(enemy.get("drops", []))
+		if sea_set_id == "" and was_sea_battle and rng.randf() <= 0.45:
 			drop_pool = GameData.sea_equipment_pool(sea_zone_id, int(enemy.level))
-		drop_id = str(drop_pool[rng.randi_range(0, drop_pool.size() - 1)])
-		_add_item(drop_id, 1)
+		if drop_pool.is_empty():
+			drop_pool = Array(enemy.get("drops", []))
+		if not drop_pool.is_empty():
+			drop_id = str(drop_pool[rng.randi_range(0, drop_pool.size() - 1)])
+			_add_item(drop_id, 1)
 	round_logs.append("战斗胜利！获得%d经验、%d银币。" % [exp_reward, silver])
 	if drop_id != "":
-		round_logs.append("百宝箱拾取：%s。" % GameData.ITEMS[drop_id].name)
+		round_logs.append("套装猎场掉落：%s（缺件拥有更高权重）。" % GameData.ITEMS[drop_id].name if sea_set_id != "" else "百宝箱拾取：%s。" % GameData.ITEMS[drop_id].name)
 	message_history.push_front("击败%s，获得%d经验。" % [enemy.name, exp_reward])
 	_trim_history()
 	active_battle = {}
@@ -1080,6 +1126,7 @@ func _finish_battle_win(enemy_id, round_logs):
 		"enemy_hp": 0, "enemy_max_hp": defeated_enemy_max_hp, "player_level": int(player.level), "player_hp": int(player.hp), "player_max_hp": int(get_stats().max_hp),
 		"sea_battle": was_sea_battle, "combatant_name": str(ship.name) if was_sea_battle else str(player.name),
 		"sea_zone_id": sea_zone_id, "sea_zone_name": sea_zone_name, "loot_tier_name": loot_tier_name, "dynamic_threat": was_sea_battle,
+		"sea_set_id": sea_set_id, "sea_set_drop_rate": sea_set_drop_rate,
 		"round": 0, "statuses": {}, "logs": round_logs,
 		"exp": exp_reward, "silver": silver, "drop": drop_id, "leveled": leveled, "new_level": int(player.level),
 		"quest_completed": quest_completed, "bounty_completed": bounty_completed, "battle_stance": finishing_stance
@@ -1852,6 +1899,10 @@ func _voyage_enemy_roster(zone_ids, tier_id, threat_count):
 	var desired_count = int(threat_count)
 	var enemy_ids = []
 	var enemy_zones = []
+	var route_boss = GameData.sea_set_boss_for_route(zone_ids, int(player.level))
+	if desired_count > 0 and not route_boss.is_empty() and str(route_boss.enemy_id) in eligible:
+		enemy_ids.append(str(route_boss.enemy_id))
+		candidate_zones[str(route_boss.enemy_id)] = str(route_boss.zone_id)
 	if desired_count > 0 and not Array(zone_ids).is_empty():
 		var origin_signatures = Array(GameData.SEA_ZONE_SIGNATURE_ENEMIES.get(str(Array(zone_ids).front()), []))
 		for enemy_id in eligible:
@@ -1901,6 +1952,7 @@ func _build_sea_encounters(plan):
 	var destination_position = GameData.sea_port_position(str(plan.destination))
 	var direction = destination_position - origin_position
 	var perpendicular = Vector2(-direction.y, direction.x).normalized()
+	var spawned_set_bosses = {}
 	for index in range(enemy_ids.size()):
 		var enemy_id = str(enemy_ids[index])
 		var zone_id = str(enemy_zones[index]) if index < enemy_zones.size() else "mediterranean"
@@ -1910,11 +1962,19 @@ func _build_sea_encounters(plan):
 		var position = origin_position.lerp(destination_position, progress) + perpendicular * lateral
 		position.x = clamp(position.x, 120.0, GameData.SEA_GLOBAL_WORLD_SIZE.x - 120.0)
 		position.y = clamp(position.y, 120.0, GameData.SEA_GLOBAL_WORLD_SIZE.y - 120.0)
+		var boss = GameData.sea_set_boss(zone_id, enemy_id)
+		var is_set_boss = not boss.is_empty() and int(player.level) >= int(boss.unlock_level) and not spawned_set_bosses.has(zone_id)
+		if is_set_boss:
+			spawned_set_bosses[zone_id] = true
+			threat_level = max(threat_level, int(boss.unlock_level))
+		var loot_name = str(GameData.sea_equipment_tier(threat_level).name)
+		if is_set_boss:
+			loot_name = "%s整套 · %d%%" % [str(GameData.EQUIPMENT_SETS[str(boss.set_id)].name), int(round(float(boss.drop_rate) * 100.0))]
 		encounters.append({
 			"id": "sea_%d" % (index + 1), "enemy_id": enemy_id,
 			"kind": "pirate" if enemy_id in ["coastal_pirate", "ocean_raider", "black_flag_privateer"] else "monster",
 			"zone_id": zone_id, "threat_level": threat_level,
-			"loot_tier_name": str(GameData.sea_equipment_tier(threat_level).name), "progress": progress,
+			"loot_tier_name": loot_name, "set_boss": is_set_boss, "set_id": str(boss.get("set_id", "")) if is_set_boss else "", "progress": progress,
 			"x": position.x, "y": position.y, "defeated": false
 		})
 	return encounters

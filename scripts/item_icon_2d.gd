@@ -1,5 +1,19 @@
 extends Control
 
+const WarriorBlackSailIcons = preload("res://assets/art/equipment/equipment_sets_warrior_black_sail_v2.png")
+const WhiteWhaleSevenSeasIcons = preload("res://assets/art/equipment/equipment_sets_white_whale_seven_seas_v2.png")
+const EarthTidekeeperIcons = preload("res://assets/art/equipment/equipment_sets_earth_tidekeeper_v2.png")
+
+const SET_ICON_LAYOUT = {
+	"warrior": {"texture": WarriorBlackSailIcons, "row": 0},
+	"black_sail": {"texture": WarriorBlackSailIcons, "row": 2},
+	"white_whale": {"texture": WhiteWhaleSevenSeasIcons, "row": 0},
+	"seven_seas": {"texture": WhiteWhaleSevenSeasIcons, "row": 2},
+	"earth_legacy": {"texture": EarthTidekeeperIcons, "row": 0},
+	"tidekeeper": {"texture": EarthTidekeeperIcons, "row": 2}
+}
+const SET_SLOT_INDEX = {"weapon": 0, "head": 1, "body": 2, "waist": 3, "boots": 4, "charm": 5}
+
 const RARITY_COLORS = {
 	"普通": Color("9ab3b8"), "补给": Color("69c8a8"), "酒馆食物": Color("d5a867"),
 	"稀有补给": Color("62b8ef"), "远航餐食": Color("64d9c6"), "优秀": Color("54c8a8"),
@@ -29,6 +43,7 @@ func configure(kind, id, item_rarity = "普通", item_slot = "", is_equipped = f
 	set_meta("visual_kind", visual_kind)
 	set_meta("visual_id", visual_id)
 	set_meta("equipped", equipped)
+	set_meta("equipment_set_skin", str(GameData.ITEMS.get(visual_id, {}).get("set", "")))
 	queue_redraw()
 
 func rarity_color():
@@ -44,10 +59,10 @@ func _draw():
 	draw_style_box(box, Rect2(Vector2.ZERO, size))
 	draw_circle(size * Vector2(0.30, 0.28), min(size.x, size.y) * 0.27, Color(accent, 0.10))
 	draw_circle(size * Vector2(0.73, 0.73), min(size.x, size.y) * 0.19, Color(accent, 0.08))
-	_draw_frame_ornaments(accent)
+	var generated_equipment = (visual_kind == "equipment" or slot != "") and _draw_set_equipment_art()
 	if visual_kind == "trade":
 		_draw_trade_icon(accent)
-	elif visual_kind == "equipment" or slot != "":
+	elif (visual_kind == "equipment" or slot != "") and not generated_equipment:
 		_draw_equipment_icon(accent)
 	elif visual_kind == "consumable":
 		_draw_consumable_icon(accent)
@@ -57,10 +72,27 @@ func _draw():
 		_draw_crate_icon(accent)
 	else:
 		_draw_charm(accent)
+	_draw_frame_ornaments(accent)
 	if equipped:
 		draw_circle(Vector2(size.x - 13, 13), 8, Color("48cdb8"))
 		draw_line(Vector2(size.x - 17, 13), Vector2(size.x - 14, 16), Color("092f33"), 2.5, true)
 		draw_line(Vector2(size.x - 14, 16), Vector2(size.x - 9, 10), Color("092f33"), 2.5, true)
+
+func _draw_set_equipment_art():
+	var item = Dictionary(GameData.ITEMS.get(visual_id, {}))
+	var set_id = str(item.get("set", ""))
+	if not SET_ICON_LAYOUT.has(set_id) or not SET_SLOT_INDEX.has(slot):
+		return false
+	var layout = Dictionary(SET_ICON_LAYOUT[set_id])
+	var texture = layout.texture as Texture2D
+	var slot_index = int(SET_SLOT_INDEX[slot])
+	var column = slot_index % 3
+	var row = int(layout.row) + int(slot_index / 3)
+	var cell_size = Vector2(float(texture.get_width()) / 3.0, float(texture.get_height()) / 4.0)
+	var source = Rect2(Vector2(column * cell_size.x, row * cell_size.y), cell_size)
+	var inset = max(5.0, min(size.x, size.y) * 0.07)
+	draw_texture_rect_region(texture, Rect2(Vector2(inset, inset), size - Vector2(inset * 2.0, inset * 2.0)), source)
+	return true
 
 func _draw_equipment_icon(accent):
 	match slot:

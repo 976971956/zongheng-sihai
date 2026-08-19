@@ -87,9 +87,9 @@ func _init():
 	var recommend_result = gear_state.equip_recommended()
 	_check(bool(recommend_result.ok) and str(gear_state.equipment.weapon) == "warrior_blade" and gear_state.get_power() > power_before_recommend, "一键推荐必须自动换上背包中更强的装备")
 	var set_state = TestState.new()
-	set_state.equipment = {"weapon": "warrior_blade", "head": "warrior_circlet", "body": "warrior_coat", "waist": "warrior_belt", "boots": "warrior_boots", "charm": ""}
+	set_state.equipment = {"weapon": "warrior_blade", "head": "warrior_circlet", "body": "warrior_coat", "waist": "warrior_belt", "boots": "warrior_boots", "charm": "warrior_talisman"}
 	var warrior_bonus = set_state.equipment_set_bonus_stats()
-	_check(int(set_state.equipment_set_counts().warrior) == 5 and int(warrior_bonus.attack) == 8 and int(warrior_bonus.defense) == 6 and int(warrior_bonus.speed) == 5 and is_equal_approx(float(warrior_bonus.drop_bonus), 0.20), "武士套必须按2件、4件、5件逐级叠加战斗与寻宝共鸣")
+	_check(int(set_state.equipment_set_counts().warrior) == 6 and int(warrior_bonus.attack) == 8 and int(warrior_bonus.defense) == 6 and int(warrior_bonus.speed) == 5 and is_equal_approx(float(warrior_bonus.drop_bonus), 0.20), "武士套必须按2件、4件、6件逐级叠加战斗与寻宝共鸣")
 	set_state.inventory["corsair_cutlass"] = 1
 	var preserve_set_result = set_state.equip_recommended()
 	_check(not bool(preserve_set_result.ok) and str(set_state.equipment.weapon) == "warrior_blade", "一键推荐必须计算拆套损失，不能只按单件数值破坏完整套装")

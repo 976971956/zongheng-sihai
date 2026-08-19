@@ -113,7 +113,31 @@ func _run():
 	_check(GameData.sea_level_band_text(["mediterranean", "indian_ocean", "east_asia"]) == "地中海 Lv.5–24 → 印度洋 Lv.38–80 → 东亚海域 Lv.42–96", "航线预览必须明确列出每段海域的等级范围")
 	var high_sea_tier = GameData.sea_equipment_tier(60)
 	var high_sea_pool = GameData.sea_equipment_pool("indian_ocean", 60)
-	_check(str(high_sea_tier.name) == "七海巡游套" and high_sea_pool.has("monsoon_boots") and not high_sea_pool.has("tira_sword") and not high_sea_pool.has("tidekeeper_regalia"), "高等级海怪应掉落通用七海装备，不能随机掉落主线Boss唯一遗物")
+	_check(str(high_sea_tier.name) == "七海入门装备" and high_sea_pool.has("stormsteel_cutlass") and not high_sea_pool.has("monsoon_boots") and not high_sea_pool.has("seven_seas_compass"), "普通高等级海怪只能掉落套装入门件，不能绕过海域Boss拿到关键缺件")
+	for zone_id in GameData.SEA_SET_BOSSES:
+		var boss_definition = GameData.sea_set_boss(str(zone_id))
+		var set_id = str(boss_definition.set_id)
+		var full_pool = GameData.sea_set_drop_pool(str(zone_id), str(boss_definition.enemy_id))
+		_check(full_pool.size() == int(GameData.EQUIPMENT_SETS[set_id].total) and full_pool.size() == 6, "%s套装Boss必须覆盖六个可穿戴部位" % GameData.EQUIPMENT_SETS[set_id].name)
+		for key_item in Array(GameData.EQUIPMENT_SETS[set_id].boss_only):
+			_check(str(key_item) in full_pool, "%s的关键缺件必须只进入对应海域Boss整套池" % GameData.ITEMS[str(key_item)].name)
+	var set_boss_state = TestState.new()
+	set_boss_state.quest_index = GameData.QUESTS.size()
+	set_boss_state.player.level = 10
+	set_boss_state.player.location = "venice_dock"
+	set_boss_state.begin_voyage("ragusa_dock")
+	var set_boss_encounter = {}
+	for encounter in Array(set_boss_state.active_voyage.encounters):
+		if bool(encounter.get("set_boss", false)):
+			set_boss_encounter = Dictionary(encounter)
+			break
+	_check(not set_boss_encounter.is_empty() and str(set_boss_encounter.get("set_id", "")) == "warrior", "达到解锁等级后，地中海航线必须随机布置可见的武士套装Boss")
+	if not set_boss_encounter.is_empty():
+		var boss_battle = set_boss_state.start_sea_encounter(str(set_boss_encounter.id))
+		_check(str(boss_battle.get("enemy_rank", "")) == "海域 Boss" and str(boss_battle.get("enemy_name", "")) == "赤潮礁王·阿刻隆" and str(boss_battle.get("sea_set_id", "")) == "warrior" and "随机掉落" in str(boss_battle.get("loot_tier_name", "")), "套装Boss战斗必须显示专属名字、海域Boss等级、整套名称与随机掉率")
+		set_boss_state.inventory["warrior_blade"] = 1
+		var weighted_pool = set_boss_state.sea_set_weighted_drop_pool("warrior")
+		_check(weighted_pool.count("warrior_talisman") == 3 and weighted_pool.count("warrior_blade") == 1, "套装Boss掉落池必须让未拥有部件获得三倍权重，同时保留重复装备")
 	state.ship.armor = 3
 	state.voyage_protection = 1
 	var protected_oceanic_plan = state.voyage_plan("cape_town_dock")

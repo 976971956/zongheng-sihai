@@ -56,8 +56,9 @@ func _run():
 	await process_frame
 	_check(scene.state.active_card == "ghost_card" and _has_text(scene.modal_layer, "当前怪物卡"), "完整日志必须显示已启用怪物卡")
 	scene._close_modal()
+	scene.state.equip_item("warrior_blade")
 	scene._open_character()
-	_check(_has_text(scene.modal_layer, "座舰系统") and _has_text(scene.modal_layer, "Lv.1 海燕号") and _has_named_node(scene.modal_layer, "CurrentShipModel"), "完整日志角色页必须同步展示当前座舰模型、等级和航行属性")
+	_check(_has_text(scene.modal_layer, "座舰系统") and _has_text(scene.modal_layer, "Lv.1 海燕号") and _has_named_node(scene.modal_layer, "CurrentShipModel") and _has_named_node(scene.modal_layer, "JournalEquipmentSkin") and _has_text(scene.modal_layer, "套装猎场") and _has_text(scene.modal_layer, "赤潮礁王·阿刻隆"), "完整日志角色页必须同步展示座舰、新版套装皮肤和指定海域Boss猎场")
 	scene._close_modal()
 	scene.state.player.location = "venice_market"
 	scene.state.player.silver = 500

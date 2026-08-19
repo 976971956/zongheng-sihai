@@ -19,7 +19,9 @@ const BattleStageScript = preload("res://scripts/battle_stage_2d.gd")
 const JoystickScript = preload("res://scripts/virtual_joystick.gd")
 const ItemIconScript = preload("res://scripts/item_icon_2d.gd")
 const PlayerPortraitTexture = preload("res://assets/art/characters/player_walk_v1.png")
+const EquipmentSkinTexture = preload("res://assets/art/equipment/equipment_set_character_skins_v2.png")
 const PlayerShipTexture = preload("res://assets/art/ships/player_ship_atlas_v1.png")
+const EQUIPMENT_SKIN_INDEX = {"warrior": 0, "black_sail": 1, "white_whale": 2, "seven_seas": 3, "earth_legacy": 4, "tidekeeper": 5}
 const MONSTER_RESPAWN_SECONDS = GameState.ENEMY_RESPAWN_SECONDS
 const MONSTER_RESPAWN_RETRY_SECONDS = 1.5
 const MONSTER_RESPAWN_SAFE_DISTANCE = 170.0
@@ -343,8 +345,9 @@ func _spawn_world_actors():
 			var spawn = ENEMY_SPAWNS.get(enemy_id, ENEMY_SPAWNS.coastal_pirate)
 			var sea_position = Vector2(float(encounter.get("x", GameData.SEA_WORLD_WIDTH * 0.5)), float(encounter.get("y", GameData.sea_route_position(int(state.active_voyage.get("distance_nm", 1000)), 0.5).y)))
 			var threat_level = int(encounter.get("threat_level", GameData.ENEMIES[enemy_id].level))
-			var enemy_label = "%s · Lv.%d" % [str(GameData.ENEMIES[enemy_id].name), threat_level]
-			_add_actor("enemy", enemy_id, enemy_label, sea_position / WORLD_SCALE, spawn.color, spawn.accent, "", {"encounter_id": str(encounter.get("id", "")), "encounter_kind": str(encounter.get("kind", "pirate")), "threat_level": threat_level})
+			var boss = GameData.sea_set_boss(str(encounter.get("zone_id", "")), enemy_id) if bool(encounter.get("set_boss", false)) else {}
+			var enemy_label = "★ 海域Boss · %s · Lv.%d" % [str(boss.boss_name), threat_level] if not boss.is_empty() else "%s · Lv.%d" % [str(GameData.ENEMIES[enemy_id].name), threat_level]
+			_add_actor("enemy", enemy_id, enemy_label, sea_position / WORLD_SCALE, spawn.color, GOLD if not boss.is_empty() else spawn.accent, "", {"encounter_id": str(encounter.get("id", "")), "encounter_kind": str(encounter.get("kind", "pirate")), "threat_level": threat_level, "set_boss": not boss.is_empty()})
 		if not bool(state.active_voyage.get("treasure_claimed", false)):
 			_add_actor("sea_treasure", "drifting_cargo", "漂流货箱", _sea_treasure_position() / WORLD_SCALE, Color("735a2f"), GOLD, "")
 	elif current_region == "city":
@@ -1808,8 +1811,17 @@ func _open_character():
 	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	var portrait_atlas = AtlasTexture.new()
-	portrait_atlas.atlas = PlayerPortraitTexture
-	portrait_atlas.region = Rect2(0, 0, PlayerPortraitTexture.get_width() / 4.0, PlayerPortraitTexture.get_height() / 2.0)
+	var dominant_set = state.dominant_equipment_set()
+	if not dominant_set.is_empty() and EQUIPMENT_SKIN_INDEX.has(str(dominant_set.id)):
+		var skin_index = int(EQUIPMENT_SKIN_INDEX[str(dominant_set.id)])
+		var skin_cell = Vector2(float(EquipmentSkinTexture.get_width()) / 3.0, float(EquipmentSkinTexture.get_height()) / 2.0)
+		portrait_atlas.atlas = EquipmentSkinTexture
+		portrait_atlas.region = Rect2(Vector2((skin_index % 3) * skin_cell.x, int(skin_index / 3) * skin_cell.y), skin_cell)
+		portrait.set_meta("equipment_skin", str(dominant_set.id))
+	else:
+		portrait_atlas.atlas = PlayerPortraitTexture
+		portrait_atlas.region = Rect2(0, 0, PlayerPortraitTexture.get_width() / 4.0, PlayerPortraitTexture.get_height() / 2.0)
+		portrait.set_meta("equipment_skin", "base")
 	portrait.texture = portrait_atlas
 	portrait_frame.add_child(portrait)
 	identity_row.add_child(portrait_frame)
@@ -1826,6 +1838,7 @@ func _open_character():
 	var xp_copy = "经验 已满级" if int(state.player.level) >= GameData.MAX_LEVEL else "经验 %d / %d" % [xp_value, xp_needed]
 	identity.add_child(_character_progress_2d(xp_copy, xp_value, xp_needed, GOLD))
 	identity.add_child(_label("战斗%d场 · 胜利%d场\n银币 %d" % [int(state.player.battles), int(state.player.victories), int(state.player.silver)], 13, MUTED))
+	identity.add_child(_label("当前套装外观｜%s %d/%d" % [str(dominant_set.name), int(dominant_set.count), int(dominant_set.total)] if not dominant_set.is_empty() else "当前套装外观｜初始航海装", 13, GOLD))
 	content.add_child(identity_panel)
 	var stat_grid = GridContainer.new()
 	stat_grid.columns = 4
@@ -1883,7 +1896,15 @@ func _open_character():
 		visible_set_count += 1
 		equipment_stack.add_child(_equipment_set_card_2d(set_progress))
 	if visible_set_count == 0:
-		equipment_stack.add_child(_label("尚未穿戴套装装备。副本 Boss 会掉落带套装标记的部件。", 13, MUTED))
+		equipment_stack.add_child(_label("尚未穿戴套装装备。主线强敌会给入门件，对应海域 Boss 才能凑齐整套。", 13, MUTED))
+	equipment_stack.add_child(_label("套装猎场｜主线得入门件 · 海域 Boss 随机掉整套 · 缺件三倍权重", 16, GOLD))
+	for set_id in GameData.EQUIPMENT_SETS:
+		var set_definition = Dictionary(GameData.EQUIPMENT_SETS[set_id])
+		var zone_name = str(GameData.SEA_REGIONS[str(set_definition.sea_zone)].name)
+		var boss_definition = GameData.sea_set_boss(str(set_definition.sea_zone))
+		var hunt = _label("%s｜%s · %s（Lv.%d，基础掉率%d%%）\n主线来源：%s｜关键缺件：%d件" % [str(set_definition.name), zone_name, str(set_definition.sea_boss), int(boss_definition.unlock_level), int(round(float(boss_definition.drop_rate) * 100.0)), str(set_definition.story_source), Array(set_definition.boss_only).size()], 12, TEAL)
+		hunt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		equipment_stack.add_child(hunt)
 	equipment_stack.add_child(_character_ship_catalog_2d())
 	var bag = _button("打开物品背包", "primary")
 	bag.pressed.connect(_switch_overlay_to_inventory)
