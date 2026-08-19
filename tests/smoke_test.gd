@@ -213,6 +213,25 @@ func _init():
 	var upgrade = state.upgrade_ship("hold")
 	_check(upgrade.ok and state.cargo_capacity() == capacity_before + 6, "货舱升级应增加6格容量")
 
+	var market_state = TestState.new()
+	market_state.quest_index = GameData.QUESTS.size()
+	market_state.player.location = "venice_dock"
+	market_state.player.silver = 9999
+	var daily_glass_supply = market_state.market_supply_limit("venetian_glass")
+	_check(daily_glass_supply >= 8 and market_state.max_buyable_cargo("venetian_glass") == min(daily_glass_supply, 6), "每日供货量必须与海燕号12格货舱、玻璃每箱2格共同限制可买数量")
+	var route_board = market_state.trade_route_opportunities(3)
+	_check(not route_board.is_empty() and int(route_board[0].space) <= market_state.cargo_space_free() and route_board[0].has("profit_per_space") and route_board[0].has("risk"), "商会价差榜必须按空余货舱、资金、供货量计算单位舱位利润和航线风险")
+	var full_hold = market_state.buy_max_cargo("venetian_glass")
+	_check(bool(full_hold.ok) and market_state.cargo_used() == market_state.cargo_capacity() and market_state.max_buyable_cargo("venetian_glass") == 0, "买满必须严格装至当前船只容量，不能超载")
+	market_state.player.location = "ragusa_dock"
+	market_state.cargo = {"venetian_glass": 18}
+	market_state.cargo_costs = {"venetian_glass": 432}
+	var first_sale_price = market_state.trade_sell_price("venetian_glass")
+	var saturated_quote = market_state.trade_sale_quote("venetian_glass", 18)
+	_check(int(saturated_quote.total) < first_sale_price * 18, "一次抛售超过本港高价需求后，后续货物必须按需求饱和价结算")
+	var saturated_sale = market_state.sell_all_cargo("venetian_glass")
+	_check(bool(saturated_sale.ok) and market_state.market_demand_remaining("venetian_glass") == 0 and int(saturated_sale.price) < first_sale_price, "大量倒货必须消耗本港需求并显示降低后的成交均价")
+
 	state.arrive_from_2d("black_sail_1")
 	_claim(state, "black_sail_clue")
 	_win_times(state, "corsair_deckhand", 1)

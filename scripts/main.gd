@@ -1842,10 +1842,10 @@ func _open_harbor():
 		return
 	var port = GameData.TRADE_PORTS[port_id]
 	content.add_child(_label("%s港口市场" % port.name, 20, GOLD))
-	var status = _label("持有银币：%d｜第%d日 · %s · 货舱%d/%d · 货值%d · 浮动%+d · 本港声望%d / 总声望%d" % [int(state.player.silver), state.trade_day, state.ship.name, state.cargo_used(), state.cargo_capacity(), state.cargo_market_value(), state.cargo_unrealized_profit(), state.port_reputation_value(port_id), state.total_trade_reputation()], 12, TEAL)
+	var status = _label("持有银币：%d｜第%d日 · %s · 货舱%d/%d（%d%%）· 空余%d · 货值%d · 浮动%+d · 本港声望%d / 总声望%d" % [int(state.player.silver), state.trade_day, state.ship.name, state.cargo_used(), state.cargo_capacity(), state.cargo_load_percent(), state.cargo_space_free(), state.cargo_market_value(), state.cargo_unrealized_profit(), state.port_reputation_value(port_id), state.total_trade_reputation()], 12, TEAL)
 	status.add_theme_stylebox_override("normal", _style(Color(0.04, 0.18, 0.18, 0.86), 10, Color(TEAL, 0.45), 1, 11))
 	content.add_child(status)
-	content.add_child(_label("行情：%s｜买入价每日波动；本港卖出价为行情的90%%。" % port.note, 11, MUTED))
+	content.add_child(_label("行情：%s｜基础收购率90%%；声望、商船特性和当日需求会改变实际成交价。" % port.note, 11, MUTED))
 
 	var scroll = ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -1861,9 +1861,13 @@ func _open_harbor():
 	merchant_copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	merchant_copy.add_theme_stylebox_override("normal", _style(Color(0.03, 0.17, 0.15, 0.92), 10, Color(TEAL, 0.5), 1, 11))
 	market.add_child(merchant_copy)
-	var opportunity = state.best_trade_opportunity()
-	if not opportunity.is_empty():
-		market.add_child(_label("商会推荐｜%s → %s｜%d日后满舱估算净利 %+d" % [GameData.TRADE_GOODS[str(opportunity.good_id)].name, GameData.TRADE_PORTS[str(opportunity.destination)].name, int(opportunity.days), int(opportunity.total_profit)], 11, TEAL))
+	var opportunities = state.trade_route_opportunities(3)
+	if not opportunities.is_empty():
+		market.add_child(_small_caption("商会推荐 · 价差榜 · 按单位舱位利润排序"))
+		for index in range(opportunities.size()):
+			var opportunity = Dictionary(opportunities[index])
+			var opportunity_good = GameData.TRADE_GOODS[str(opportunity.good_id)]
+			market.add_child(_label("%d. %s → %s｜%d%s/%d格 · 本金%d · %d日 · 风险%d%%｜净利%+d · 每格%+d" % [index + 1, str(opportunity_good.name), GameData.TRADE_PORTS[str(opportunity.destination)].name, int(opportunity.units), str(opportunity_good.unit), int(opportunity.space), int(opportunity.capital), int(opportunity.days), int(opportunity.risk), int(opportunity.total_profit), int(opportunity.profit_per_space)], 11, TEAL))
 	var order = state.current_trade_order(port_id)
 	if not order.is_empty():
 		var order_row = HBoxContainer.new()
@@ -2004,6 +2008,7 @@ func _add_journal_trade_good_card(market, good_id, can_buy):
 	stack.add_child(_label("%s · %s · 产地%s · %d格/%s" % [good.name, stock_tag, origin_name, int(good.space), good.unit], 13, INK))
 	var price_text = "买%d / 卖%d" % [state.trade_buy_price(good_id), state.trade_sell_price(good_id)] if can_buy else "本港收购%d" % state.trade_sell_price(good_id)
 	stack.add_child(_label("%s · 持有%d%s · 均价%d · 单件预估%+d" % [price_text, held, good.unit, average, estimate], 11, GOLD))
+	stack.add_child(_label("今日余货%d/%d%s · 空舱%d格" % [state.market_supply_remaining(good_id), state.market_supply_limit(good_id), good.unit, state.cargo_space_free()] if can_buy else "高价需求剩余%d%s · 超量抛售会降价" % [state.market_demand_remaining(good_id), good.unit], 11, MUTED))
 	var row = HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	stack.add_child(row)
@@ -2013,6 +2018,11 @@ func _add_journal_trade_good_card(market, good_id, can_buy):
 		buy.disabled = state.max_buyable_cargo(good_id) <= 0
 		buy.pressed.connect(_trade_buy.bind(good_id))
 		row.add_child(buy)
+		var buy_five = _button("买5", "primary")
+		buy_five.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		buy_five.disabled = state.max_buyable_cargo(good_id) <= 0
+		buy_five.pressed.connect(_trade_buy.bind(good_id, false, 5))
+		row.add_child(buy_five)
 		var buy_max = _button("买满", "gold")
 		buy_max.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		buy_max.disabled = state.max_buyable_cargo(good_id) <= 0
@@ -2033,8 +2043,8 @@ func _add_journal_trade_good_card(market, good_id, can_buy):
 func _hold_upgrade_state(button):
 	button.disabled = int(state.ship.get("hold_level", 0)) >= 3
 
-func _trade_buy(good_id, buy_max = false):
-	var result = state.buy_max_cargo(good_id) if buy_max else state.buy_cargo(good_id)
+func _trade_buy(good_id, buy_max = false, amount = 1):
+	var result = state.buy_max_cargo(good_id) if buy_max else state.buy_cargo(good_id, amount)
 	_close_modal()
 	refresh_ui()
 	_show_toast(result.message, result.ok)

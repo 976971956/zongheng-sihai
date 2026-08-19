@@ -63,6 +63,7 @@ func _run():
 	await process_frame
 	_check(is_instance_valid(scene.modal_layer), "手机端必须能打开货物贸易页面")
 	_check(_has_button_text(scene.modal_layer, "买1"), "货物贸易页面必须显示买入操作")
+	_check(_has_button_text(scene.modal_layer, "买5") and _has_label_text(scene.modal_layer, "价差榜") and _has_label_text(scene.modal_layer, "空余"), "手机贸易页必须提供批量采购、价差排行与真实货舱余量")
 	_check(_has_button_text(scene.modal_layer, "拉古萨"), "货物贸易页面必须显示跨港航线")
 	scene._close_modal()
 
@@ -126,5 +127,15 @@ func _has_button_text(node, text_fragment):
 		return true
 	for child in node.get_children():
 		if _has_button_text(child, text_fragment):
+			return true
+	return false
+
+func _has_label_text(node, text_fragment):
+	if not is_instance_valid(node):
+		return false
+	if node is Label and text_fragment in node.text:
+		return true
+	for child in node.get_children():
+		if _has_label_text(child, text_fragment):
 			return true
 	return false

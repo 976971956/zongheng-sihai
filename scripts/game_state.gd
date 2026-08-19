@@ -31,6 +31,7 @@ var trade_day = 1
 var trade_profit = 0
 var trade_volume = 0
 var trade_lifetime_profit = 0
+var market_activity = {}
 var port_reputation = {}
 var trade_order_cycles = {}
 var completed_trade_orders = {}
@@ -79,6 +80,7 @@ func new_game():
 	trade_profit = 0
 	trade_volume = 0
 	trade_lifetime_profit = 0
+	market_activity = {}
 	port_reputation = {}
 	trade_order_cycles = {}
 	for port_id in GameData.TRADE_PORTS:
@@ -1411,30 +1413,52 @@ func claim_trade_contract():
 	return {"ok": true, "message": "第%d轮商会奖励：%d银币、未知道具×1\n新一轮委托已开启。" % [completed_round, silver_reward]}
 
 func best_trade_opportunity():
+	var opportunities = trade_route_opportunities(1)
+	return {} if opportunities.is_empty() else Dictionary(opportunities[0])
+
+func trade_route_opportunities(limit = 3):
 	if not GameData.TRADE_PORTS.has(player.location):
-		return {}
-	var best = {}
-	var specialty_good = str(GameData.TRADE_PORTS[str(player.location)].get("specialty_good", ""))
-	var recommendation_goods = [specialty_good] if GameData.TRADE_GOODS.has(specialty_good) else GameData.port_stock(str(player.location))
+		return []
+	var opportunities = []
+	var origin = str(player.location)
+	var free_space = cargo_space_free()
 	for destination in GameData.TRADE_PORTS:
-		if str(destination) == str(player.location):
+		if str(destination) == origin:
 			continue
 		if not is_port_unlocked(str(destination)):
 			continue
-		var route = GameData.trade_route(str(player.location), str(destination))
+		var route = GameData.trade_route(origin, str(destination))
 		if route.is_empty():
 			continue
 		var days = voyage_days_for_distance(int(route.get("distance_nm", 1)))
-		for good_id in recommendation_goods:
+		for good_id in GameData.port_stock(origin):
 			var good = GameData.TRADE_GOODS[good_id]
 			var buy_price = trade_buy_price(good_id)
 			var sell_price = trade_sell_price_at(str(destination), str(good_id), trade_day + days)
-			var units = max(1, int(floor(float(cargo_capacity()) / float(good.space))))
-			# 商会默认推荐正常出航；只有主动选择快捷传送时才扣传送费。
-			var total_profit = (sell_price - buy_price) * units
-			if best.is_empty() or total_profit > int(best.total_profit):
-				best = {"good_id": str(good_id), "destination": str(destination), "days": days, "units": units, "buy": buy_price, "sell": sell_price, "total_profit": total_profit}
-	return best
+			var space = max(1, int(good.space))
+			var units = min(market_supply_remaining(str(good_id), origin), int(floor(float(free_space) / float(space))))
+			units = min(units, int(floor(float(player.silver) / float(max(1, buy_price)))))
+			if units <= 0:
+				continue
+			var sale_total = projected_sale_total_at(str(destination), str(good_id), trade_day + days, units)
+			var total_profit = sale_total - buy_price * units
+			var occupied_space = units * space
+			var plan = voyage_plan(str(destination))
+			opportunities.append({
+				"good_id": str(good_id), "destination": str(destination), "days": days,
+				"units": units, "space": occupied_space, "buy": buy_price, "sell": sell_price,
+				"capital": buy_price * units, "sale_total": sale_total, "total_profit": total_profit,
+				"profit_per_space": int(floor(float(total_profit) / float(max(1, occupied_space)))),
+				"risk": int(plan.get("risk", 0)), "distance_nm": int(route.get("distance_nm", 0))
+			})
+	opportunities.sort_custom(func(a, b):
+		if int(a.profit_per_space) == int(b.profit_per_space):
+			return int(a.total_profit) > int(b.total_profit)
+		return int(a.profit_per_space) > int(b.profit_per_space)
+	)
+	if int(limit) > 0 and opportunities.size() > int(limit):
+		opportunities.resize(int(limit))
+	return opportunities
 
 func cargo_used():
 	var used = 0
@@ -1446,6 +1470,79 @@ func cargo_used():
 func cargo_capacity():
 	var hull = current_ship_hull()
 	return int(hull.capacity) + int(ship.get("hold_level", 0)) * 6
+
+func cargo_space_free():
+	return max(0, cargo_capacity() - cargo_used())
+
+func cargo_load_percent():
+	return int(round(float(cargo_used()) * 100.0 / float(max(1, cargo_capacity()))))
+
+func _market_activity_key(port_id, good_id):
+	return "%s|%s" % [str(port_id), str(good_id)]
+
+func _market_activity_entry(port_id, good_id):
+	var entry = Dictionary(market_activity.get(_market_activity_key(port_id, good_id), {}))
+	if int(entry.get("day", 0)) != int(trade_day):
+		return {"day": int(trade_day), "bought": 0, "sold": 0}
+	return {"day": int(trade_day), "bought": max(0, int(entry.get("bought", 0))), "sold": max(0, int(entry.get("sold", 0)))}
+
+func _record_market_activity(port_id, good_id, kind, amount):
+	var entry = _market_activity_entry(port_id, good_id)
+	entry[str(kind)] = int(entry.get(str(kind), 0)) + max(0, int(amount))
+	market_activity[_market_activity_key(port_id, good_id)] = entry
+
+func _market_daily_variation(port_id, good_id, salt, day_override = -1):
+	var resolved_day = int(trade_day) if int(day_override) < 1 else int(day_override)
+	var key = "%s:%s:%d:%d" % [str(port_id), str(good_id), resolved_day, int(salt)]
+	var seed = 0
+	for index in range(key.length()):
+		seed = (seed + key.unicode_at(index) * (index + 5)) % 997
+	return seed % 5
+
+func market_supply_limit(good_id, port_id = ""):
+	var resolved_port = str(player.location) if str(port_id) == "" else str(port_id)
+	if not GameData.TRADE_GOODS.has(str(good_id)) or not GameData.port_sells_good(resolved_port, str(good_id)):
+		return 0
+	var good = GameData.TRADE_GOODS[str(good_id)]
+	return int(good.get("supply", 8)) + _market_daily_variation(resolved_port, str(good_id), 17) + int(floor(float(port_reputation_value(resolved_port)) / 5.0))
+
+func market_supply_remaining(good_id, port_id = ""):
+	var resolved_port = str(player.location) if str(port_id) == "" else str(port_id)
+	return max(0, market_supply_limit(str(good_id), resolved_port) - int(_market_activity_entry(resolved_port, str(good_id)).bought))
+
+func market_demand_limit(good_id, port_id = "", day_override = -1):
+	var resolved_port = str(player.location) if str(port_id) == "" else str(port_id)
+	if not GameData.TRADE_GOODS.has(str(good_id)) or not GameData.TRADE_PORTS.has(resolved_port):
+		return 0
+	var good = GameData.TRADE_GOODS[str(good_id)]
+	return int(good.get("demand", 8)) + _market_daily_variation(resolved_port, str(good_id), 31, day_override) + int(floor(float(port_reputation_value(resolved_port)) / 6.0))
+
+func market_demand_remaining(good_id, port_id = ""):
+	var resolved_port = str(player.location) if str(port_id) == "" else str(port_id)
+	return max(0, market_demand_limit(str(good_id), resolved_port) - int(_market_activity_entry(resolved_port, str(good_id)).sold))
+
+func _demand_price_multiplier(sold_before, demand_limit):
+	if int(sold_before) < int(demand_limit):
+		return 1.0
+	if int(sold_before) < int(demand_limit) * 2:
+		return 0.88
+	return 0.76
+
+func projected_sale_total_at(port_id, good_id, day, amount, sold_before = 0):
+	var base_price = trade_sell_price_at(str(port_id), str(good_id), int(day))
+	var demand_limit = market_demand_limit(str(good_id), str(port_id), int(day))
+	var total = 0
+	for index in range(max(0, int(amount))):
+		total += max(1, int(floor(float(base_price) * _demand_price_multiplier(int(sold_before) + index, demand_limit))))
+	return total
+
+func trade_sale_quote(good_id, amount = 1):
+	if not GameData.TRADE_PORTS.has(str(player.location)) or not GameData.TRADE_GOODS.has(str(good_id)):
+		return {}
+	var actual_amount = min(max(0, int(amount)), int(cargo.get(str(good_id), 0)))
+	var sold_before = int(_market_activity_entry(str(player.location), str(good_id)).sold)
+	var total = projected_sale_total_at(str(player.location), str(good_id), trade_day, actual_amount, sold_before)
+	return {"amount": actual_amount, "total": total, "average": int(floor(float(total) / float(max(1, actual_amount)))), "demand_remaining": market_demand_remaining(str(good_id))}
 
 func current_ship_hull():
 	return Dictionary(GameData.SHIP_HULLS.get(str(ship.get("hull_id", "sea_swallow")), GameData.SHIP_HULLS.sea_swallow))
@@ -1524,13 +1621,18 @@ func max_buyable_cargo(good_id):
 	var by_space = int(floor(float(cargo_capacity() - cargo_used()) / float(good.space)))
 	var price = trade_buy_price(good_id)
 	var by_silver = int(floor(float(player.silver) / float(max(1, price))))
-	return max(0, min(by_space, by_silver))
+	var by_supply = market_supply_remaining(str(good_id))
+	return max(0, min(by_space, min(by_silver, by_supply)))
 
 func trade_buy_price(good_id):
 	return trade_buy_price_at(str(player.location), good_id, trade_day)
 
 func trade_sell_price(good_id):
-	return trade_sell_price_at(str(player.location), good_id, trade_day)
+	var base_price = trade_sell_price_at(str(player.location), good_id, trade_day)
+	if not GameData.TRADE_PORTS.has(str(player.location)) or not GameData.TRADE_GOODS.has(str(good_id)):
+		return base_price
+	var activity = _market_activity_entry(str(player.location), str(good_id))
+	return max(1, int(floor(float(base_price) * _demand_price_multiplier(int(activity.sold), market_demand_limit(str(good_id))))))
 
 func trade_buy_price_at(port_id, good_id, day):
 	var market_price = GameData.trade_market_price(str(port_id), str(good_id), int(day))
@@ -1564,6 +1666,7 @@ func buy_cargo(good_id, amount = 1):
 	cargo_costs[good_id] = int(cargo_costs.get(good_id, 0)) + total
 	trade_profit -= total
 	trade_volume += actual_amount
+	_record_market_activity(str(player.location), str(good_id), "bought", actual_amount)
 	var quest_completed = _advance_quest("trade_buy", str(good_id), actual_amount)
 	message_history.push_front("在%s买入%d%s%s。" % [GameData.TRADE_PORTS[player.location].name, actual_amount, good.unit, good.name])
 	_trim_history()
@@ -1581,10 +1684,11 @@ func sell_cargo(good_id, amount = 1):
 	if not current_quest.is_empty() and str(current_quest.objective.type) == "trade_sell" and str(current_quest.objective.target) == str(good_id):
 		required_sale_port = str(current_quest.objective.get("location", ""))
 	var wrong_quest_port = required_sale_port != "" and str(player.location) != required_sale_port
-	var price = trade_sell_price(good_id)
 	var old_count = int(cargo[good_id])
 	var actual_amount = min(max(1, int(amount)), old_count)
-	var total = price * actual_amount
+	var sale_quote = trade_sale_quote(str(good_id), actual_amount)
+	var price = int(sale_quote.get("average", trade_sell_price(good_id)))
+	var total = int(sale_quote.get("total", price * actual_amount))
 	var old_cost = int(cargo_costs.get(good_id, 0))
 	var removed_cost = int(round(float(old_cost) * float(actual_amount) / float(old_count)))
 	var realized_profit = total - removed_cost
@@ -1600,12 +1704,14 @@ func sell_cargo(good_id, amount = 1):
 		cargo[good_id] = left
 		cargo_costs[good_id] = max(0, old_cost - removed_cost)
 	trade_volume += actual_amount
+	_record_market_activity(str(player.location), str(good_id), "sold", actual_amount)
 	if realized_profit > 0:
 		quest_completed = _add_port_reputation(str(player.location), max(1, int(floor(float(actual_amount) / 3.0)))) or quest_completed
 	message_history.push_front("在%s卖出%d%s%s。" % [GameData.TRADE_PORTS[player.location].name, actual_amount, good.unit, good.name])
 	_trim_history()
 	save_game()
-	var sale_message = "卖出%s×%d，收入%d银币｜实际盈亏%+d" % [good.name, actual_amount, total, realized_profit]
+	var demand_after = market_demand_remaining(str(good_id))
+	var sale_message = "卖出%s×%d，收入%d银币（均价%d）｜实际盈亏%+d\n本港高价需求剩余%d%s；继续抛售会压低收购价。" % [good.name, actual_amount, total, price, realized_profit, demand_after, good.unit]
 	if wrong_quest_port:
 		sale_message += "\n主线要求在%s出售，本次交易不计入任务进度。" % GameData.TRADE_PORTS[required_sale_port].name
 	return {"ok": true, "message": sale_message, "price": price, "amount": actual_amount, "total": total, "realized_profit": realized_profit, "quest_completed": quest_completed, "wrong_quest_port": wrong_quest_port}
@@ -2382,7 +2488,7 @@ func save_game():
 		"party_members": party_members, "companion_unlocked": companion_unlocked, "pet": pet,
 		"dungeon_cleared": dungeon_cleared, "cargo": cargo, "cargo_costs": cargo_costs, "ship": ship,
 		"trade_day": trade_day, "trade_profit": trade_profit, "trade_volume": trade_volume,
-		"trade_lifetime_profit": trade_lifetime_profit, "port_reputation": port_reputation,
+		"trade_lifetime_profit": trade_lifetime_profit, "market_activity": market_activity, "port_reputation": port_reputation,
 		"trade_order_cycles": trade_order_cycles, "completed_trade_orders": completed_trade_orders,
 		"voyage_protection": voyage_protection, "active_voyage": active_voyage,
 		"battle_stance": battle_stance, "auto_heal_threshold": auto_heal_threshold, "auto_cure_status": auto_cure_status,
@@ -2446,6 +2552,9 @@ func load_game():
 	trade_profit = int(parsed.get("trade_profit", 0))
 	trade_volume = max(0, int(parsed.get("trade_volume", 0)))
 	trade_lifetime_profit = int(parsed.get("trade_lifetime_profit", 0))
+	market_activity = parsed.get("market_activity", {})
+	if typeof(market_activity) != TYPE_DICTIONARY:
+		market_activity = {}
 	port_reputation = parsed.get("port_reputation", {"venice_dock": 0, "ragusa_dock": 0, "alexandria_dock": 0})
 	if typeof(port_reputation) != TYPE_DICTIONARY:
 		port_reputation = {}

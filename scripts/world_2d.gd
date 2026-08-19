@@ -3027,9 +3027,13 @@ func _open_trade_2d(npc_id = ""):
 	var list = _port_service_scroll_2d(content)
 	var market_event = GameData.trade_event(state.trade_day)
 	list.add_child(_label("今日行情｜%s\n%s" % [market_event.name, market_event.description], 14, GOLD))
-	var opportunity = state.best_trade_opportunity()
-	if not opportunity.is_empty():
-		list.add_child(_label("商路推荐｜%s → %s · %d日后满舱约赚%d银" % [GameData.TRADE_GOODS[str(opportunity.good_id)].name, GameData.TRADE_PORTS[str(opportunity.destination)].name, int(opportunity.days), int(opportunity.total_profit)], 13, TEAL))
+	var opportunities = state.trade_route_opportunities(3)
+	if not opportunities.is_empty():
+		list.add_child(_label("商会价差榜 · 已按单位舱位利润排序", 16, GOLD))
+		for index in range(opportunities.size()):
+			var opportunity = Dictionary(opportunities[index])
+			var opportunity_good = GameData.TRADE_GOODS[str(opportunity.good_id)]
+			list.add_child(_label("%d. %s → %s｜装%d%s · 占%d格 · 本金%d\n约%d日 / %d海里 · 风险%d%%｜预计净利%+d · 每格%+d" % [index + 1, str(opportunity_good.name), GameData.TRADE_PORTS[str(opportunity.destination)].name, int(opportunity.units), str(opportunity_good.unit), int(opportunity.space), int(opportunity.capital), int(opportunity.days), int(opportunity.distance_nm), int(opportunity.risk), int(opportunity.total_profit), int(opportunity.profit_per_space)], 12, TEAL if int(opportunity.total_profit) > 0 else MUTED))
 	var local_stock = GameData.port_stock(port_id)
 	list.add_child(_label("本港产地货栈 · 仅出售%s" % str(port.specialty), 16, GOLD))
 	for good_id in local_stock:
@@ -3366,11 +3370,14 @@ func _add_trade_good_card_2d(list, good_id, can_buy):
 	details.add_child(_label("产地：%s｜每%s占%d格" % [origin_name, good.unit, int(good.space)], 12, MUTED))
 	details.add_child(_label("行情%s｜较昨日%+d银" % [str(market_trend.name), int(market_trend.delta)], 12, Color(market_trend.color)))
 	if can_buy:
+		details.add_child(_label("今日余货%d/%d%s｜空舱%d格" % [state.market_supply_remaining(good_id), state.market_supply_limit(good_id), str(good.unit), state.cargo_space_free()], 12, GOLD))
 		var recommendation = _best_trade_destination_2d(good_id)
 		if not recommendation.is_empty():
-			details.add_child(_label("推荐销往%s · 约%d日 · 单件预估%+d" % [GameData.TRADE_PORTS[str(recommendation.port)].name, int(recommendation.days), int(recommendation.profit)], 12, TEAL if int(recommendation.profit) > 0 else MUTED))
+			var profit_per_space = int(floor(float(recommendation.profit) / float(max(1, int(good.space)))))
+			details.add_child(_label("推荐销往%s · 约%d日 · 单件%+d / 每格%+d" % [GameData.TRADE_PORTS[str(recommendation.port)].name, int(recommendation.days), int(recommendation.profit), profit_per_space], 12, TEAL if int(recommendation.profit) > 0 else MUTED))
 	else:
 		details.add_child(_label("持仓均价%d｜现在卖出单件%+d" % [average, estimate], 12, GOLD if estimate > 0 else RED if estimate < 0 else MUTED))
+		details.add_child(_label("本港高价需求还剩%d%s｜超量抛售将分段降价" % [state.market_demand_remaining(good_id), str(good.unit)], 12, TEAL))
 	card_header.add_child(details)
 	var price_badge = Label.new()
 	price_badge.text = ("买入\n%d银" % buy_price) if can_buy else ("收购\n%d银" % sell_price)
@@ -3393,11 +3400,19 @@ func _add_trade_good_card_2d(list, good_id, can_buy):
 		buy.disabled = state.max_buyable_cargo(good_id) <= 0
 		buy.pressed.connect(_trade_buy_2d.bind(good_id))
 		row.add_child(buy)
+		var buy_five = _button("买5", "primary")
+		buy_five.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		buy_five.disabled = state.max_buyable_cargo(good_id) <= 0
+		buy_five.pressed.connect(_trade_buy_2d.bind(good_id, false, 5))
+		row.add_child(buy_five)
 		var buy_max = _button("买满", "gold")
 		buy_max.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		buy_max.disabled = state.max_buyable_cargo(good_id) <= 0
 		buy_max.pressed.connect(_trade_buy_2d.bind(good_id, true))
 		row.add_child(buy_max)
+		row = HBoxContainer.new()
+		row.add_theme_constant_override("separation", 7)
+		stack.add_child(row)
 	var sell = _button("卖1", "ghost")
 	sell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sell.disabled = held <= 0
@@ -3439,7 +3454,10 @@ func _trade_dashboard_2d(port_id):
 	cargo_bar.add_theme_stylebox_override("background", _style(Color(0.02, 0.06, 0.075, 0.95), 9, Color(TEAL, 0.30), 1, 2))
 	cargo_bar.add_theme_stylebox_override("fill", _style(Color(TEAL, 0.78), 9))
 	stack.add_child(cargo_bar)
-	stack.add_child(_label("货舱装载 %d/%d格  ·  空余%d格｜本港声望%d · 总声望%d" % [state.cargo_used(), state.cargo_capacity(), max(0, state.cargo_capacity() - state.cargo_used()), state.port_reputation_value(port_id), state.total_trade_reputation()], 13, MUTED))
+	var hull = state.current_ship_hull()
+	var hold_bonus = int(state.ship.get("hold_level", 0)) * 6
+	stack.add_child(_label("货舱装载 %d/%d格（%d%%） · 空余%d格｜船体%d + 舱板%d" % [state.cargo_used(), state.cargo_capacity(), state.cargo_load_percent(), state.cargo_space_free(), int(hull.capacity), hold_bonus], 13, MUTED))
+	stack.add_child(_label("每种货物占舱不同；价差榜按每格利润排序｜本港声望%d · 总声望%d" % [state.port_reputation_value(port_id), state.total_trade_reputation()], 12, MUTED))
 	var ship_profile = state.ship_speed_profile()
 	stack.add_child(_label("船只｜%s · %.1f节 · 日航%d海里｜船甲%d" % [str(state.ship.name), float(ship_profile.knots), int(ship_profile.nm_per_day), state.ship_armor()], 13, TEAL))
 	return panel
@@ -3471,8 +3489,8 @@ func _best_trade_destination_2d(good_id):
 			best = {"port": destination_id, "days": days, "profit": profit}
 	return best
 
-func _trade_buy_2d(good_id, buy_max = false):
-	var result = state.buy_max_cargo(good_id) if buy_max else state.buy_cargo(good_id)
+func _trade_buy_2d(good_id, buy_max = false, amount = 1):
+	var result = state.buy_max_cargo(good_id) if buy_max else state.buy_cargo(good_id, amount)
 	inventory_notice = ("✓ " if bool(result.get("ok", false)) else "！") + str(result.get("message", "交易失败"))
 	_refresh_hud()
 	_close_overlay()
@@ -3494,8 +3512,8 @@ func _cook_recipe_2d(recipe_id):
 	else:
 		_show_message("无法烹制", str(result.get("message", "材料不足")))
 
-func _trade_sell_2d(good_id, sell_all = false):
-	var result = state.sell_all_cargo(good_id) if sell_all else state.sell_cargo(good_id)
+func _trade_sell_2d(good_id, sell_all = false, amount = 1):
+	var result = state.sell_all_cargo(good_id) if sell_all else state.sell_cargo(good_id, amount)
 	inventory_notice = ("✓ " if bool(result.get("ok", false)) else "！") + str(result.get("message", "交易失败"))
 	_refresh_hud()
 	_close_overlay()
