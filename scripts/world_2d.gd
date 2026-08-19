@@ -203,7 +203,8 @@ func _ready():
 	var capture_field = "--capture-2d-field" in OS.get_cmdline_user_args()
 	var capture_dungeon = "--capture-2d-dungeon" in OS.get_cmdline_user_args()
 	var capture_black_sail = "--capture-black-sail" in OS.get_cmdline_user_args()
-	var capture_mode = capture_world or capture_battle or capture_field or capture_dungeon or capture_black_sail
+	var preview_equipment_walk = "--preview-equipment-walk" in OS.get_cmdline_user_args()
+	var capture_mode = capture_world or capture_battle or capture_field or capture_dungeon or capture_black_sail or preview_equipment_walk
 	if state.has_save() and not capture_mode:
 		state.load_game()
 	_scale_world_geometry()
@@ -229,6 +230,11 @@ func _ready():
 		state.player.level = 12
 		state.quest_index = 13
 		call_deferred("_capture_region_preview", "black_sail", "black_sail_1", "res://world_2d_black_sail_preview.png")
+	elif preview_equipment_walk:
+		state.inventory["warrior_blade"] = 1
+		state.equip_item("warrior_blade")
+		_sync_player_equipment_visual()
+		player_actor.set_motion(Vector2.RIGHT)
 	elif capture_world:
 		call_deferred("_capture_preview")
 
@@ -276,6 +282,15 @@ func _build_world():
 		player_actor.set_ship_hull(str(state.ship.get("hull_id", "sea_swallow")))
 	player_actor.scale = Vector2.ONE * (1.28 if current_region == "sea" else 1.12)
 	world_layer.add_child(player_actor)
+	_sync_player_equipment_visual()
+
+func _sync_player_equipment_visual():
+	if not is_instance_valid(player_actor) or current_region == "sea":
+		return
+	var dominant_set = state.dominant_equipment_set()
+	var set_id = str(dominant_set.get("id", ""))
+	var weapon_id = str(state.equipment.get("weapon", ""))
+	player_actor.set_equipment_visual(set_id, weapon_id)
 
 func _scale_world_geometry():
 	for region_id in region_zones:
@@ -1233,6 +1248,7 @@ func _dungeon_floor_lock(location_id):
 	return "道路被封锁：先击败%s" % GameData.ENEMIES[required_enemy].name
 
 func _refresh_hud():
+	_sync_player_equipment_visual()
 	if current_region == "sea" and not state.active_voyage.is_empty():
 		var voyage = state.active_voyage
 		location_label.text = "◆ %s" % GameData.SEA_REGIONS[str(voyage.region)].name

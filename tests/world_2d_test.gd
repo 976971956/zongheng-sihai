@@ -29,7 +29,7 @@ func _run():
 		_check(initial_city_layout.plaza_rect.has_point(Vector2(initial_city_layout.npc_positions[str(initial_npc_id)])), "%s必须站在威尼斯开放广场内" % GameData.NPCS[str(initial_npc_id)].name)
 	scene.player_actor.position = scene._spawn_for_location("venice_square")
 	_check(scene.player_actor.display_id == "player", "主角必须使用独立的新版角色模型")
-	_check(scene.player_actor.art_sprite.hframes == 4 and scene.player_actor.art_sprite.vframes == 2, "主角必须使用多帧行走图集")
+	_check(scene.player_actor.art_sprite.hframes == 4 and scene.player_actor.art_sprite.vframes == 3, "主角必须使用正面、侧面、背面三向多帧行走图集")
 	scene.player_actor.set_motion(Vector2.RIGHT)
 	scene.player_actor._process(0.16)
 	var first_walk_frame = scene.player_actor.art_sprite.frame
@@ -37,7 +37,7 @@ func _run():
 	_check(scene.player_actor.art_sprite.frame != first_walk_frame, "主角移动时必须循环播放迈步帧而不是整图平移")
 	scene.player_actor.set_motion(Vector2.UP)
 	scene.player_actor._process(0.16)
-	_check("player_walk_back_v1" in str(scene.player_actor.art_sprite.texture.resource_path), "主角向上走时必须切换为背面步态")
+	_check(scene.player_actor.art_sprite.frame_coords.y == 2, "主角向上走时必须切换为背面步态")
 	scene.player_actor.set_motion(Vector2.ZERO)
 	_check(scene.actors.size() >= 4, "地图必须包含NPC和可见敌人")
 	_check(_has_actor(scene, "guard_captain") and _has_actor(scene, "jeweler") and _has_actor(scene, "venice_shipwright"), "威尼斯必须生成守卫、珠宝商与船匠，不能只存在于数据配置中")
@@ -138,6 +138,25 @@ func _run():
 	scene._equip_item_2d("warrior_blade")
 	await process_frame
 	_check(str(scene.state.equipment.weapon) == "warrior_blade", "点击装备必须更新角色装备槽")
+	var outdoor_equipment = scene.player_actor.equipment_visual_state()
+	_check(str(outdoor_equipment.skin) == "warrior" and str(outdoor_equipment.weapon) == "warrior_blade" and bool(outdoor_equipment.has_weapon_layer), "地图角色必须同步穿上当前主套装，并显示真实手持武器")
+	scene.player_actor.set_motion(Vector2.UP)
+	scene.player_actor._process(0.2)
+	outdoor_equipment = scene.player_actor.equipment_visual_state()
+	_check(str(outdoor_equipment.facing) == "up" and Vector2i(outdoor_equipment.frame).y == 2, "套装角色向上走时必须切换背面行走帧")
+	scene.player_actor.set_motion(Vector2.LEFT)
+	scene.player_actor._process(0.2)
+	outdoor_equipment = scene.player_actor.equipment_visual_state()
+	_check(str(outdoor_equipment.facing) == "left" and Vector2i(outdoor_equipment.frame).y == 0, "套装角色左右行走时必须切换侧面行走帧")
+	scene.player_actor.set_motion(Vector2.ZERO)
+	scene.state.inventory["spider_knife"] = 1
+	scene._equip_item_2d("spider_knife")
+	await process_frame
+	outdoor_equipment = scene.player_actor.equipment_visual_state()
+	_check(str(outdoor_equipment.skin) == "base" and str(outdoor_equipment.weapon) == "spider_knife" and bool(outdoor_equipment.has_weapon_layer), "非套装武器也必须在基础旅行装角色手中真实显示")
+	scene.state.inventory["warrior_blade"] = 1
+	scene._equip_item_2d("warrior_blade")
+	await process_frame
 	scene._open_character()
 	_check(_has_label_text(scene.overlay, "武士套装") and _has_label_text(scene.overlay, "套装共鸣") and _has_label_text(scene.overlay, "套装猎场") and _has_label_text(scene.overlay, "赤潮礁王·阿刻隆") and _has_button_text(scene.overlay, "强化至 +1") and _named_node_meta(scene.overlay, "CharacterPortrait", "equipment_skin") == "warrior", "角色装备页必须切换新版套装皮肤，并显示共鸣、指定海域Boss、掉率和强化入口")
 	scene._open_inventory()

@@ -21,8 +21,34 @@ const SHIP_DIRECTION_ROWS = ["down", "down_right", "right", "up_right", "up", "u
 const ENEMY_ATLAS = preload("res://assets/art/characters/enemy_atlas_v2.png")
 const LEGACY_BOSS_ATLAS_A = preload("res://assets/art/characters/legacy_boss_atlas_a_v1.png")
 const LEGACY_BOSS_ATLAS_B = preload("res://assets/art/characters/legacy_boss_atlas_b_v1.png")
-const PLAYER_WALK = preload("res://assets/art/characters/player_walk_v1.png")
-const PLAYER_WALK_BACK = preload("res://assets/art/characters/player_walk_back_v1.png")
+const PlayerWeaponVisual = preload("res://scripts/player_weapon_2d.gd")
+const PLAYER_BASE_WALK_ATLAS = preload("res://assets/art/characters/equipment_walk/base_traveler_walk_4x3_v2.png")
+const PLAYER_EQUIPMENT_WALK_ATLASES = {
+	"warrior": preload("res://assets/art/characters/equipment_walk/warrior_walk_4x3_v2.png"),
+	"black_sail": preload("res://assets/art/characters/equipment_walk/black_sail_walk_4x3_v2.png"),
+	"white_whale": preload("res://assets/art/characters/equipment_walk/white_whale_walk_4x3_v2.png"),
+	"seven_seas": preload("res://assets/art/characters/equipment_walk/seven_seas_walk_4x3_v2.png"),
+	"earth_legacy": preload("res://assets/art/characters/equipment_walk/earth_legacy_walk_4x3_v2.png"),
+	"tidekeeper": preload("res://assets/art/characters/equipment_walk/tidekeeper_walk_4x3_v2.png")
+}
+const PLAYER_EQUIPMENT_SCALES = {
+	"warrior": 0.62,
+	"black_sail": 0.50,
+	"white_whale": 0.50,
+	"seven_seas": 0.50,
+	"earth_legacy": 0.50,
+	"tidekeeper": 0.50
+}
+const PLAYER_EQUIPMENT_CHROMA_SHADER = """
+shader_type canvas_item;
+render_mode unshaded;
+void fragment() {
+	vec4 source = texture(TEXTURE, UV);
+	float key_distance = distance(source.rgb, vec3(1.0, 0.0, 1.0));
+	source.a *= smoothstep(0.12, 0.30, key_distance);
+	COLOR = source;
+}
+"""
 const ATLAS_CELL_SIZE = Vector2(362, 362)
 const ENEMY_ATLAS_CELL_SIZE = Vector2(384, 256)
 const LEGACY_BOSS_ATLAS_CELL_SIZE = Vector2(384, 384)
@@ -128,6 +154,7 @@ var display_id = "player"
 var selected = false
 var bob_time = 0.0
 var art_sprite
+var weapon_visual
 var ship_depth_sprite
 var ship_bow_foam
 var motion_direction = Vector2.ZERO
@@ -141,6 +168,8 @@ var ship_target_heading = 0.0
 var ship_motion_blend = 0.0
 var ship_turn_lean = 0.0
 var ship_throttle = 1.0
+var equipment_skin_id = ""
+var equipped_weapon_id = ""
 
 func _ready():
 	_refresh_art_sprite()
@@ -159,6 +188,27 @@ func set_ship_hull(hull_id):
 	if display_id == "player_ship" and is_inside_tree():
 		_refresh_art_sprite()
 	queue_redraw()
+
+func set_equipment_visual(set_id, weapon_id):
+	var next_skin = str(set_id) if PLAYER_EQUIPMENT_WALK_ATLASES.has(str(set_id)) else ""
+	var next_weapon = str(weapon_id) if GameData.ITEMS.has(str(weapon_id)) and str(GameData.ITEMS[str(weapon_id)].get("slot", "")) == "weapon" else ""
+	if equipment_skin_id == next_skin and equipped_weapon_id == next_weapon:
+		return
+	equipment_skin_id = next_skin
+	equipped_weapon_id = next_weapon
+	set_meta("equipment_skin", equipment_skin_id if equipment_skin_id != "" else "base")
+	set_meta("equipped_weapon", equipped_weapon_id)
+	if display_id == "player" and is_inside_tree():
+		_refresh_art_sprite()
+
+func equipment_visual_state():
+	return {
+		"skin": equipment_skin_id if equipment_skin_id != "" else "base",
+		"weapon": equipped_weapon_id,
+		"facing": last_facing,
+		"frame": art_sprite.frame_coords if is_instance_valid(art_sprite) else Vector2i.ZERO,
+		"has_weapon_layer": is_instance_valid(weapon_visual) and weapon_visual.visible
+	}
 
 func _process(delta):
 	bob_time += delta
@@ -261,18 +311,31 @@ func _refresh_art_sprite():
 		ship_depth_sprite.queue_free()
 	if is_instance_valid(ship_bow_foam):
 		ship_bow_foam.queue_free()
+	if is_instance_valid(weapon_visual):
+		weapon_visual.queue_free()
 	art_sprite = null
 	ship_depth_sprite = null
 	ship_bow_foam = null
+	weapon_visual = null
 	if display_id == "player":
 		art_sprite = Sprite2D.new()
-		art_sprite.texture = PLAYER_WALK
+		art_sprite.texture = PLAYER_EQUIPMENT_WALK_ATLASES[equipment_skin_id] if equipment_skin_id != "" else PLAYER_BASE_WALK_ATLAS
 		art_sprite.hframes = 4
-		art_sprite.vframes = 2
+		art_sprite.vframes = 3
 		art_sprite.frame_coords = Vector2i(0, 1)
-		art_sprite.scale = Vector2.ONE * 0.35
+		art_sprite.scale = Vector2.ONE * _player_walk_scale()
+		var chroma_shader = Shader.new()
+		chroma_shader.code = PLAYER_EQUIPMENT_CHROMA_SHADER
+		var chroma_material = ShaderMaterial.new()
+		chroma_material.shader = chroma_shader
+		art_sprite.material = chroma_material
 		art_sprite.z_index = 1
 		add_child(art_sprite)
+		weapon_visual = PlayerWeaponVisual.new()
+		weapon_visual.z_index = 2
+		weapon_visual.visible = equipped_weapon_id != ""
+		weapon_visual.configure(equipped_weapon_id)
+		add_child(weapon_visual)
 		return
 	if display_id == "player_ship":
 		ship_depth_sprite = Sprite2D.new()
@@ -369,25 +432,18 @@ func _update_player_walk_sprite(moving):
 	if not is_instance_valid(art_sprite):
 		return
 	var frame_index = int(floor(walk_time * 9.0)) % 4 if moving else 0
-	if last_facing == "up":
-		if art_sprite.texture != PLAYER_WALK_BACK:
-			art_sprite.texture = PLAYER_WALK_BACK
-			art_sprite.hframes = 4
-			art_sprite.vframes = 1
-		art_sprite.frame = frame_index
-		art_sprite.flip_h = false
-		art_sprite.scale = Vector2.ONE * 0.22
-	else:
-		if art_sprite.texture != PLAYER_WALK:
-			art_sprite.texture = PLAYER_WALK
-			art_sprite.hframes = 4
-			art_sprite.vframes = 2
-		var row = 1 if last_facing == "down" else 0
-		art_sprite.frame_coords = Vector2i(frame_index, row)
-		art_sprite.flip_h = last_facing == "left"
-		art_sprite.scale = Vector2.ONE * 0.35
+	var row = 2 if last_facing == "up" else (1 if last_facing == "down" else 0)
+	art_sprite.frame_coords = Vector2i(frame_index, row)
+	art_sprite.flip_h = last_facing == "left"
+	art_sprite.scale = Vector2.ONE * _player_walk_scale()
+	if is_instance_valid(weapon_visual):
+		weapon_visual.z_index = 0 if last_facing == "up" else 2
+		weapon_visual.update_pose(last_facing, moving, walk_time)
 	art_sprite.position.y = sin(walk_time * 9.0 * PI) * 0.9 if moving else 0.0
 	art_sprite.rotation = 0.0
+
+func _player_walk_scale():
+	return float(PLAYER_EQUIPMENT_SCALES.get(equipment_skin_id, 0.45))
 
 func _art_scale():
 	if NPC_ATLAS_CELLS.has(display_id):
