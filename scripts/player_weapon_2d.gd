@@ -17,7 +17,7 @@ func update_pose(next_facing, is_moving, phase):
 	walk_time = float(phase)
 	set_meta("facing", facing)
 	set_meta("moving", moving)
-	set_meta("mount", "back" if moving else "hand")
+	set_meta("mount", "back")
 	queue_redraw()
 
 func _draw():
@@ -25,83 +25,55 @@ func _draw():
 		return
 	var palette = _weapon_palette()
 	var bob = sin(walk_time * 9.0 * PI) * 0.8 if moving else 0.0
-	if moving:
-		_draw_back_carried_weapon(palette, bob)
-		return
-	var origin = Vector2(18, -2 + bob)
-	var angle = -0.42
-	if facing == "left":
-		origin = Vector2(-18, -2 + bob)
-		angle = PI + 0.42
-	elif facing == "up":
-		origin = Vector2(16, -1 + bob)
-		angle = -0.72
-	elif facing == "down":
-		origin = Vector2(17, 1 + bob)
-		angle = -0.23
-	draw_set_transform(origin, angle)
-	if weapon_id == "divine_shears":
-		_draw_shears(palette)
-	elif weapon_id in ["spider_knife"]:
-		_draw_blade(24.0, 4.4, palette, true)
-	elif weapon_id in ["tira_sword"]:
-		_draw_blade(43.0, 5.4, palette, false)
-	else:
-		_draw_blade(36.0, 5.2, palette, true)
-	draw_set_transform(Vector2.ZERO)
+	_draw_back_carried_weapon(palette, bob)
 
 func _draw_back_carried_weapon(palette, bob):
-	# 行走时将武器斜挂在背带上。正面/侧面由父节点放到人物后层，
+	# 探索地图中始终将武器斜挂在背带上。正面/侧面由父节点放到人物后层，
 	# 背面朝镜头时则覆盖在背部上方，既符合空间关系也不会完全被遮住。
-	var origin = Vector2(-17, 18 + bob)
-	var angle = -1.02
+	var origin = Vector2(-22, 23 + bob)
+	var angle = -0.98
 	if facing == "left":
-		origin = Vector2(17, 18 + bob)
-		angle = -2.12
+		origin = Vector2(22, 23 + bob)
+		angle = -2.16
 	elif facing == "up":
-		origin = Vector2(-16, 17 + bob)
-		angle = -1.02
+		origin = Vector2(-21, 22 + bob)
+		angle = -0.98
 	elif facing == "down":
-		origin = Vector2(-17, 19 + bob)
-		angle = -1.02
+		origin = Vector2(-22, 24 + bob)
+		angle = -0.98
 	draw_set_transform(origin, angle)
 	if weapon_id == "divine_shears":
-		_draw_shears(palette)
+		_draw_sheathed_shears(palette)
 	elif weapon_id == "spider_knife":
-		_draw_blade(24.0, 4.4, palette, true)
+		_draw_sheathed_blade(31.0, 5.0, palette)
 	elif weapon_id == "tira_sword":
-		_draw_blade(43.0, 5.4, palette, false)
+		_draw_sheathed_blade(51.0, 7.0, palette)
 	else:
-		_draw_blade(36.0, 5.2, palette, true)
+		_draw_sheathed_blade(45.0, 6.5, palette)
 	draw_set_transform(Vector2.ZERO)
 
-func _draw_blade(length, width, palette, curved):
-	var guard_color = Color(palette.guard)
-	var blade_color = Color(palette.blade)
-	var shine_color = Color(palette.shine)
-	draw_line(Vector2(-5, 0), Vector2(3, 0), Color(palette.grip), 4.6, true)
-	draw_line(Vector2(2, -5), Vector2(2, 5), guard_color, 3.0, true)
-	if curved:
-		var points = PackedVector2Array([Vector2(4, 0), Vector2(length * 0.55, -1), Vector2(length, -7), Vector2(length - 3, -2), Vector2(5, 3)])
-		draw_colored_polygon(points, blade_color)
-		draw_polyline(PackedVector2Array([Vector2(6, 0), Vector2(length * 0.56, -2), Vector2(length - 2, -6)]), shine_color, 1.4, true)
-	else:
-		var points = PackedVector2Array([Vector2(4, -width * 0.5), Vector2(length - 4, -width * 0.5), Vector2(length, 0), Vector2(length - 4, width * 0.5), Vector2(4, width * 0.5)])
-		draw_colored_polygon(points, blade_color)
-		draw_line(Vector2(7, -1.2), Vector2(length - 5, -1.2), shine_color, 1.2, true)
+func _draw_sheathed_blade(length, width, palette):
+	# 背负状态展示的是完整刀鞘：鞘尖在腰后、握柄越过肩头，
+	# 与手持状态的裸刃轮廓明显不同，远距离也能一眼看出正在背刀。
+	var sheath = Color("18262d")
+	var sheath_edge = Color(palette.guard).darkened(0.25)
+	draw_line(Vector2.ZERO, Vector2(length - 5.0, 0), sheath, width + 3.0, true)
+	draw_line(Vector2(2, -1.2), Vector2(length - 7.0, -1.2), sheath_edge, 1.6, true)
+	var tip = PackedVector2Array([Vector2(-4, 0), Vector2(1, -width * 0.62), Vector2(3, width * 0.62)])
+	draw_colored_polygon(tip, Color(palette.guard))
+	var guard_x = length - 4.0
+	draw_line(Vector2(guard_x, -6), Vector2(guard_x, 6), Color(palette.guard), 3.2, true)
+	draw_line(Vector2(length - 1.0, 0), Vector2(length + 11.0, 0), Color(palette.grip), 5.0, true)
+	draw_line(Vector2(length + 1.0, -1.1), Vector2(length + 9.0, -1.1), Color(palette.shine), 1.2, true)
+	draw_circle(Vector2(length + 12.0, 0), 3.2, Color(palette.guard))
 
-func _draw_shears(palette):
-	var metal = Color(palette.blade)
-	var shine = Color(palette.shine)
-	draw_arc(Vector2(-2, -4), 5.0, 0, TAU, 18, Color(palette.guard), 2.4, true)
-	draw_arc(Vector2(-2, 5), 5.0, 0, TAU, 18, Color(palette.guard), 2.4, true)
-	draw_circle(Vector2(5, 0), 2.5, Color(palette.grip))
-	var top = PackedVector2Array([Vector2(5, -1), Vector2(39, -9), Vector2(42, -6), Vector2(7, 2)])
-	var bottom = PackedVector2Array([Vector2(5, 1), Vector2(39, 9), Vector2(42, 6), Vector2(7, -2)])
-	draw_colored_polygon(top, metal)
-	draw_colored_polygon(bottom, metal)
-	draw_line(Vector2(9, -1), Vector2(38, -7), shine, 1.2, true)
-	draw_line(Vector2(9, 1), Vector2(38, 7), shine, 1.2, true)
+func _draw_sheathed_shears(palette):
+	var sheath = Color("18262d")
+	draw_line(Vector2.ZERO, Vector2(42, 0), sheath, 10.0, true)
+	draw_line(Vector2(3, -2), Vector2(38, -2), Color(palette.guard).darkened(0.2), 1.6, true)
+	draw_arc(Vector2(47, -5), 5.5, 0, TAU, 18, Color(palette.guard), 2.6, true)
+	draw_arc(Vector2(47, 6), 5.5, 0, TAU, 18, Color(palette.guard), 2.6, true)
+	draw_circle(Vector2(41, 0), 2.8, Color(palette.shine))
 
 func _weapon_palette():
 	var set_id = ""

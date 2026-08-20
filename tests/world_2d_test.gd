@@ -130,10 +130,18 @@ func _run():
 	# The 2D backpack must expose and execute real item actions.
 	scene.state.inventory["warrior_blade"] = 1
 	scene._open_inventory()
-	_check(_has_button_text(scene.overlay, "装备") and _has_button_text(scene.overlay, "使用"), "背包必须显示装备与使用按钮")
-	_check(_has_label_text(scene.overlay, "物品背包") and _has_label_text(scene.overlay, "背包物品") and not _has_label_text(scene.overlay, "当前已装备") and _count_visuals(scene.overlay, "equipment") >= 1 and _count_visuals(scene.overlay, "consumable") >= 1 and _has_visual_set(scene.overlay, "warrior"), "物品背包必须展示新版套装图集，并只保留未装备物品")
+	_check(_has_label_text(scene.overlay, "航海行囊") and _has_label_text(scene.overlay, "全部货架") and _has_named_node(scene.overlay, "InventoryDetail"), "新版背包必须提供标题、货架和选中详情区")
+	_check(_has_button_text(scene.overlay, "推荐排序") and _has_button_text(scene.overlay, "装备") and _has_button_text(scene.overlay, "全部") and _has_button_text(scene.overlay, "补给"), "新版背包必须提供分类、排序与集中操作按钮")
+	_check(_count_named_nodes(scene.overlay, "InventoryTile") >= 3, "新版背包必须以三列物品网格展示库存")
+	_check(not _has_label_text(scene.overlay, "当前已装备") and _count_visuals(scene.overlay, "equipment") >= 1 and _count_visuals(scene.overlay, "consumable") >= 1 and _has_visual_set(scene.overlay, "warrior"), "航海行囊必须可视化展示装备与补给，并只保留未装备物品")
+	scene._select_inventory_item_2d("small_milk")
+	await process_frame
+	_check(_named_node_meta(scene.overlay, "InventoryDetail", "item_id") == "small_milk" and _has_button_text(scene.overlay, "使用"), "点选补给后详情区必须切换为对应物品并提供使用操作")
+	scene._set_inventory_filter_2d("equipment")
+	await process_frame
+	_check(scene.inventory_filter == "equipment" and _has_label_text(scene.overlay, "装备货架") and _count_visuals(scene.overlay, "consumable") == 0, "装备分类必须隐藏其他类别并保留独立货架")
 	scene._open_character()
-	_check(_has_label_text(scene.overlay, "角色信息 · 已装备") and _has_label_text(scene.overlay, "当前已装备") and _has_named_node(scene.overlay, "CharacterPortrait") and _has_named_node(scene.overlay, "CurrentShipModel") and _has_label_text(scene.overlay, "座舰系统") and _has_label_text(scene.overlay, "Lv.1  海燕号") and _has_label_text(scene.overlay, "九港船型图鉴") and _has_label_text(scene.overlay, "Lv.9 北海飞剪船") and _count_visuals(scene.overlay, "equipment") == 6 and not _has_label_text(scene.overlay, "背包物品"), "角色页必须独立展示人物、装备与当前座舰，并列出九港分级船型")
+	_check(_has_label_text(scene.overlay, "角色信息 · 已装备") and _has_label_text(scene.overlay, "当前已装备") and _has_named_node(scene.overlay, "CharacterPortrait") and _has_named_node(scene.overlay, "CurrentShipModel") and _has_label_text(scene.overlay, "座舰系统") and _has_label_text(scene.overlay, "Lv.1  海燕号") and _has_label_text(scene.overlay, "九港船型图鉴") and _has_label_text(scene.overlay, "Lv.9 北海飞剪船") and _count_visuals(scene.overlay, "equipment") == 6 and not _has_label_text(scene.overlay, "航海行囊"), "角色页必须独立展示人物、装备与当前座舰，并列出九港分级船型")
 	scene._open_inventory()
 	scene._equip_item_2d("warrior_blade")
 	await process_frame
@@ -151,7 +159,7 @@ func _run():
 	scene.player_actor.set_motion(Vector2.ZERO)
 	scene.player_actor._process(0.1)
 	outdoor_equipment = scene.player_actor.equipment_visual_state()
-	_check(str(outdoor_equipment.weapon_mount) == "hand" and int(outdoor_equipment.weapon_z) == 2, "角色停下后武器必须恢复手持姿态")
+	_check(str(outdoor_equipment.weapon_mount) == "back" and int(outdoor_equipment.weapon_z) == 0, "角色停下后武器也必须留在背部，不能重新跳回手中")
 	scene.state.inventory["spider_knife"] = 1
 	scene._equip_item_2d("spider_knife")
 	await process_frame
@@ -172,6 +180,8 @@ func _run():
 	scene._close_overlay()
 	scene.state.inventory["ghost_card"] = 1
 	scene._open_inventory()
+	scene._set_inventory_filter_2d("card")
+	await process_frame
 	_check(_has_button_text(scene.overlay, "启用"), "背包必须允许启用怪物卡")
 	scene._equip_card_2d("ghost_card")
 	await process_frame
@@ -771,6 +781,14 @@ func _named_node_meta(node, target_name, meta_name):
 		if result != "":
 			return result
 	return ""
+
+func _count_named_nodes(node, target_name):
+	if not is_instance_valid(node):
+		return 0
+	var count = 1 if str(node.name).begins_with(str(target_name)) else 0
+	for child in node.get_children():
+		count += _count_named_nodes(child, target_name)
+	return count
 
 func _wait_for_auto_battle(scene):
 	for _step in range(160):

@@ -439,9 +439,9 @@ func _update_player_walk_sprite(moving):
 	art_sprite.flip_h = last_facing == "left"
 	art_sprite.scale = Vector2.ONE * _player_walk_scale()
 	if is_instance_valid(weapon_visual):
-		# 移动时武器背负：背面朝镜头时露在背上，其余方向位于人物后层。
-		# 停下后恢复手持，沿用原来的前后遮挡关系。
-		weapon_visual.z_index = (2 if last_facing == "up" else 0) if moving else (0 if last_facing == "up" else 2)
+		# 探索地图中始终背负武器：背面朝镜头时露在背上，其余方向
+		# 位于人物后层；真正挥动武器只发生在独立战斗演出中。
+		weapon_visual.z_index = 2 if last_facing == "up" else 0
 		weapon_visual.update_pose(last_facing, moving, walk_time)
 	art_sprite.position.y = sin(walk_time * 9.0 * PI) * 0.9 if moving else 0.0
 	art_sprite.rotation = 0.0

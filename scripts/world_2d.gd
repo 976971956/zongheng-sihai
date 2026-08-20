@@ -22,6 +22,13 @@ const PlayerPortraitTexture = preload("res://assets/art/characters/player_walk_v
 const EquipmentSkinTexture = preload("res://assets/art/equipment/equipment_set_character_skins_v2.png")
 const PlayerShipTexture = preload("res://assets/art/ships/player_ship_atlas_v1.png")
 const EQUIPMENT_SKIN_INDEX = {"warrior": 0, "black_sail": 1, "white_whale": 2, "seven_seas": 3, "earth_legacy": 4, "tidekeeper": 5}
+const INVENTORY_FILTERS = [
+	{"id": "all", "label": "全部"},
+	{"id": "equipment", "label": "装备"},
+	{"id": "consumable", "label": "补给"},
+	{"id": "material", "label": "材料"},
+	{"id": "card", "label": "卡片"}
+]
 const MONSTER_RESPAWN_SECONDS = GameState.ENEMY_RESPAWN_SECONDS
 const MONSTER_RESPAWN_RETRY_SECONDS = 1.5
 const MONSTER_RESPAWN_SAFE_DISTANCE = 170.0
@@ -117,6 +124,11 @@ var waypoint_label
 var waypoint_world_target = Vector2.ZERO
 var navigation_button
 var inventory_notice = ""
+var inventory_filter = "all"
+var inventory_sort_mode = "recommended"
+var inventory_selected_item = ""
+var inventory_grid_scroll
+var inventory_scroll_position = 0
 var settings_button
 var footstep_timer = 0.0
 var task_navigation_active = false
@@ -2030,48 +2042,83 @@ func _switch_overlay_to_character():
 
 func _open_inventory():
 	var content = VBoxContainer.new()
-	content.add_theme_constant_override("separation", 10)
-	content.add_child(_label("物品背包", 26, GOLD))
+	content.add_theme_constant_override("separation", 9)
+	var title_row = HBoxContainer.new()
+	title_row.add_theme_constant_override("separation", 8)
+	content.add_child(title_row)
+	var title_stack = VBoxContainer.new()
+	title_stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_row.add_child(title_stack)
+	title_stack.add_child(_label("航海行囊", 26, GOLD))
+	title_stack.add_child(_label("分类收纳 · 点选物品后在详情区操作", 12, MUTED))
+	var sort_button = _button("推荐排序" if inventory_sort_mode == "recommended" else "数量排序", "ghost")
+	sort_button.custom_minimum_size = Vector2(118, 52)
+	sort_button.add_theme_font_size_override("font_size", 13)
+	sort_button.pressed.connect(_toggle_inventory_sort_2d)
+	title_row.add_child(sort_button)
 	var inventory_counts = _inventory_counts_2d()
 	var bag_panel = PanelContainer.new()
 	bag_panel.add_theme_stylebox_override("panel", _style(Color(0.03, 0.15, 0.17, 0.94), 12, Color(TEAL, 0.48), 1, 10))
-	bag_panel.add_child(_label("◈ 银币 %d｜装备%d · 补给%d · 材料%d · 卡片%d\n装备后物品会移入独立的角色装备页" % [int(state.player.silver), int(inventory_counts.equipment), int(inventory_counts.consumable), int(inventory_counts.material), int(inventory_counts.card)], 14, TEAL))
+	bag_panel.add_child(_label("◈ 银币 %d　◆ 物品 %d件\n装备%d · 补给%d · 材料%d · 卡片%d" % [int(state.player.silver), int(inventory_counts.total), int(inventory_counts.equipment), int(inventory_counts.consumable), int(inventory_counts.material), int(inventory_counts.card)], 14, TEAL))
 	content.add_child(bag_panel)
 	var card_name = "未启用"
 	if state.active_card != "" and GameData.ITEMS.has(state.active_card):
 		card_name = str(GameData.ITEMS[state.active_card].name)
-	content.add_child(_label("当前怪物卡：%s｜同时只能启用1张" % card_name, 14, TEAL))
+	content.add_child(_label("怪物卡槽：%s｜装备物品会自动移入角色装备页" % card_name, 12, TEAL))
 	if inventory_notice != "":
 		var notice = _label(inventory_notice, 14, GOLD)
 		notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		notice.add_theme_stylebox_override("normal", _style(Color(0.20, 0.14, 0.04, 0.9), 10, Color(GOLD, 0.6), 1, 10))
 		content.add_child(notice)
 		inventory_notice = ""
-	var scroll = ScrollContainer.new()
-	scroll.custom_minimum_size.y = 500
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	content.add_child(scroll)
-	var items = VBoxContainer.new()
-	items.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	items.add_theme_constant_override("separation", 8)
-	scroll.add_child(items)
-	items.add_child(_label("背包物品｜按装备、补给、卡片分类排列", 16, GOLD))
-	if state.inventory.is_empty():
-		items.add_child(_label("背包是空的。", 16, MUTED))
-	var item_ids = state.inventory.keys()
-	item_ids.sort_custom(func(a, b): return _inventory_sort_key_2d(str(a)) < _inventory_sort_key_2d(str(b)))
+	var filters = GridContainer.new()
+	filters.columns = 5
+	filters.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	filters.add_theme_constant_override("h_separation", 6)
+	content.add_child(filters)
+	for filter_definition in INVENTORY_FILTERS:
+		var filter_id = str(filter_definition.id)
+		var filter_count = int(inventory_counts.total if filter_id == "all" else inventory_counts.get(filter_id, 0))
+		var filter_button = _button("%s %d" % [str(filter_definition.label), filter_count], "gold" if inventory_filter == filter_id else "ghost")
+		filter_button.custom_minimum_size = Vector2(0, 50)
+		filter_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		filter_button.add_theme_font_size_override("font_size", 13)
+		filter_button.pressed.connect(_set_inventory_filter_2d.bind(filter_id))
+		filters.add_child(filter_button)
+	var item_ids = _inventory_visible_item_ids_2d()
+	if inventory_selected_item not in item_ids:
+		inventory_selected_item = str(item_ids[0]) if not item_ids.is_empty() else ""
+	content.add_child(_inventory_detail_card_2d(inventory_selected_item))
+	var shelf_title = _label("%s货架｜%d种物品" % [_inventory_filter_label_2d(), item_ids.size()], 15, GOLD)
+	content.add_child(shelf_title)
+	inventory_grid_scroll = ScrollContainer.new()
+	inventory_grid_scroll.name = "InventoryGridScroll"
+	inventory_grid_scroll.custom_minimum_size.y = 360
+	inventory_grid_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	content.add_child(inventory_grid_scroll)
+	var shelf = GridContainer.new()
+	shelf.columns = 3
+	shelf.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	shelf.add_theme_constant_override("h_separation", 7)
+	shelf.add_theme_constant_override("v_separation", 7)
+	inventory_grid_scroll.add_child(shelf)
+	if item_ids.is_empty():
+		var empty = _label("这一分类暂时没有物品。", 15, MUTED)
+		empty.custom_minimum_size = Vector2(600, 120)
+		empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		empty.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		shelf.add_child(empty)
 	for item_id in item_ids:
-		if not GameData.ITEMS.has(item_id):
-			continue
-		var item = GameData.ITEMS[item_id]
-		items.add_child(_inventory_item_card_2d(item_id, item, int(state.inventory[item_id])))
+		var item = Dictionary(GameData.ITEMS[str(item_id)])
+		shelf.add_child(_inventory_item_tile_2d(str(item_id), item, int(state.inventory[item_id]), str(item_id) == inventory_selected_item))
 	var character = _button("查看角色与已装备", "gold")
 	character.pressed.connect(_switch_overlay_to_character)
 	content.add_child(character)
 	var close = _button("返回地图", "primary")
 	close.pressed.connect(_close_overlay)
 	content.add_child(close)
-	_open_overlay(content, true, Vector2(666, 960))
+	_open_overlay(content, true, Vector2(666, 1040))
+	call_deferred("_restore_inventory_scroll_2d")
 
 func _equipped_upgrade_card_2d(slot):
 	var item_id = str(state.equipment.get(slot, ""))
@@ -2126,19 +2173,34 @@ func _upgrade_equipped_2d(slot):
 	else:
 		call_deferred("_open_character")
 
-func _inventory_item_card_2d(item_id, item, count):
+func _inventory_detail_card_2d(item_id):
 	var card = PanelContainer.new()
-	card.add_theme_stylebox_override("panel", _style(Color(0.04, 0.13, 0.16, 0.92), 11, _rarity_color_2d(str(item.rarity)), 2, 10))
+	card.name = "InventoryDetail"
+	card.set_meta("item_id", str(item_id))
+	if str(item_id) == "" or not GameData.ITEMS.has(str(item_id)):
+		card.custom_minimum_size.y = 176
+		card.add_theme_stylebox_override("panel", _style(Color(0.03, 0.10, 0.12, 0.92), 12, Color(TEAL, 0.35), 1, 12))
+		var empty = _label("选择下方物品查看详情与操作", 15, MUTED)
+		empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		empty.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		card.add_child(empty)
+		return card
+	var item = Dictionary(GameData.ITEMS[str(item_id)])
+	var count = int(state.inventory.get(str(item_id), 0))
+	card.custom_minimum_size.y = 196
+	card.add_theme_stylebox_override("panel", _style(Color(0.04, 0.13, 0.16, 0.97), 12, _rarity_color_2d(str(item.rarity)), 2, 12))
 	var row = HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
+	row.add_theme_constant_override("separation", 12)
 	card.add_child(row)
-	row.add_child(_item_visual_2d(str(item.type), item_id, str(item.rarity), str(item.get("slot", "")), false, 76))
+	row.add_child(_item_visual_2d(str(item.type), str(item_id), str(item.rarity), str(item.get("slot", "")), false, 102))
 	var text_stack = VBoxContainer.new()
 	text_stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	text_stack.add_theme_constant_override("separation", 3)
 	row.add_child(text_stack)
-	text_stack.add_child(_label("%s  ×%d" % [item.name, count], 15, INK))
-	text_stack.add_child(_label("%s%s" % [str(item.rarity), " · %s" % GameData.SLOT_NAMES[str(item.slot)] if str(item.type) == "equipment" else ""], 12, _rarity_color_2d(str(item.rarity))))
+	text_stack.add_child(_label("%s　×%d" % [str(item.name), count], 18, INK))
+	var category_copy = _inventory_category_name_2d(str(item.type))
+	var slot_copy = " · %s" % GameData.SLOT_NAMES.get(str(item.get("slot", "")), "") if str(item.type) == "equipment" else ""
+	text_stack.add_child(_label("%s · %s%s" % [str(item.rarity), category_copy, slot_copy], 12, _rarity_color_2d(str(item.rarity))))
 	var description = _label(str(item.description), 12, MUTED)
 	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text_stack.add_child(description)
@@ -2150,8 +2212,13 @@ func _inventory_item_card_2d(item_id, item, count):
 		var delta = state.equipment_score_delta(item_id)
 		var comparison = "较当前战力 %+d" % delta if delta != 0 else "与当前装备战力相当"
 		text_stack.add_child(_label(comparison, 12, GOLD if delta > 0 else MUTED))
-	var action = _button("收藏", "ghost")
-	action.custom_minimum_size = Vector2(94, 58)
+	var action = _inventory_action_button_2d(str(item_id), item)
+	action.custom_minimum_size = Vector2(112, 66)
+	row.add_child(action)
+	return card
+
+func _inventory_action_button_2d(item_id, item):
+	var action = _button("仅供收藏", "ghost")
 	match str(item.type):
 		"equipment":
 			action.text = "装备"
@@ -2171,17 +2238,113 @@ func _inventory_item_card_2d(item_id, item, count):
 			action.disabled = true
 		_:
 			action.disabled = true
-	row.add_child(action)
+	return action
+
+func _inventory_item_tile_2d(item_id, item, count, selected):
+	var card = PanelContainer.new()
+	card.name = "InventoryTile_%s" % str(item_id)
+	card.set_meta("item_id", str(item_id))
+	card.custom_minimum_size = Vector2(196, 176)
+	var border = GOLD if bool(selected) else _rarity_color_2d(str(item.rarity))
+	card.add_theme_stylebox_override("panel", _style(Color(0.035, 0.105, 0.13, 0.96), 11, Color(border, 0.88 if bool(selected) else 0.52), 2 if bool(selected) else 1, 7))
+	var stack = VBoxContainer.new()
+	stack.alignment = BoxContainer.ALIGNMENT_CENTER
+	stack.add_theme_constant_override("separation", 2)
+	card.add_child(stack)
+	var visual_center = CenterContainer.new()
+	visual_center.custom_minimum_size.y = 72
+	stack.add_child(visual_center)
+	visual_center.add_child(_item_visual_2d(str(item.type), str(item_id), str(item.rarity), str(item.get("slot", "")), false, 70))
+	var name_label = _label("%s ×%d" % [str(item.name), int(count)], 12, INK)
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	stack.add_child(name_label)
+	var rarity_label = _label(str(item.rarity), 11, _rarity_color_2d(str(item.rarity)))
+	rarity_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	stack.add_child(rarity_label)
+	var select = _button("已选中" if bool(selected) else "查看", "gold" if bool(selected) else "ghost")
+	select.custom_minimum_size.y = 40
+	select.add_theme_font_size_override("font_size", 12)
+	select.pressed.connect(_select_inventory_item_2d.bind(str(item_id)))
+	stack.add_child(select)
 	return card
 
+func _set_inventory_filter_2d(filter_id):
+	inventory_filter = str(filter_id)
+	inventory_selected_item = ""
+	inventory_scroll_position = 0
+	_refresh_inventory_overlay_2d()
+
+func _toggle_inventory_sort_2d():
+	inventory_sort_mode = "quantity" if inventory_sort_mode == "recommended" else "recommended"
+	inventory_scroll_position = 0
+	_refresh_inventory_overlay_2d()
+
+func _select_inventory_item_2d(item_id):
+	inventory_selected_item = str(item_id)
+	if is_instance_valid(inventory_grid_scroll):
+		inventory_scroll_position = int(inventory_grid_scroll.scroll_vertical)
+	_refresh_inventory_overlay_2d()
+
+func _refresh_inventory_overlay_2d():
+	_close_overlay()
+	call_deferred("_open_inventory")
+
+func _restore_inventory_scroll_2d():
+	if is_instance_valid(inventory_grid_scroll):
+		inventory_grid_scroll.scroll_vertical = inventory_scroll_position
+
+func _inventory_visible_item_ids_2d():
+	var item_ids = []
+	for raw_item_id in state.inventory:
+		var item_id = str(raw_item_id)
+		if not GameData.ITEMS.has(item_id) or int(state.inventory.get(item_id, 0)) <= 0:
+			continue
+		var item = Dictionary(GameData.ITEMS[item_id])
+		if inventory_filter != "all" and _inventory_bucket_2d(str(item.get("type", "other"))) != inventory_filter:
+			continue
+		item_ids.append(item_id)
+	if inventory_sort_mode == "quantity":
+		item_ids.sort_custom(func(a, b):
+			var count_a = int(state.inventory.get(str(a), 0))
+			var count_b = int(state.inventory.get(str(b), 0))
+			return count_a > count_b if count_a != count_b else _inventory_sort_key_2d(str(a)) < _inventory_sort_key_2d(str(b))
+		)
+	else:
+		item_ids.sort_custom(func(a, b): return _inventory_sort_key_2d(str(a)) < _inventory_sort_key_2d(str(b)))
+	return item_ids
+
+func _inventory_filter_label_2d():
+	for definition in INVENTORY_FILTERS:
+		if str(definition.id) == inventory_filter:
+			return str(definition.label)
+	return "全部"
+
+func _inventory_category_name_2d(item_type):
+	match _inventory_bucket_2d(str(item_type)):
+		"equipment": return "装备"
+		"consumable": return "补给"
+		"material": return "材料"
+		"card": return "怪物卡"
+		_: return "收藏"
+
+func _inventory_bucket_2d(item_type):
+	match str(item_type):
+		"equipment": return "equipment"
+		"consumable": return "consumable"
+		"card": return "card"
+		"material", "mystery": return "material"
+		_: return "material"
+
 func _inventory_counts_2d():
-	var counts = {"equipment": 0, "consumable": 0, "material": 0, "card": 0, "other": 0}
+	var counts = {"total": 0, "equipment": 0, "consumable": 0, "material": 0, "card": 0}
 	for item_id in state.inventory:
 		if not GameData.ITEMS.has(str(item_id)):
 			continue
-		var item_type = str(GameData.ITEMS[str(item_id)].get("type", "other"))
-		var bucket = item_type if counts.has(item_type) else "other"
-		counts[bucket] += int(state.inventory[item_id])
+		var count = int(state.inventory[item_id])
+		var bucket = _inventory_bucket_2d(str(GameData.ITEMS[str(item_id)].get("type", "other")))
+		counts.total += count
+		counts[bucket] += count
 	return counts
 
 func _inventory_sort_key_2d(item_id):
@@ -3747,6 +3910,7 @@ func _close_overlay():
 		overlay.queue_free()
 	overlay = null
 	overlay_scroll = null
+	inventory_grid_scroll = null
 	_reset_overlay_drag()
 	battle_stage = null
 	battle_log_label = null
