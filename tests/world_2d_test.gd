@@ -143,12 +143,15 @@ func _run():
 	scene.player_actor.set_motion(Vector2.UP)
 	scene.player_actor._process(0.2)
 	outdoor_equipment = scene.player_actor.equipment_visual_state()
-	_check(str(outdoor_equipment.facing) == "up" and Vector2i(outdoor_equipment.frame).y == 2, "套装角色向上走时必须切换背面行走帧")
+	_check(str(outdoor_equipment.facing) == "up" and Vector2i(outdoor_equipment.frame).y == 2 and str(outdoor_equipment.weapon_mount) == "back" and int(outdoor_equipment.weapon_z) == 2, "套装角色向上走时必须切换背面帧，并把武器露在背部上方")
 	scene.player_actor.set_motion(Vector2.LEFT)
 	scene.player_actor._process(0.2)
 	outdoor_equipment = scene.player_actor.equipment_visual_state()
-	_check(str(outdoor_equipment.facing) == "left" and Vector2i(outdoor_equipment.frame).y == 0, "套装角色左右行走时必须切换侧面行走帧")
+	_check(str(outdoor_equipment.facing) == "left" and Vector2i(outdoor_equipment.frame).y == 0 and str(outdoor_equipment.weapon_mount) == "back" and int(outdoor_equipment.weapon_z) == 0, "套装角色侧向行走时武器必须斜背在人物后层")
 	scene.player_actor.set_motion(Vector2.ZERO)
+	scene.player_actor._process(0.1)
+	outdoor_equipment = scene.player_actor.equipment_visual_state()
+	_check(str(outdoor_equipment.weapon_mount) == "hand" and int(outdoor_equipment.weapon_z) == 2, "角色停下后武器必须恢复手持姿态")
 	scene.state.inventory["spider_knife"] = 1
 	scene._equip_item_2d("spider_knife")
 	await process_frame

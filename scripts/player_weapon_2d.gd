@@ -17,6 +17,7 @@ func update_pose(next_facing, is_moving, phase):
 	walk_time = float(phase)
 	set_meta("facing", facing)
 	set_meta("moving", moving)
+	set_meta("mount", "back" if moving else "hand")
 	queue_redraw()
 
 func _draw():
@@ -24,6 +25,9 @@ func _draw():
 		return
 	var palette = _weapon_palette()
 	var bob = sin(walk_time * 9.0 * PI) * 0.8 if moving else 0.0
+	if moving:
+		_draw_back_carried_weapon(palette, bob)
+		return
 	var origin = Vector2(18, -2 + bob)
 	var angle = -0.42
 	if facing == "left":
@@ -41,6 +45,31 @@ func _draw():
 	elif weapon_id in ["spider_knife"]:
 		_draw_blade(24.0, 4.4, palette, true)
 	elif weapon_id in ["tira_sword"]:
+		_draw_blade(43.0, 5.4, palette, false)
+	else:
+		_draw_blade(36.0, 5.2, palette, true)
+	draw_set_transform(Vector2.ZERO)
+
+func _draw_back_carried_weapon(palette, bob):
+	# 行走时将武器斜挂在背带上。正面/侧面由父节点放到人物后层，
+	# 背面朝镜头时则覆盖在背部上方，既符合空间关系也不会完全被遮住。
+	var origin = Vector2(-17, 18 + bob)
+	var angle = -1.02
+	if facing == "left":
+		origin = Vector2(17, 18 + bob)
+		angle = -2.12
+	elif facing == "up":
+		origin = Vector2(-16, 17 + bob)
+		angle = -1.02
+	elif facing == "down":
+		origin = Vector2(-17, 19 + bob)
+		angle = -1.02
+	draw_set_transform(origin, angle)
+	if weapon_id == "divine_shears":
+		_draw_shears(palette)
+	elif weapon_id == "spider_knife":
+		_draw_blade(24.0, 4.4, palette, true)
+	elif weapon_id == "tira_sword":
 		_draw_blade(43.0, 5.4, palette, false)
 	else:
 		_draw_blade(36.0, 5.2, palette, true)

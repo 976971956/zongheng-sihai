@@ -207,7 +207,9 @@ func equipment_visual_state():
 		"weapon": equipped_weapon_id,
 		"facing": last_facing,
 		"frame": art_sprite.frame_coords if is_instance_valid(art_sprite) else Vector2i.ZERO,
-		"has_weapon_layer": is_instance_valid(weapon_visual) and weapon_visual.visible
+		"has_weapon_layer": is_instance_valid(weapon_visual) and weapon_visual.visible,
+		"weapon_mount": str(weapon_visual.get_meta("mount", "hand")) if is_instance_valid(weapon_visual) else "none",
+		"weapon_z": weapon_visual.z_index if is_instance_valid(weapon_visual) else 0
 	}
 
 func _process(delta):
@@ -437,7 +439,9 @@ func _update_player_walk_sprite(moving):
 	art_sprite.flip_h = last_facing == "left"
 	art_sprite.scale = Vector2.ONE * _player_walk_scale()
 	if is_instance_valid(weapon_visual):
-		weapon_visual.z_index = 0 if last_facing == "up" else 2
+		# 移动时武器背负：背面朝镜头时露在背上，其余方向位于人物后层。
+		# 停下后恢复手持，沿用原来的前后遮挡关系。
+		weapon_visual.z_index = (2 if last_facing == "up" else 0) if moving else (0 if last_facing == "up" else 2)
 		weapon_visual.update_pose(last_facing, moving, walk_time)
 	art_sprite.position.y = sin(walk_time * 9.0 * PI) * 0.9 if moving else 0.0
 	art_sprite.rotation = 0.0
