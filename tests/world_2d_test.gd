@@ -135,14 +135,27 @@ func _run():
 
 	# The 2D backpack must expose and execute real item actions.
 	scene.state.inventory["warrior_blade"] = 1
+	var inventory_quest_index_before_cargo = scene.state.quest_index
+	scene.state.quest_index = 8
+	scene.state.cargo = {"venetian_glass": 2, "wool_cloth": 3}
+	scene.state.cargo_costs = {"venetian_glass": 48, "wool_cloth": 75}
 	scene._open_inventory()
 	_check(_has_label_text(scene.overlay, "航海行囊") and _has_label_text(scene.overlay, "全部货架") and _has_named_node(scene.overlay, "InventoryDetail") and _has_named_node(scene.overlay, "InventorySummary"), "新版背包必须提供标题、资产概览、货架和选中详情区")
-	_check(_has_button_text(scene.overlay, "推荐排序") and _has_button_text(scene.overlay, "装备") and _has_button_text(scene.overlay, "全部") and _has_button_text(scene.overlay, "补给"), "新版背包必须提供分类、排序与集中操作按钮")
+	_check(_has_button_text(scene.overlay, "推荐排序") and _has_button_text(scene.overlay, "装备") and _has_button_text(scene.overlay, "全部") and _has_button_text(scene.overlay, "补给") and _has_button_text(scene.overlay, "货物 5"), "新版背包必须提供货物在内的分类、排序与集中操作按钮")
 	_check(_count_named_nodes(scene.overlay, "InventoryTile") >= 3, "新版背包必须以三列物品网格展示库存")
-	_check(not _has_label_text(scene.overlay, "当前已装备") and _count_visuals(scene.overlay, "equipment") >= 1 and _count_visuals(scene.overlay, "consumable") >= 1 and _has_visual_set(scene.overlay, "warrior"), "航海行囊必须可视化展示装备与补给，并只保留未装备物品")
+	_check(not _has_label_text(scene.overlay, "当前已装备") and _count_visuals(scene.overlay, "equipment") >= 1 and _count_visuals(scene.overlay, "consumable") >= 1 and _count_visuals(scene.overlay, "trade") >= 2 and _has_visual_set(scene.overlay, "warrior"), "航海行囊必须可视化展示装备、补给与船舱货物，并只保留未装备物品")
 	scene._select_inventory_item_2d("small_milk")
 	await process_frame
 	_check(_named_node_meta(scene.overlay, "InventoryDetail", "item_id") == "small_milk" and _has_button_text(scene.overlay, "使用"), "点选补给后详情区必须切换为对应物品并提供使用操作")
+	scene._set_inventory_filter_2d("cargo")
+	await process_frame
+	_check(scene.inventory_filter == "cargo" and _has_label_text(scene.overlay, "货物舱单") and _has_label_text(scene.overlay, "已用7/12格") and _count_visuals(scene.overlay, "trade") == 3 and _has_label_text(scene.overlay, "威尼斯玻璃") and _has_label_text(scene.overlay, "石墙羊毛布"), "货物分类必须单独列出船舱货物、携带种类与实际舱位占用")
+	scene._select_inventory_item_2d("cargo:venetian_glass")
+	await process_frame
+	_check(_named_node_meta(scene.overlay, "InventoryDetail", "item_id") == "cargo:venetian_glass" and _has_label_text(scene.overlay, "买入均价 24银/箱") and _has_label_text(scene.overlay, "最高收购") and _has_button_text(scene.overlay, "到港口货栈"), "点选货物后必须显示数量、买入均价、最高收购港和正确出售入口说明")
+	scene.state.cargo = {}
+	scene.state.cargo_costs = {}
+	scene.state.quest_index = inventory_quest_index_before_cargo
 	scene._set_inventory_filter_2d("equipment")
 	await process_frame
 	_check(scene.inventory_filter == "equipment" and _has_label_text(scene.overlay, "装备货架") and _count_visuals(scene.overlay, "consumable") == 0, "装备分类必须隐藏其他类别并保留独立货架")

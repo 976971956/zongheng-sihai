@@ -27,7 +27,8 @@ const INVENTORY_FILTERS = [
 	{"id": "equipment", "label": "装备"},
 	{"id": "consumable", "label": "补给"},
 	{"id": "material", "label": "材料"},
-	{"id": "card", "label": "卡片"}
+	{"id": "card", "label": "卡片"},
+	{"id": "cargo", "label": "货物"}
 ]
 const MONSTER_RESPAWN_SECONDS = GameState.ENEMY_RESPAWN_SECONDS
 const MONSTER_RESPAWN_RETRY_SECONDS = 1.5
@@ -2102,14 +2103,17 @@ func _open_inventory():
 	var holdings = VBoxContainer.new()
 	holdings.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	holdings.add_theme_constant_override("separation", 5)
-	holdings.add_child(_label("行囊库存 · 共%d件" % int(inventory_counts.total), 13, INK))
-	var count_row = HBoxContainer.new()
-	count_row.add_theme_constant_override("separation", 5)
+	holdings.add_child(_label("随身与货舱 · 共%d件" % int(inventory_counts.total), 13, INK))
+	var count_row = GridContainer.new()
+	count_row.columns = 3
+	count_row.add_theme_constant_override("h_separation", 4)
+	count_row.add_theme_constant_override("v_separation", 4)
 	for summary in [
 		{"label": "装备%d" % int(inventory_counts.equipment), "color": Color("65aee8")},
 		{"label": "补给%d" % int(inventory_counts.consumable), "color": Color("64d9c6")},
 		{"label": "材料%d" % int(inventory_counts.material), "color": Color("bb7bea")},
-		{"label": "卡片%d" % int(inventory_counts.card), "color": GOLD}
+		{"label": "卡片%d" % int(inventory_counts.card), "color": GOLD},
+		{"label": "货物%d" % int(inventory_counts.cargo), "color": Color("55c6d8")}
 	]:
 		count_row.add_child(_compact_badge_2d(str(summary.label), Color(summary.color)))
 	holdings.add_child(count_row)
@@ -2126,7 +2130,7 @@ func _open_inventory():
 		content.add_child(notice)
 		inventory_notice = ""
 	var filters = GridContainer.new()
-	filters.columns = 5
+	filters.columns = 6
 	filters.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	filters.add_theme_constant_override("h_separation", 6)
 	content.add_child(filters)
@@ -2143,7 +2147,8 @@ func _open_inventory():
 	if inventory_selected_item not in item_ids:
 		inventory_selected_item = str(item_ids[0]) if not item_ids.is_empty() else ""
 	content.add_child(_inventory_detail_card_2d(inventory_selected_item))
-	var shelf_title = _label("%s货架｜%d种物品" % [_inventory_filter_label_2d(), item_ids.size()], 15, GOLD)
+	var shelf_copy = "货物舱单｜%d种货物 · 已用%d/%d格" % [item_ids.size(), state.cargo_used(), state.cargo_capacity()] if inventory_filter == "cargo" else "%s货架｜%d种物品" % [_inventory_filter_label_2d(), item_ids.size()]
+	var shelf_title = _label(shelf_copy, 15, GOLD)
 	content.add_child(shelf_title)
 	inventory_grid_scroll = ScrollContainer.new()
 	inventory_grid_scroll.name = "InventoryGridScroll"
@@ -2157,14 +2162,19 @@ func _open_inventory():
 	shelf.add_theme_constant_override("v_separation", 7)
 	inventory_grid_scroll.add_child(shelf)
 	if item_ids.is_empty():
-		var empty = _label("这一分类暂时没有物品。", 15, MUTED)
+		var empty_copy = "货舱里暂时没有贸易货物，可到各港口货栈采购。" if inventory_filter == "cargo" else "这一分类暂时没有物品。"
+		var empty = _label(empty_copy, 15, MUTED)
 		empty.custom_minimum_size = Vector2(600, 120)
 		empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		empty.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		shelf.add_child(empty)
-	for item_id in item_ids:
-		var item = Dictionary(GameData.ITEMS[str(item_id)])
-		shelf.add_child(_inventory_item_tile_2d(str(item_id), item, int(state.inventory[item_id]), str(item_id) == inventory_selected_item))
+	for entry_id in item_ids:
+		if _inventory_is_cargo_entry_2d(str(entry_id)):
+			var cargo_id = _inventory_cargo_id_2d(str(entry_id))
+			shelf.add_child(_inventory_item_tile_2d(str(entry_id), _inventory_cargo_item_2d(cargo_id), int(state.cargo.get(cargo_id, 0)), str(entry_id) == inventory_selected_item))
+		else:
+			var item = Dictionary(GameData.ITEMS[str(entry_id)])
+			shelf.add_child(_inventory_item_tile_2d(str(entry_id), item, int(state.inventory[entry_id]), str(entry_id) == inventory_selected_item))
 	var character = _button("查看角色与已装备", "gold")
 	character.pressed.connect(_switch_overlay_to_character)
 	content.add_child(character)
@@ -2265,6 +2275,8 @@ func _equipment_upgrade_meter_2d(level, color):
 	return meter
 
 func _inventory_detail_card_2d(item_id):
+	if _inventory_is_cargo_entry_2d(str(item_id)):
+		return _inventory_cargo_detail_card_2d(_inventory_cargo_id_2d(str(item_id)))
 	var card = PanelContainer.new()
 	card.name = "InventoryDetail"
 	card.set_meta("item_id", str(item_id))
@@ -2316,6 +2328,62 @@ func _inventory_detail_card_2d(item_id):
 	row.add_child(action)
 	return card
 
+func _inventory_cargo_detail_card_2d(cargo_id):
+	var card = PanelContainer.new()
+	card.name = "InventoryDetail"
+	card.set_meta("item_id", _inventory_cargo_entry_id_2d(str(cargo_id)))
+	card.set_meta("cargo_id", str(cargo_id))
+	if not GameData.TRADE_GOODS.has(str(cargo_id)):
+		return card
+	var good = Dictionary(GameData.TRADE_GOODS[str(cargo_id)])
+	var count = int(state.cargo.get(str(cargo_id), 0))
+	var cargo_color = Color("55c6d8")
+	card.custom_minimum_size.y = 230
+	card.add_theme_stylebox_override("panel", _style(Color(0.018, 0.085, 0.105, 0.98).lerp(cargo_color, 0.10), 15, Color(cargo_color, 0.88), 2, 13))
+	var row = HBoxContainer.new()
+	row.add_theme_constant_override("separation", 13)
+	card.add_child(row)
+	row.add_child(_item_visual_2d("trade", str(cargo_id), "贸易货物", "", false, 112))
+	var text_stack = VBoxContainer.new()
+	text_stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text_stack.add_theme_constant_override("separation", 4)
+	row.add_child(text_stack)
+	var name_row = HBoxContainer.new()
+	name_row.add_child(_label(str(good.name), 18, INK))
+	var name_space = Control.new()
+	name_space.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_row.add_child(name_space)
+	name_row.add_child(_compact_badge_2d("%d%s" % [count, str(good.unit)], cargo_color))
+	text_stack.add_child(name_row)
+	var origin_id = str(good.origin)
+	var origin_name = str(GameData.TRADE_PORTS.get(origin_id, {"name": "未知港口"}).name)
+	text_stack.add_child(_label("◆ 贸易货物 · 产自%s" % origin_name, 12, cargo_color))
+	text_stack.add_child(_label("占用 %d格｜每%s%d格 · 货舱共%d/%d格" % [count * int(good.space), str(good.unit), int(good.space), state.cargo_used(), state.cargo_capacity()], 12, MUTED))
+	var average = state.cargo_average_cost(str(cargo_id))
+	text_stack.add_child(_label("买入均价 %d银/%s｜持仓成本 %d银" % [average, str(good.unit), int(state.cargo_costs.get(str(cargo_id), 0))], 12, GOLD))
+	if GameData.TRADE_PORTS.has(str(state.player.location)):
+		var local_sell = state.trade_sell_price(str(cargo_id))
+		text_stack.add_child(_label("本港收购 %d银/%s｜单件预计%+d" % [local_sell, str(good.unit), local_sell - average], 12, TEAL if local_sell >= average else RED))
+	var best = _inventory_best_cargo_destination_2d(str(cargo_id), average)
+	if not best.is_empty():
+		text_stack.add_child(_label("最高收购 %s · %d银/%s｜单件预计%+d" % [str(GameData.TRADE_PORTS[str(best.port)].name), int(best.price), str(good.unit), int(best.profit)], 12, GOLD if int(best.profit) > 0 else MUTED))
+	var action = _button("到港口货栈\n出售", "ghost")
+	action.custom_minimum_size = Vector2(98, 72)
+	action.disabled = true
+	row.add_child(action)
+	return card
+
+func _inventory_best_cargo_destination_2d(cargo_id, average_cost):
+	var best = {}
+	for port_id in GameData.TRADE_PORTS:
+		var resolved_port = str(port_id)
+		if not state.is_port_unlocked(resolved_port):
+			continue
+		var price = state.trade_sell_price_at(resolved_port, str(cargo_id), int(state.trade_day))
+		if best.is_empty() or price > int(best.price):
+			best = {"port": resolved_port, "price": price, "profit": price - int(average_cost)}
+	return best
+
 func _inventory_action_button_2d(item_id, item):
 	var action = _button("仅供收藏", "ghost")
 	match str(item.type):
@@ -2341,7 +2409,7 @@ func _inventory_action_button_2d(item_id, item):
 
 func _inventory_item_tile_2d(item_id, item, count, selected):
 	var card = PanelContainer.new()
-	card.name = "InventoryTile_%s" % str(item_id)
+	card.name = "InventoryTile_%s" % str(item_id).replace(":", "_")
 	card.set_meta("item_id", str(item_id))
 	card.set_meta("rarity", str(item.rarity))
 	card.set_meta("selected", bool(selected))
@@ -2363,7 +2431,8 @@ func _inventory_item_tile_2d(item_id, item, count, selected):
 	var visual_center = CenterContainer.new()
 	visual_center.custom_minimum_size.y = 82
 	stack.add_child(visual_center)
-	visual_center.add_child(_item_visual_2d(str(item.type), str(item_id), str(item.rarity), str(item.get("slot", "")), false, 80))
+	var visual_id = _inventory_cargo_id_2d(str(item_id)) if _inventory_is_cargo_entry_2d(str(item_id)) else str(item_id)
+	visual_center.add_child(_item_visual_2d(str(item.type), visual_id, str(item.rarity), str(item.get("slot", "")), false, 80))
 	var name_label = _label(str(item.name), 13, INK)
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -2418,18 +2487,24 @@ func _restore_inventory_scroll_2d():
 
 func _inventory_visible_item_ids_2d():
 	var item_ids = []
-	for raw_item_id in state.inventory:
-		var item_id = str(raw_item_id)
-		if not GameData.ITEMS.has(item_id) or int(state.inventory.get(item_id, 0)) <= 0:
-			continue
-		var item = Dictionary(GameData.ITEMS[item_id])
-		if inventory_filter != "all" and _inventory_bucket_2d(str(item.get("type", "other"))) != inventory_filter:
-			continue
-		item_ids.append(item_id)
+	if inventory_filter != "cargo":
+		for raw_item_id in state.inventory:
+			var item_id = str(raw_item_id)
+			if not GameData.ITEMS.has(item_id) or int(state.inventory.get(item_id, 0)) <= 0:
+				continue
+			var item = Dictionary(GameData.ITEMS[item_id])
+			if inventory_filter != "all" and _inventory_bucket_2d(str(item.get("type", "other"))) != inventory_filter:
+				continue
+			item_ids.append(item_id)
+	if inventory_filter in ["all", "cargo"]:
+		for raw_cargo_id in state.cargo:
+			var cargo_id = str(raw_cargo_id)
+			if GameData.TRADE_GOODS.has(cargo_id) and int(state.cargo.get(cargo_id, 0)) > 0:
+				item_ids.append(_inventory_cargo_entry_id_2d(cargo_id))
 	if inventory_sort_mode == "quantity":
 		item_ids.sort_custom(func(a, b):
-			var count_a = int(state.inventory.get(str(a), 0))
-			var count_b = int(state.inventory.get(str(b), 0))
+			var count_a = _inventory_entry_count_2d(str(a))
+			var count_b = _inventory_entry_count_2d(str(b))
 			return count_a > count_b if count_a != count_b else _inventory_sort_key_2d(str(a)) < _inventory_sort_key_2d(str(b))
 		)
 	else:
@@ -2448,6 +2523,7 @@ func _inventory_category_name_2d(item_type):
 		"consumable": return "补给"
 		"material": return "材料"
 		"card": return "怪物卡"
+		"cargo": return "货物"
 		_: return "收藏"
 
 func _inventory_bucket_2d(item_type):
@@ -2455,11 +2531,12 @@ func _inventory_bucket_2d(item_type):
 		"equipment": return "equipment"
 		"consumable": return "consumable"
 		"card": return "card"
+		"trade": return "cargo"
 		"material", "mystery": return "material"
 		_: return "material"
 
 func _inventory_counts_2d():
-	var counts = {"total": 0, "equipment": 0, "consumable": 0, "material": 0, "card": 0}
+	var counts = {"total": 0, "equipment": 0, "consumable": 0, "material": 0, "card": 0, "cargo": 0}
 	for item_id in state.inventory:
 		if not GameData.ITEMS.has(str(item_id)):
 			continue
@@ -2467,9 +2544,18 @@ func _inventory_counts_2d():
 		var bucket = _inventory_bucket_2d(str(GameData.ITEMS[str(item_id)].get("type", "other")))
 		counts.total += count
 		counts[bucket] += count
+	for cargo_id in state.cargo:
+		if not GameData.TRADE_GOODS.has(str(cargo_id)):
+			continue
+		var cargo_count = max(0, int(state.cargo[cargo_id]))
+		counts.total += cargo_count
+		counts.cargo += cargo_count
 	return counts
 
 func _inventory_sort_key_2d(item_id):
+	if _inventory_is_cargo_entry_2d(str(item_id)):
+		var cargo_id = _inventory_cargo_id_2d(str(item_id))
+		return "4_0_%s" % str(GameData.TRADE_GOODS.get(cargo_id, {"name": cargo_id}).name)
 	if not GameData.ITEMS.has(item_id):
 		return "9_%s" % item_id
 	var item = GameData.ITEMS[item_id]
@@ -2477,12 +2563,36 @@ func _inventory_sort_key_2d(item_id):
 	var rarity_order = {"唯一": "0", "神话": "1", "传说": "2", "史诗": "3", "珍稀": "4", "优秀": "5", "普通": "6", "稀有补给": "3", "远航餐食": "4", "补给": "5", "酒馆食物": "6", "未知": "7"}
 	return "%s_%s_%s" % [str(type_order.get(str(item.type), "8")), str(rarity_order.get(str(item.rarity), "8")), str(item.name)]
 
+func _inventory_cargo_entry_id_2d(cargo_id):
+	return "cargo:%s" % str(cargo_id)
+
+func _inventory_is_cargo_entry_2d(entry_id):
+	return str(entry_id).begins_with("cargo:")
+
+func _inventory_cargo_id_2d(entry_id):
+	return str(entry_id).trim_prefix("cargo:")
+
+func _inventory_entry_count_2d(entry_id):
+	if _inventory_is_cargo_entry_2d(str(entry_id)):
+		return int(state.cargo.get(_inventory_cargo_id_2d(str(entry_id)), 0))
+	return int(state.inventory.get(str(entry_id), 0))
+
+func _inventory_cargo_item_2d(cargo_id):
+	var good = Dictionary(GameData.TRADE_GOODS.get(str(cargo_id), {"name": "未知货物", "unit": "件", "space": 1, "origin": ""}))
+	return {
+		"name": str(good.name),
+		"type": "trade",
+		"rarity": "贸易货物",
+		"description": "船舱贸易货物",
+		"slot": ""
+	}
+
 func _rarity_color_2d(rarity):
 	var colors = {
 		"普通": MUTED, "补给": Color("69c8a8"), "酒馆食物": Color("d5a867"),
 		"稀有补给": Color("62b8ef"), "远航餐食": Color("64d9c6"), "优秀": Color("54c8a8"),
 		"珍稀": Color("65aee8"), "史诗": Color("bb7bea"), "传说": Color("efb95f"),
-		"神话": Color("ef785f"), "唯一": Color("f6df8b"), "未知": Color("88949d")
+		"神话": Color("ef785f"), "唯一": Color("f6df8b"), "未知": Color("88949d"), "贸易货物": Color("55c6d8")
 	}
 	return Color(colors.get(str(rarity), MUTED))
 
