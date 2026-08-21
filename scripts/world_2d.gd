@@ -31,9 +31,8 @@ const INVENTORY_FILTERS = [
 ]
 const MONSTER_RESPAWN_SECONDS = GameState.ENEMY_RESPAWN_SECONDS
 const MONSTER_RESPAWN_RETRY_SECONDS = 1.5
-const RESPAWN_MARKER_SIZE = Vector2(320, 58)
-const RESPAWN_MARKER_TOP = 198.0
-const RESPAWN_MARKER_GAP = 8.0
+const RESPAWN_MARKER_SIZE = Vector2(300, 64)
+const RESPAWN_MARKER_OFFSET = Vector2(-150, -175)
 const AUTO_BATTLE_HIT_DELAY = 0.16
 const AUTO_BATTLE_READ_DELAY = 0.30
 const NAVIGATION_GRID_SIZE = 42.0
@@ -506,8 +505,10 @@ func _show_enemy_respawn_marker(enemy_id, remaining):
 	var key = _enemy_spawn_key(enemy_id)
 	var marker = enemy_respawn_markers.get(key)
 	if not is_instance_valid(marker):
+		var data = ENEMY_SPAWNS[enemy_id]
 		marker = Label.new()
 		marker.name = "RespawnMarker_%s" % enemy_id
+		marker.position = _world_point(data.position) + RESPAWN_MARKER_OFFSET
 		marker.size = RESPAWN_MARKER_SIZE
 		marker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		marker.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -518,22 +519,23 @@ func _show_enemy_respawn_marker(enemy_id, remaining):
 		marker.add_theme_stylebox_override("normal", _style(Color(0.02, 0.09, 0.11, 0.92), 12, Color(TEAL, 0.78), 2, 7))
 		add_child(marker)
 		enemy_respawn_markers[key] = marker
-		_layout_enemy_respawn_markers()
+		_update_enemy_respawn_marker_screen_position(enemy_id)
 	_update_enemy_respawn_marker(enemy_id, float(remaining))
 
-func _layout_enemy_respawn_markers():
-	var marker_keys = Array(enemy_respawn_markers.keys())
-	marker_keys.sort()
-	for marker_index in range(marker_keys.size()):
-		var marker = enemy_respawn_markers.get(marker_keys[marker_index])
-		if not is_instance_valid(marker):
-			continue
-		var column = marker_index % 2
-		var row = floori(float(marker_index) / 2.0)
-		marker.position = Vector2(
-			28.0 + float(column) * (RESPAWN_MARKER_SIZE.x + 24.0),
-			RESPAWN_MARKER_TOP + float(row) * (RESPAWN_MARKER_SIZE.y + RESPAWN_MARKER_GAP)
-		)
+func _update_enemy_respawn_marker_screen_position(enemy_id):
+	var marker = enemy_respawn_markers.get(str(enemy_id))
+	if not is_instance_valid(marker) or not ENEMY_SPAWNS.has(str(enemy_id)) or not is_instance_valid(world_layer):
+		return
+	var spawn_screen_position = world_layer.position + _world_point(ENEMY_SPAWNS[str(enemy_id)].position)
+	var desired_position = spawn_screen_position + RESPAWN_MARKER_OFFSET
+	marker.position = Vector2(
+		clamp(desired_position.x, 12.0, MAP_SIZE.x - RESPAWN_MARKER_SIZE.x - 12.0),
+		clamp(desired_position.y, 198.0, 850.0)
+	)
+
+func _update_enemy_respawn_marker_screen_positions():
+	for enemy_id in Array(enemy_respawn_markers.keys()):
+		_update_enemy_respawn_marker_screen_position(str(enemy_id))
 
 func _update_enemy_respawn_marker(enemy_id, remaining):
 	var key = _enemy_spawn_key(enemy_id)
@@ -566,7 +568,6 @@ func _remove_enemy_respawn_marker(key):
 	if is_instance_valid(marker):
 		marker.queue_free()
 	enemy_respawn_markers.erase(str(key))
-	_layout_enemy_respawn_markers()
 
 func _defer_enemy_respawn(enemy_id):
 	var key = _enemy_spawn_key(enemy_id)
@@ -970,6 +971,7 @@ func _update_camera(delta, snap = false):
 		world_layer.position = desired
 	else:
 		world_layer.position = world_layer.position.lerp(desired, min(1.0, delta * CAMERA_SMOOTH_SPEED))
+	_update_enemy_respawn_marker_screen_positions()
 
 func _on_joystick_direction(value):
 	joystick_direction = value

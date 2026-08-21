@@ -85,7 +85,10 @@ func _run():
 	_check(not _has_actor(scene, "drunk_sailor"), "重建地图时必须继续遵守存档中的怪物刷新倒计时")
 	var saved_respawn_marker = scene.enemy_respawn_markers.get(saved_respawn_key)
 	_check(scene.enemy_respawn_markers.has(saved_respawn_key) and _has_label_text(scene, "喝醉的水手刷新中") and _has_label_text(scene, ":"), "怪物刷新期间必须持续显示名称和分秒倒计时")
-	_check(is_instance_valid(saved_respawn_marker) and saved_respawn_marker.get_parent() == scene and saved_respawn_marker.position.y >= 195.0 and saved_respawn_marker.position.y < 340.0 and saved_respawn_marker.z_index > 50, "刷新倒计时必须固定在顶部HUD上层，不能随地图移动或被人物挡住")
+	var saved_spawn_position = scene._world_point(scene.ENEMY_SPAWNS["drunk_sailor"].position)
+	var saved_spawn_screen_position = scene.world_layer.position + saved_spawn_position
+	var expected_marker_position = Vector2(clamp(saved_spawn_screen_position.x + scene.RESPAWN_MARKER_OFFSET.x, 12.0, scene.MAP_SIZE.x - scene.RESPAWN_MARKER_SIZE.x - 12.0), clamp(saved_spawn_screen_position.y + scene.RESPAWN_MARKER_OFFSET.y, 198.0, 850.0))
+	_check(is_instance_valid(saved_respawn_marker) and saved_respawn_marker.get_parent() == scene and saved_respawn_marker.position.distance_to(expected_marker_position) < 1.0 and saved_respawn_marker.z_index > 50, "刷新倒计时必须跟随敌人原刷新点并显示在上方，且不能被敌人名字或HUD挡住")
 	scene.state.enemy_respawns.erase(saved_respawn_key)
 	scene._spawn_world_actors()
 	_check(_has_actor(scene, "drunk_sailor"), "没有刷新冷却时必须正常生成怪物")
@@ -338,7 +341,7 @@ func _run():
 	_check(not _has_actor(scene, "drunk_sailor"), "怪物被击败后必须立即从地图消失")
 	var respawn_key = scene._enemy_spawn_key("drunk_sailor")
 	_check(float(scene.state.enemy_respawns.get(respawn_key, 0.0)) > scene._world_time_seconds(), "怪物消失后必须把刷新倒计时写入存档状态")
-	_check(scene.enemy_respawn_markers.has(respawn_key) and _has_label_text(scene, "喝醉的水手刷新中"), "怪物被击败消失后必须立即在顶部显示可见刷新倒计时")
+	_check(scene.enemy_respawn_markers.has(respawn_key) and _has_label_text(scene, "喝醉的水手刷新中"), "怪物被击败消失后必须立即在原刷新点上方显示可见倒计时")
 	var early_retry = scene.state.start_battle("drunk_sailor")
 	_check(not bool(early_retry.get("ok", true)) and float(early_retry.get("respawn_remaining", 0.0)) > 0.0, "刷新冷却必须在核心战斗状态中阻止提前重复挑战")
 	scene.state.enemy_respawns[respawn_key] = scene._world_time_seconds() - 0.1
