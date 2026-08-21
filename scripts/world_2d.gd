@@ -31,6 +31,9 @@ const INVENTORY_FILTERS = [
 ]
 const MONSTER_RESPAWN_SECONDS = GameState.ENEMY_RESPAWN_SECONDS
 const MONSTER_RESPAWN_RETRY_SECONDS = 1.5
+const RESPAWN_MARKER_SIZE = Vector2(320, 58)
+const RESPAWN_MARKER_TOP = 198.0
+const RESPAWN_MARKER_GAP = 8.0
 const AUTO_BATTLE_HIT_DELAY = 0.16
 const AUTO_BATTLE_READ_DELAY = 0.30
 const NAVIGATION_GRID_SIZE = 42.0
@@ -503,21 +506,34 @@ func _show_enemy_respawn_marker(enemy_id, remaining):
 	var key = _enemy_spawn_key(enemy_id)
 	var marker = enemy_respawn_markers.get(key)
 	if not is_instance_valid(marker):
-		var data = ENEMY_SPAWNS[enemy_id]
 		marker = Label.new()
 		marker.name = "RespawnMarker_%s" % enemy_id
-		marker.position = _world_point(data.position) + Vector2(-105, -112)
-		marker.size = Vector2(210, 66)
+		marker.size = RESPAWN_MARKER_SIZE
 		marker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		marker.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		marker.z_index = 32
+		marker.z_index = 54
 		marker.add_theme_font_size_override("font_size", 14)
 		marker.add_theme_color_override("font_color", Color("d9f7f1"))
 		marker.add_theme_stylebox_override("normal", _style(Color(0.02, 0.09, 0.11, 0.92), 12, Color(TEAL, 0.78), 2, 7))
-		world_layer.add_child(marker)
+		add_child(marker)
 		enemy_respawn_markers[key] = marker
+		_layout_enemy_respawn_markers()
 	_update_enemy_respawn_marker(enemy_id, float(remaining))
+
+func _layout_enemy_respawn_markers():
+	var marker_keys = Array(enemy_respawn_markers.keys())
+	marker_keys.sort()
+	for marker_index in range(marker_keys.size()):
+		var marker = enemy_respawn_markers.get(marker_keys[marker_index])
+		if not is_instance_valid(marker):
+			continue
+		var column = marker_index % 2
+		var row = floori(float(marker_index) / 2.0)
+		marker.position = Vector2(
+			28.0 + float(column) * (RESPAWN_MARKER_SIZE.x + 24.0),
+			RESPAWN_MARKER_TOP + float(row) * (RESPAWN_MARKER_SIZE.y + RESPAWN_MARKER_GAP)
+		)
 
 func _update_enemy_respawn_marker(enemy_id, remaining):
 	var key = _enemy_spawn_key(enemy_id)
@@ -550,6 +566,7 @@ func _remove_enemy_respawn_marker(key):
 	if is_instance_valid(marker):
 		marker.queue_free()
 	enemy_respawn_markers.erase(str(key))
+	_layout_enemy_respawn_markers()
 
 func _defer_enemy_respawn(enemy_id):
 	var key = _enemy_spawn_key(enemy_id)
