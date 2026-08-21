@@ -31,7 +31,6 @@ const INVENTORY_FILTERS = [
 ]
 const MONSTER_RESPAWN_SECONDS = GameState.ENEMY_RESPAWN_SECONDS
 const MONSTER_RESPAWN_RETRY_SECONDS = 1.5
-const MONSTER_RESPAWN_SAFE_DISTANCE = 170.0
 const AUTO_BATTLE_HIT_DELAY = 0.16
 const AUTO_BATTLE_READ_DELAY = 0.30
 const NAVIGATION_GRID_SIZE = 42.0
@@ -536,8 +535,15 @@ func _refresh_enemy_respawn_markers():
 		if not is_instance_valid(marker):
 			enemy_respawn_markers.erase(key)
 			continue
-		var deadline = max(float(state.enemy_respawns.get(key, 0.0)), float(enemy_respawn_scheduled.get(key, 0.0)))
-		_update_enemy_respawn_marker(str(key), max(0.0, deadline - now))
+		var scheduled_deadline = float(enemy_respawn_scheduled.get(key, -1.0))
+		var deadline = max(float(state.enemy_respawns.get(key, 0.0)), scheduled_deadline)
+		var remaining = deadline - now
+		_update_enemy_respawn_marker(str(key), max(0.0, remaining))
+		# Mobile browsers may throttle or discard a one-shot timer while the game is
+		# backgrounded. The visible countdown is also the recovery watchdog, so an
+		# expired marker can never remain stuck at 00:00.
+		if remaining <= 0.0:
+			_try_respawn_enemy(str(key), scheduled_deadline)
 
 func _remove_enemy_respawn_marker(key):
 	var marker = enemy_respawn_markers.get(str(key))
@@ -553,12 +559,10 @@ func _defer_enemy_respawn(enemy_id):
 	var timer = get_tree().create_timer(MONSTER_RESPAWN_RETRY_SECONDS)
 	timer.timeout.connect(_try_respawn_enemy.bind(enemy_id, retry_deadline))
 
-func _respawn_is_blocked(data):
-	if is_instance_valid(overlay):
-		return true
-	if not is_instance_valid(player_actor):
-		return false
-	return player_actor.position.distance_to(_world_point(data.position)) < MONSTER_RESPAWN_SAFE_DISTANCE
+func _respawn_is_blocked(_data):
+	# Do not create an enemy behind a battle/result window. Once the window is
+	# closed, the retry timer or countdown watchdog completes the respawn.
+	return is_instance_valid(overlay)
 
 func _try_respawn_enemy(enemy_id, scheduled_deadline = -1.0):
 	var key = _enemy_spawn_key(enemy_id)

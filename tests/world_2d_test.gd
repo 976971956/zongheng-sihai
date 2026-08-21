@@ -343,9 +343,12 @@ func _run():
 	scene._try_respawn_enemy("drunk_sailor")
 	_check(not _has_actor(scene, "drunk_sailor"), "战斗结算页未关闭时怪物不能在背后刷新")
 	scene._close_overlay()
-	scene.player_actor.position = scene._spawn_for_location("venice_tavern")
-	scene._try_respawn_enemy("drunk_sailor")
-	_check(_has_actor(scene, "drunk_sailor"), "倒计时结束且玩家离开出生点后怪物必须重新出现")
+	# Simulate a mobile browser discarding the deferred one-shot timer while
+	# backgrounded. The visible countdown update must recover the spawn itself,
+	# even when the player waits beside the marker.
+	scene.enemy_respawn_scheduled[respawn_key] = scene._world_time_seconds() - 0.1
+	scene._refresh_enemy_respawn_markers()
+	_check(_has_actor(scene, "drunk_sailor"), "倒计时结束后怪物必须立即重新出现，不能因手机计时器丢失或玩家在附近而停在00:00")
 
 	# A defeat must visibly finish at zero HP and return the player to the tavern map.
 	scene.state.player.level = 1
