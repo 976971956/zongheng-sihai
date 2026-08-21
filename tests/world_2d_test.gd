@@ -113,13 +113,14 @@ func _run():
 	stick_release.position = Vector2(160, 90)
 	scene.joystick._gui_input(stick_release)
 	_check(scene.joystick_direction == Vector2.ZERO, "松开摇杆后角色方向必须归零")
-	scene.player_actor.position = _actor_position(scene, "alisa")
-
-	scene._update_nearest_actor()
-	_check(not scene.nearest_actor.is_empty() and scene.nearest_actor.id == "alisa", "开局应能靠近艾丽莎互动")
-	scene._interact()
-	_check(scene.state.quest_progress == 1, "NPC交谈必须推进原有任务状态")
-	_check(is_instance_valid(scene.overlay), "NPC交谈必须显示对话面板")
+	scene.player_actor.position = scene._spawn_for_location("venice_square")
+	scene._navigate_to_quest()
+	_check(scene.task_navigation_active and not is_instance_valid(scene.overlay), "点击交谈任务导航后必须先向NPC步行")
+	await _walk_task_navigation(scene)
+	await process_frame
+	await process_frame
+	_check(scene.state.quest_progress == 1, "任务导航抵达NPC后必须自动交谈并推进任务，不能要求二次点击")
+	_check(is_instance_valid(scene.overlay) and _has_label_text(scene.overlay, "艾丽莎"), "任务导航抵达NPC后必须立即显示对应对话面板")
 	scene._close_then_claim()
 	await process_frame
 	_check(scene.state.quest_can_claim(), "结束任务对话后必须弹出领奖流程")

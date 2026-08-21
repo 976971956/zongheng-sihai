@@ -2776,6 +2776,7 @@ func _finish_task_navigation_leg():
 			_continue_task_navigation()
 		return
 	var target_name = str(task_navigation_target.get("name", "任务目标"))
+	var target_actor_id = str(task_navigation_target.get("actor_id", ""))
 	var open_service = task_navigation_open_service
 	has_move_target = false
 	move_target = player_actor.position
@@ -2786,7 +2787,11 @@ func _finish_task_navigation_leg():
 	task_navigation_path_index = 0
 	task_navigation_open_service = ""
 	_update_nearest_actor()
-	hint_label.text = "已步行到达：%s｜靠近后点击互动" % target_name
+	if _prepare_task_npc_interaction(target_actor_id):
+		hint_label.text = "已到达：%s｜正在自动交谈" % target_name
+		call_deferred("_interact")
+		return
+	hint_label.text = "已步行到达：%s" % target_name
 	if open_service == "market":
 		call_deferred("_open_trade_2d")
 	elif open_service == "harbor":
@@ -2799,6 +2804,22 @@ func _finish_task_navigation_leg():
 		call_deferred("_open_port_kitchen_2d")
 	elif open_service.begins_with("sail:"):
 		call_deferred("_open_sailing_map", open_service.trim_prefix("sail:"))
+
+func _prepare_task_npc_interaction(target_actor_id):
+	if str(target_actor_id) == "":
+		return false
+	for entry in actors:
+		if str(entry.get("id", "")) != str(target_actor_id) or str(entry.get("kind", "")) != "npc":
+			continue
+		if player_actor.position.distance_to(entry.node.position) >= 108.0 * WORLD_SCALE:
+			return false
+		if not nearest_actor.is_empty() and is_instance_valid(nearest_actor.get("node")):
+			nearest_actor.node.selected = false
+		nearest_actor = entry
+		nearest_actor.node.selected = true
+		action_button.disabled = false
+		return true
+	return false
 
 func _cancel_task_navigation():
 	task_navigation_active = false
