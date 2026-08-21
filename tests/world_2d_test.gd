@@ -136,7 +136,7 @@ func _run():
 	# The 2D backpack must expose and execute real item actions.
 	scene.state.inventory["warrior_blade"] = 1
 	scene._open_inventory()
-	_check(_has_label_text(scene.overlay, "航海行囊") and _has_label_text(scene.overlay, "全部货架") and _has_named_node(scene.overlay, "InventoryDetail"), "新版背包必须提供标题、货架和选中详情区")
+	_check(_has_label_text(scene.overlay, "航海行囊") and _has_label_text(scene.overlay, "全部货架") and _has_named_node(scene.overlay, "InventoryDetail") and _has_named_node(scene.overlay, "InventorySummary"), "新版背包必须提供标题、资产概览、货架和选中详情区")
 	_check(_has_button_text(scene.overlay, "推荐排序") and _has_button_text(scene.overlay, "装备") and _has_button_text(scene.overlay, "全部") and _has_button_text(scene.overlay, "补给"), "新版背包必须提供分类、排序与集中操作按钮")
 	_check(_count_named_nodes(scene.overlay, "InventoryTile") >= 3, "新版背包必须以三列物品网格展示库存")
 	_check(not _has_label_text(scene.overlay, "当前已装备") and _count_visuals(scene.overlay, "equipment") >= 1 and _count_visuals(scene.overlay, "consumable") >= 1 and _has_visual_set(scene.overlay, "warrior"), "航海行囊必须可视化展示装备与补给，并只保留未装备物品")
@@ -175,7 +175,19 @@ func _run():
 	scene._equip_item_2d("warrior_blade")
 	await process_frame
 	scene._open_character()
-	_check(_has_label_text(scene.overlay, "武士套装") and _has_label_text(scene.overlay, "套装共鸣") and _has_label_text(scene.overlay, "套装猎场") and _has_label_text(scene.overlay, "赤潮礁王·阿刻隆") and _has_button_text(scene.overlay, "强化至 +1") and _named_node_meta(scene.overlay, "CharacterPortrait", "equipment_skin") == "warrior", "角色装备页必须切换新版套装皮肤，并显示共鸣、指定海域Boss、掉率和强化入口")
+	_check(_has_label_text(scene.overlay, "武士套装") and _has_label_text(scene.overlay, "套装共鸣") and _has_label_text(scene.overlay, "套装猎场") and _has_label_text(scene.overlay, "赤潮礁王·阿刻隆") and _has_button_text(scene.overlay, "强化至 +1") and _has_named_node(scene.overlay, "EquipmentUpgradeMeter") and _named_node_meta(scene.overlay, "CharacterPortrait", "equipment_skin") == "warrior", "角色装备页必须切换新版套装皮肤，并显示强化进度、共鸣、指定海域Boss、掉率和强化入口")
+	await process_frame
+	await process_frame
+	scene.character_equipment_scroll.scroll_vertical = 240
+	await process_frame
+	var character_scroll_before_upgrade = int(scene.character_equipment_scroll.scroll_vertical)
+	scene.state.player.silver += 1000
+	scene._upgrade_equipped_2d("weapon")
+	await process_frame
+	await process_frame
+	await process_frame
+	_check(scene.state.equipment_upgrade_level("warrior_blade") == 1 and character_scroll_before_upgrade > 0 and int(scene.character_equipment_scroll.scroll_vertical) == character_scroll_before_upgrade, "强化装备后必须留在原装备卡位置，不能自动滚回角色页顶部")
+	scene.state.equipment_upgrades.erase("warrior_blade")
 	scene._open_inventory()
 	var item_count_before = int(scene.state.inventory.get("small_milk", 0))
 	var max_hp = int(scene.state.get_stats().max_hp)

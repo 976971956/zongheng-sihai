@@ -51,32 +51,58 @@ func rarity_color():
 
 func _draw():
 	var accent = rarity_color()
+	var extent = min(size.x, size.y)
+	var frame_rect = Rect2((size - Vector2(extent, extent)) * 0.5, Vector2(extent, extent))
+	var shadow = StyleBoxFlat.new()
+	shadow.bg_color = Color(0.0, 0.015, 0.02, 0.56)
+	shadow.set_corner_radius_all(17)
+	draw_style_box(shadow, Rect2(frame_rect.position + Vector2(0, 3), frame_rect.size).grow(-1.0))
 	var box = StyleBoxFlat.new()
-	box.bg_color = Color(0.025, 0.085, 0.105, 0.98)
+	box.bg_color = Color(0.018, 0.068, 0.088, 0.98).lerp(accent, 0.08)
 	box.border_color = accent
 	box.set_border_width_all(3 if equipped else 2)
-	box.set_corner_radius_all(15)
-	draw_style_box(box, Rect2(Vector2.ZERO, size))
-	draw_circle(size * Vector2(0.30, 0.28), min(size.x, size.y) * 0.27, Color(accent, 0.10))
-	draw_circle(size * Vector2(0.73, 0.73), min(size.x, size.y) * 0.19, Color(accent, 0.08))
+	box.set_corner_radius_all(17)
+	draw_style_box(box, frame_rect)
+	var inner = StyleBoxFlat.new()
+	inner.bg_color = Color(0.0, 0.02, 0.025, 0.10)
+	inner.border_color = Color(accent, 0.22)
+	inner.set_border_width_all(1)
+	inner.set_corner_radius_all(12)
+	draw_style_box(inner, frame_rect.grow(-6.0))
+	draw_circle(frame_rect.position + frame_rect.size * Vector2(0.30, 0.28), extent * 0.30, Color(accent, 0.13))
+	draw_circle(frame_rect.position + frame_rect.size * Vector2(0.72, 0.72), extent * 0.23, Color(accent, 0.09))
+	for ray_index in range(4):
+		var angle = -0.9 + float(ray_index) * 0.62
+		var center = frame_rect.get_center()
+		draw_line(center + Vector2.RIGHT.rotated(angle) * extent * 0.18, center + Vector2.RIGHT.rotated(angle) * extent * 0.42, Color(accent, 0.075), max(1.0, extent * 0.022), true)
 	var generated_equipment = (visual_kind == "equipment" or slot != "") and _draw_set_equipment_art()
-	if visual_kind == "trade":
-		_draw_trade_icon(accent)
-	elif (visual_kind == "equipment" or slot != "") and not generated_equipment:
-		_draw_equipment_icon(accent)
-	elif visual_kind == "consumable":
-		_draw_consumable_icon(accent)
-	elif visual_kind == "card":
-		_draw_card_icon(accent)
-	elif visual_kind == "mystery":
-		_draw_crate_icon(accent)
-	else:
-		_draw_charm(accent)
+	if not generated_equipment:
+		var model_scale = extent / 76.0
+		var model_origin = frame_rect.position + (frame_rect.size - Vector2(76, 76) * model_scale) * 0.5
+		draw_set_transform(model_origin, 0.0, Vector2(model_scale, model_scale))
+		if visual_kind == "trade":
+			_draw_trade_icon(accent)
+		elif visual_kind == "equipment" or slot != "":
+			_draw_equipment_icon(accent)
+		elif visual_kind == "consumable":
+			_draw_consumable_icon(accent)
+		elif visual_kind == "card":
+			_draw_card_icon(accent)
+		elif visual_kind == "mystery":
+			_draw_crate_icon(accent)
+		else:
+			_draw_charm(accent)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	_draw_frame_ornaments(accent)
+	var jewel_center = frame_rect.position + Vector2(extent - 12.0, 12.0)
+	var jewel = PackedVector2Array([jewel_center + Vector2(0, -5), jewel_center + Vector2(5, 0), jewel_center + Vector2(0, 5), jewel_center + Vector2(-5, 0)])
+	draw_colored_polygon(jewel, accent.lightened(0.14))
+	draw_polyline(PackedVector2Array([jewel[0], jewel[1], jewel[2], jewel[3], jewel[0]]), Color(accent, 0.92), 1.5, true)
 	if equipped:
-		draw_circle(Vector2(size.x - 13, 13), 8, Color("48cdb8"))
-		draw_line(Vector2(size.x - 17, 13), Vector2(size.x - 14, 16), Color("092f33"), 2.5, true)
-		draw_line(Vector2(size.x - 14, 16), Vector2(size.x - 9, 10), Color("092f33"), 2.5, true)
+		var equipped_center = frame_rect.position + Vector2(13, 13)
+		draw_circle(equipped_center, 8, Color("48cdb8"))
+		draw_line(equipped_center + Vector2(-4, 0), equipped_center + Vector2(-1, 3), Color("092f33"), 2.5, true)
+		draw_line(equipped_center + Vector2(-1, 3), equipped_center + Vector2(4, -3), Color("092f33"), 2.5, true)
 
 func _draw_set_equipment_art():
 	var item = Dictionary(GameData.ITEMS.get(visual_id, {}))

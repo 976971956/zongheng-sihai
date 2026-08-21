@@ -130,6 +130,8 @@ var inventory_sort_mode = "recommended"
 var inventory_selected_item = ""
 var inventory_grid_scroll
 var inventory_scroll_position = 0
+var character_equipment_scroll
+var character_scroll_position = 0
 var settings_button
 var footstep_timer = 0.0
 var task_navigation_active = false
@@ -1922,8 +1924,10 @@ func _open_character():
 		content.add_child(notice)
 		inventory_notice = ""
 	var scroll = ScrollContainer.new()
+	scroll.name = "CharacterEquipmentScroll"
 	scroll.custom_minimum_size.y = 365
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	character_equipment_scroll = scroll
 	content.add_child(scroll)
 	var equipment_stack = VBoxContainer.new()
 	equipment_stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1964,6 +1968,7 @@ func _open_character():
 	close.pressed.connect(_close_overlay)
 	content.add_child(close)
 	_open_overlay(content, true, Vector2(666, 1020))
+	call_deferred("_restore_character_scroll_2d")
 
 func _character_ship_card_2d():
 	var hull_id = str(state.ship.get("hull_id", "sea_swallow"))
@@ -2081,8 +2086,34 @@ func _open_inventory():
 	title_row.add_child(sort_button)
 	var inventory_counts = _inventory_counts_2d()
 	var bag_panel = PanelContainer.new()
-	bag_panel.add_theme_stylebox_override("panel", _style(Color(0.03, 0.15, 0.17, 0.94), 12, Color(TEAL, 0.48), 1, 10))
-	bag_panel.add_child(_label("◈ 银币 %d　◆ 物品 %d件\n装备%d · 补给%d · 材料%d · 卡片%d" % [int(state.player.silver), int(inventory_counts.total), int(inventory_counts.equipment), int(inventory_counts.consumable), int(inventory_counts.material), int(inventory_counts.card)], 14, TEAL))
+	bag_panel.name = "InventorySummary"
+	bag_panel.add_theme_stylebox_override("panel", _style(Color(0.025, 0.125, 0.15, 0.97), 14, Color(GOLD, 0.52), 1, 11))
+	var bag_summary = HBoxContainer.new()
+	bag_summary.add_theme_constant_override("separation", 10)
+	bag_panel.add_child(bag_summary)
+	var purse = VBoxContainer.new()
+	purse.custom_minimum_size.x = 150
+	purse.add_child(_label("持有银币", 11, MUTED))
+	purse.add_child(_label("◈ %d" % int(state.player.silver), 22, GOLD))
+	bag_summary.add_child(purse)
+	var divider = VSeparator.new()
+	divider.add_theme_constant_override("separation", 6)
+	bag_summary.add_child(divider)
+	var holdings = VBoxContainer.new()
+	holdings.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	holdings.add_theme_constant_override("separation", 5)
+	holdings.add_child(_label("行囊库存 · 共%d件" % int(inventory_counts.total), 13, INK))
+	var count_row = HBoxContainer.new()
+	count_row.add_theme_constant_override("separation", 5)
+	for summary in [
+		{"label": "装备%d" % int(inventory_counts.equipment), "color": Color("65aee8")},
+		{"label": "补给%d" % int(inventory_counts.consumable), "color": Color("64d9c6")},
+		{"label": "材料%d" % int(inventory_counts.material), "color": Color("bb7bea")},
+		{"label": "卡片%d" % int(inventory_counts.card), "color": GOLD}
+	]:
+		count_row.add_child(_compact_badge_2d(str(summary.label), Color(summary.color)))
+	holdings.add_child(count_row)
+	bag_summary.add_child(holdings)
 	content.add_child(bag_panel)
 	var card_name = "未启用"
 	if state.active_card != "" and GameData.ITEMS.has(state.active_card):
@@ -2148,25 +2179,38 @@ func _equipped_upgrade_card_2d(slot):
 	var item = GameData.ITEMS.get(item_id, {})
 	var level = state.equipment_upgrade_level(item_id) if item_id != "" else 0
 	var rarity = str(item.get("rarity", "普通"))
+	var rarity_color = _rarity_color_2d(rarity)
 	var card = PanelContainer.new()
-	card.custom_minimum_size = Vector2(288, 168)
+	card.name = "EquippedCard_%s" % str(slot)
+	card.set_meta("slot", str(slot))
+	card.set_meta("upgrade_level", level)
+	card.custom_minimum_size = Vector2(288, 202)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	card.add_theme_stylebox_override("panel", _style(Color(0.07, 0.105, 0.105, 0.95), 11, _rarity_color_2d(rarity), 2 if item_id != "" else 1, 9))
+	var card_background = Color(0.018, 0.065, 0.078, 0.97).lerp(rarity_color, 0.08 if item_id != "" else 0.02)
+	card.add_theme_stylebox_override("panel", _style(card_background, 13, Color(rarity_color, 0.86 if item_id != "" else 0.28), 2 if item_id != "" else 1, 9))
 	var stack = VBoxContainer.new()
-	stack.add_theme_constant_override("separation", 6)
+	stack.add_theme_constant_override("separation", 7)
 	card.add_child(stack)
+	var heading = HBoxContainer.new()
+	heading.add_child(_compact_badge_2d(str(GameData.SLOT_NAMES[slot]), rarity_color if item_id != "" else MUTED))
+	var heading_space = Control.new()
+	heading_space.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	heading.add_child(heading_space)
+	heading.add_child(_compact_badge_2d(rarity if item_id != "" else "待装备", rarity_color if item_id != "" else MUTED))
+	stack.add_child(heading)
 	var row = HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	stack.add_child(row)
-	row.add_child(_item_visual_2d("equipment", item_id if item_id != "" else slot, rarity, slot, item_id != "", 62))
+	row.add_child(_item_visual_2d("equipment", item_id if item_id != "" else slot, rarity, slot, item_id != "", 70))
 	var item_name = str(item.get("name", "尚未装备"))
 	var stats_text = _item_stats_text_2d(item.get("stats", {})) if item_id != "" else "从背包选择该槽位装备"
 	var set_name = state.equipment_set_name(item_id)
-	var set_text = "\n套装 · %s" % set_name if set_name != "" else ""
-	var info = _label("%s\n%s%s\n%s%s" % [GameData.SLOT_NAMES[slot], item_name, "  +%d" % level if level > 0 else "", stats_text, set_text], 12, INK if item_id != "" else MUTED)
+	var set_text = "\n◆ %s" % set_name if set_name != "" else ""
+	var info = _label("%s%s\n%s%s" % [item_name, "  +%d" % level if level > 0 else "", stats_text, set_text], 12, INK if item_id != "" else MUTED)
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	row.add_child(info)
+	stack.add_child(_equipment_upgrade_meter_2d(level, rarity_color if item_id != "" else MUTED))
 	var upgrade = _button("空槽位" if item_id == "" else ("已强化满级 +10" if level >= 10 else "强化至 +%d\n%s" % [level + 1, state.equipment_upgrade_requirement_text(slot)]), "gold")
 	upgrade.custom_minimum_size = Vector2(0, 48)
 	upgrade.add_theme_font_size_override("font_size", 13)
@@ -2187,6 +2231,7 @@ func _equipment_set_card_2d(set_progress):
 	return card
 
 func _upgrade_equipped_2d(slot):
+	_capture_character_scroll_2d()
 	var result = state.upgrade_equipped(slot)
 	inventory_notice = ("✓ " if bool(result.get("ok", false)) else "！") + str(result.get("message", "强化失败"))
 	_refresh_hud()
@@ -2195,6 +2240,29 @@ func _upgrade_equipped_2d(slot):
 		call_deferred("_show_quest_claim")
 	else:
 		call_deferred("_open_character")
+
+func _capture_character_scroll_2d():
+	if is_instance_valid(character_equipment_scroll):
+		character_scroll_position = int(character_equipment_scroll.scroll_vertical)
+
+func _restore_character_scroll_2d():
+	if is_instance_valid(character_equipment_scroll):
+		character_equipment_scroll.scroll_vertical = character_scroll_position
+
+func _equipment_upgrade_meter_2d(level, color):
+	var meter = HBoxContainer.new()
+	meter.name = "EquipmentUpgradeMeter"
+	meter.add_theme_constant_override("separation", 3)
+	var copy = _label("强化 %d/10" % int(level), 10, Color(color))
+	copy.custom_minimum_size.x = 66
+	meter.add_child(copy)
+	for rank in range(10):
+		var pip = ColorRect.new()
+		pip.custom_minimum_size = Vector2(11, 6)
+		pip.color = Color(color, 0.92) if rank < int(level) else Color(0.20, 0.29, 0.30, 0.68)
+		pip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		meter.add_child(pip)
+	return meter
 
 func _inventory_detail_card_2d(item_id):
 	var card = PanelContainer.new()
@@ -2210,20 +2278,28 @@ func _inventory_detail_card_2d(item_id):
 		return card
 	var item = Dictionary(GameData.ITEMS[str(item_id)])
 	var count = int(state.inventory.get(str(item_id), 0))
-	card.custom_minimum_size.y = 196
-	card.add_theme_stylebox_override("panel", _style(Color(0.04, 0.13, 0.16, 0.97), 12, _rarity_color_2d(str(item.rarity)), 2, 12))
+	var rarity_color = _rarity_color_2d(str(item.rarity))
+	card.custom_minimum_size.y = 220
+	var detail_background = Color(0.018, 0.085, 0.105, 0.98).lerp(rarity_color, 0.09)
+	card.add_theme_stylebox_override("panel", _style(detail_background, 15, Color(rarity_color, 0.88), 2, 13))
 	var row = HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
+	row.add_theme_constant_override("separation", 13)
 	card.add_child(row)
-	row.add_child(_item_visual_2d(str(item.type), str(item_id), str(item.rarity), str(item.get("slot", "")), false, 102))
+	row.add_child(_item_visual_2d(str(item.type), str(item_id), str(item.rarity), str(item.get("slot", "")), false, 112))
 	var text_stack = VBoxContainer.new()
 	text_stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text_stack.add_theme_constant_override("separation", 3)
+	text_stack.add_theme_constant_override("separation", 5)
 	row.add_child(text_stack)
-	text_stack.add_child(_label("%s　×%d" % [str(item.name), count], 18, INK))
+	var name_row = HBoxContainer.new()
+	name_row.add_child(_label(str(item.name), 19, INK))
+	var name_space = Control.new()
+	name_space.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_row.add_child(name_space)
+	name_row.add_child(_compact_badge_2d("持有 ×%d" % count, rarity_color))
+	text_stack.add_child(name_row)
 	var category_copy = _inventory_category_name_2d(str(item.type))
 	var slot_copy = " · %s" % GameData.SLOT_NAMES.get(str(item.get("slot", "")), "") if str(item.type) == "equipment" else ""
-	text_stack.add_child(_label("%s · %s%s" % [str(item.rarity), category_copy, slot_copy], 12, _rarity_color_2d(str(item.rarity))))
+	text_stack.add_child(_label("◆ %s · %s%s" % [str(item.rarity), category_copy, slot_copy], 12, rarity_color))
 	var description = _label(str(item.description), 12, MUTED)
 	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text_stack.add_child(description)
@@ -2236,7 +2312,7 @@ func _inventory_detail_card_2d(item_id):
 		var comparison = "较当前战力 %+d" % delta if delta != 0 else "与当前装备战力相当"
 		text_stack.add_child(_label(comparison, 12, GOLD if delta > 0 else MUTED))
 	var action = _inventory_action_button_2d(str(item_id), item)
-	action.custom_minimum_size = Vector2(112, 66)
+	action.custom_minimum_size = Vector2(98, 72)
 	row.add_child(action)
 	return card
 
@@ -2267,30 +2343,53 @@ func _inventory_item_tile_2d(item_id, item, count, selected):
 	var card = PanelContainer.new()
 	card.name = "InventoryTile_%s" % str(item_id)
 	card.set_meta("item_id", str(item_id))
-	card.custom_minimum_size = Vector2(196, 176)
+	card.set_meta("rarity", str(item.rarity))
+	card.set_meta("selected", bool(selected))
+	card.custom_minimum_size = Vector2(196, 206)
 	var border = GOLD if bool(selected) else _rarity_color_2d(str(item.rarity))
-	card.add_theme_stylebox_override("panel", _style(Color(0.035, 0.105, 0.13, 0.96), 11, Color(border, 0.88 if bool(selected) else 0.52), 2 if bool(selected) else 1, 7))
+	var tile_base = Color(0.015, 0.065, 0.085, 0.98).lerp(border, 0.11 if bool(selected) else 0.055)
+	card.add_theme_stylebox_override("panel", _style(tile_base, 13, Color(border, 0.94 if bool(selected) else 0.58), 2 if bool(selected) else 1, 8))
 	var stack = VBoxContainer.new()
 	stack.alignment = BoxContainer.ALIGNMENT_CENTER
-	stack.add_theme_constant_override("separation", 2)
+	stack.add_theme_constant_override("separation", 4)
 	card.add_child(stack)
+	var badge_row = HBoxContainer.new()
+	badge_row.add_child(_compact_badge_2d(str(item.rarity), _rarity_color_2d(str(item.rarity))))
+	var badge_space = Control.new()
+	badge_space.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	badge_row.add_child(badge_space)
+	badge_row.add_child(_compact_badge_2d("×%d" % int(count), GOLD))
+	stack.add_child(badge_row)
 	var visual_center = CenterContainer.new()
-	visual_center.custom_minimum_size.y = 72
+	visual_center.custom_minimum_size.y = 82
 	stack.add_child(visual_center)
-	visual_center.add_child(_item_visual_2d(str(item.type), str(item_id), str(item.rarity), str(item.get("slot", "")), false, 70))
-	var name_label = _label("%s ×%d" % [str(item.name), int(count)], 12, INK)
+	visual_center.add_child(_item_visual_2d(str(item.type), str(item_id), str(item.rarity), str(item.get("slot", "")), false, 80))
+	var name_label = _label(str(item.name), 13, INK)
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	stack.add_child(name_label)
-	var rarity_label = _label(str(item.rarity), 11, _rarity_color_2d(str(item.rarity)))
-	rarity_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	stack.add_child(rarity_label)
+	var category_label = _inventory_category_name_2d(str(item.type))
+	if str(item.type) == "equipment":
+		category_label = str(GameData.SLOT_NAMES.get(str(item.get("slot", "")), "装备"))
+	var type_label = _label(category_label, 10, MUTED)
+	type_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	stack.add_child(type_label)
 	var select = _button("已选中" if bool(selected) else "查看", "gold" if bool(selected) else "ghost")
-	select.custom_minimum_size.y = 40
+	select.custom_minimum_size.y = 38
 	select.add_theme_font_size_override("font_size", 12)
 	select.pressed.connect(_select_inventory_item_2d.bind(str(item_id)))
 	stack.add_child(select)
 	return card
+
+func _compact_badge_2d(copy, color):
+	var badge = Label.new()
+	badge.text = str(copy)
+	badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	badge.add_theme_font_size_override("font_size", 10)
+	badge.add_theme_color_override("font_color", Color(color).lightened(0.22))
+	badge.add_theme_stylebox_override("normal", _style(Color(color, 0.13), 8, Color(color, 0.50), 1, 5))
+	return badge
 
 func _set_inventory_filter_2d(filter_id):
 	inventory_filter = str(filter_id)
@@ -3955,6 +4054,7 @@ func _close_overlay():
 	overlay = null
 	overlay_scroll = null
 	inventory_grid_scroll = null
+	character_equipment_scroll = null
 	_reset_overlay_drag()
 	battle_stage = null
 	battle_log_label = null
