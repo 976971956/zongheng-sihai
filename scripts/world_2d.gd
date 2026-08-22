@@ -1113,8 +1113,11 @@ func _complete_sea_voyage(port_id = ""):
 	AudioDirector.play_sfx("sail")
 	_leave_sea_to_port(str(result.destination))
 	if bool(result.get("quest_completed", false)):
+		_cancel_task_navigation()
 		hint_label.text = str(result.message)
 		call_deferred("_show_quest_claim")
+	elif _resume_task_navigation_after_port_arrival(str(result.destination)):
+		pass
 	else:
 		_show_message("航行抵达", str(result.message))
 
@@ -2880,27 +2883,38 @@ func _navigate_to_quest():
 		hint_label.text = "自动航行沿主航道前进并迎战挡路威胁；想避战请拖动摇杆绕行。"
 		return
 	var quest = state.get_current_quest()
+	if not quest.is_empty() and state.quest_can_claim():
+		_cancel_task_navigation()
+		has_move_target = false
+		if is_instance_valid(overlay):
+			_close_overlay()
+		call_deferred("_show_quest_claim")
+		return
 	if not quest.is_empty() and str(quest.objective.type) == "upgrade_equipment":
 		_open_character()
 		return
 	var navigation_target = _quest_navigation_target()
 	var objective_type = str(quest.objective.type) if not quest.is_empty() else ""
-	var needs_harbor = not quest.is_empty() and (objective_type in ["trade_buy", "trade_sell", "trade_order", "trade_reputation", "prepare_voyage", "upgrade_ship", "cook"] or (objective_type == "visit" and str(quest.objective.target) in GameData.TRADE_PORTS))
+	var target_port = _task_navigation_port(navigation_target)
+	var needs_harbor = not quest.is_empty() and target_port != ""
 	if needs_harbor:
-		var target_port = str(navigation_target.get("location", ""))
 		var objective_service = {"trade_buy": "market", "trade_sell": "market", "trade_order": "orders", "trade_reputation": "orders", "prepare_voyage": "harbor", "upgrade_ship": "shipyard", "cook": "kitchen"}.get(objective_type, "")
 		var target_actor_service = _npc_service(str(navigation_target.get("actor_id", "")))
 		if target_actor_service != "":
 			objective_service = {"market": "market", "harbor": "harbor", "shipyard": "shipyard", "trade_order": "orders", "cook": "kitchen"}.get(target_actor_service, objective_service)
-		if target_port in GameData.TRADE_PORTS and str(state.player.location) in GameData.TRADE_PORTS and str(state.player.location) != target_port:
+		var current_port = _active_city_port_id() if current_region == "city" else ""
+		if current_port != "" and current_port != target_port and str(state.player.location) in GameData.TRADE_PORTS:
+			task_navigation_target = navigation_target
+			task_navigation_active = true
+			task_navigation_open_service = str(objective_service)
+			if is_instance_valid(overlay):
+				_close_overlay()
 			_open_task_sailing_route(target_port)
 			return
-		if str(state.player.location) == target_port:
+		if current_port == target_port:
 			task_navigation_open_service = str(objective_service)
-		elif target_port in GameData.TRADE_PORTS:
-			task_navigation_open_service = "sail:%s" % target_port
 		else:
-			task_navigation_open_service = str(objective_service)
+			task_navigation_open_service = "sail:%s" % target_port
 	else:
 		task_navigation_open_service = ""
 	if is_instance_valid(overlay):
@@ -2909,9 +2923,22 @@ func _navigate_to_quest():
 	task_navigation_active = true
 	_continue_task_navigation()
 
+func _task_navigation_port(target):
+	var location_id = str(target.get("location", ""))
+	if location_id in GameData.TRADE_PORTS:
+		return location_id
+	var actor_id = str(target.get("actor_id", ""))
+	if actor_id == "":
+		return ""
+	for port_id in GameData.PORT_CITY_MAPS:
+		if actor_id in Array(GameData.PORT_CITY_MAPS[port_id].get("npc_ids", [])):
+			return str(port_id)
+	return ""
+
 func _open_task_sailing_route(target_port):
 	var destination = str(target_port)
 	if not state.is_port_unlocked(destination):
+		_cancel_task_navigation()
 		_show_message("航线尚未发现", "继续推进主线，取得前往%s的海图后再来。" % GameData.TRADE_PORTS[destination].name)
 		return
 	var unlocked_ports = []
@@ -2920,9 +2947,25 @@ func _open_task_sailing_route(target_port):
 			unlocked_ports.append(str(port_id))
 	var path = GameData.trade_route_path(str(state.player.location), destination, unlocked_ports)
 	if path.size() < 2:
+		_cancel_task_navigation()
 		_show_message("暂时无法规划航线", "%s尚未加入当前海图。" % GameData.TRADE_PORTS[destination].name)
 		return
 	_open_sailing_map(destination)
+
+func _resume_task_navigation_after_port_arrival(port_id):
+	if not task_navigation_active or task_navigation_target.is_empty():
+		return false
+	if _task_navigation_port(task_navigation_target) != str(port_id):
+		_cancel_task_navigation()
+		return false
+	if state.quest_can_claim():
+		_cancel_task_navigation()
+		has_move_target = false
+		call_deferred("_show_quest_claim")
+		return true
+	hint_label.text = "已抵达%s，继续步行前往：%s" % [GameData.TRADE_PORTS[str(port_id)].name, str(task_navigation_target.get("name", "任务目标"))]
+	_continue_task_navigation()
+	return true
 
 func _continue_task_navigation():
 	if not task_navigation_active or task_navigation_target.is_empty():
@@ -3017,6 +3060,7 @@ func _finish_task_navigation_leg():
 	var target_name = str(task_navigation_target.get("name", "任务目标"))
 	var target_actor_id = str(task_navigation_target.get("actor_id", ""))
 	var open_service = task_navigation_open_service
+	var sailing_task_target = task_navigation_target.duplicate(true) if open_service.begins_with("sail:") else {}
 	has_move_target = false
 	move_target = player_actor.position
 	player_actor.set_motion(Vector2.ZERO)
@@ -3042,7 +3086,9 @@ func _finish_task_navigation_leg():
 	elif open_service == "kitchen":
 		call_deferred("_open_port_kitchen_2d")
 	elif open_service.begins_with("sail:"):
-		call_deferred("_open_sailing_map", open_service.trim_prefix("sail:"))
+		task_navigation_target = sailing_task_target
+		task_navigation_active = true
+		call_deferred("_open_task_sailing_route", open_service.trim_prefix("sail:"))
 
 func _prepare_task_npc_interaction(target_actor_id):
 	if str(target_actor_id) == "":
@@ -3315,6 +3361,8 @@ func _select_sailing_destination(port_id):
 func _start_sailing_voyage(duration = 2.2):
 	if sailing_destination == "" or not is_instance_valid(sailing_map):
 		return
+	if task_navigation_active and _task_navigation_port(task_navigation_target) != sailing_destination:
+		_cancel_task_navigation()
 	var departure = state.begin_voyage(sailing_destination)
 	if not bool(departure.get("ok", false)):
 		_show_message("无法启航", str(departure.get("message", "航线不可用")))
@@ -3326,6 +3374,8 @@ func _start_sailing_voyage(duration = 2.2):
 func _transfer_sailing_destination():
 	if sailing_destination == "":
 		return
+	if task_navigation_active and _task_navigation_port(task_navigation_target) != sailing_destination:
+		_cancel_task_navigation()
 	var result = state.transfer_to(sailing_destination)
 	if not bool(result.get("ok", false)):
 		_show_message("无法传送", str(result.get("message", "传送船不可用。")))
@@ -3337,8 +3387,11 @@ func _transfer_sailing_destination():
 	_update_camera(0.0, true)
 	_refresh_hud()
 	if bool(result.get("quest_completed", false)):
+		_cancel_task_navigation()
 		hint_label.text = str(result.message)
 		call_deferred("_show_quest_claim")
+	elif _resume_task_navigation_after_port_arrival(str(state.player.location)):
+		pass
 	else:
 		_show_message("港口传送", str(result.message))
 

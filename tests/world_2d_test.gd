@@ -126,12 +126,44 @@ func _run():
 	await process_frame
 	_check(scene.state.quest_progress == 1, "任务导航抵达NPC后必须自动交谈并推进任务，不能要求二次点击")
 	_check(is_instance_valid(scene.overlay) and _has_label_text(scene.overlay, "艾丽莎"), "任务导航抵达NPC后必须立即显示对应对话面板")
-	scene._close_then_claim()
+	scene._close_overlay()
+	scene._navigate_to_quest()
 	await process_frame
-	_check(scene.state.quest_can_claim(), "结束任务对话后必须弹出领奖流程")
+	_check(scene.state.quest_can_claim() and not scene.task_navigation_active and is_instance_valid(scene.overlay) and _has_label_text(scene.overlay, "任务完成"), "已经达成的任务再次点击导航必须直接弹出领奖，不能重复走向NPC")
 	scene._claim_quest_2d()
 	_check(scene.state.quest_index == 1, "领奖必须进入下一任务")
 	scene._close_overlay()
+
+	# 所有剧情交谈目标都必须能映射到实际港口；跨港后导航要自动续走并触发对话。
+	for story_quest_index in range(GameData.QUESTS.size()):
+		var story_quest = GameData.QUESTS[story_quest_index]
+		if str(story_quest.objective.type) != "talk":
+			continue
+		scene.state.quest_index = story_quest_index
+		scene.state.quest_progress = 0
+		var story_target = scene._quest_navigation_target()
+		var story_port = scene._task_navigation_port(story_target)
+		_check(story_port in GameData.PORT_CITY_MAPS and str(story_target.actor_id) in Array(GameData.PORT_CITY_MAPS.get(story_port, {}).get("npc_ids", [])), "交谈任务「%s」必须指向真实港口中的可见NPC" % str(story_quest.title))
+	scene.state.quest_index = _quest_index_by_id("samir_testimony")
+	scene.state.quest_progress = 0
+	scene._switch_region("city", "venice_dock")
+	scene.state.player.location = "venice_tavern"
+	scene.player_actor.position = scene._spawn_for_location("venice_tavern")
+	scene._navigate_to_quest()
+	_check(scene.task_navigation_active and not is_instance_valid(scene.sailing_map), "人在城市街区时，跨港NPC导航必须先步行到本地码头，不能原地弹出海图")
+	await _walk_until_sailing_map(scene)
+	_check(scene.task_navigation_active and is_instance_valid(scene.sailing_map) and str(scene.sailing_destination) == "alexandria_dock", "抵达本地码头后必须规划到NPC所在港口，并保留靠港后的步行目标")
+	scene._close_overlay()
+	scene._switch_region("city", "alexandria_dock")
+	_check(scene._resume_task_navigation_after_port_arrival("alexandria_dock") and scene.task_navigation_active and scene.has_move_target, "抵达目标港口后必须自动续接NPC步行导航")
+	await _walk_task_navigation(scene)
+	await process_frame
+	await process_frame
+	_check(scene.state.quest_progress == 1 and is_instance_valid(scene.overlay) and _has_label_text(scene.overlay, "萨米尔"), "跨港导航抵达NPC后必须自动触发任务对话并完成交谈目标")
+	scene._close_overlay()
+	scene.state.quest_index = 1
+	scene.state.quest_progress = 0
+	scene._switch_region("city", "venice_dock")
 
 	# The 2D backpack must expose and execute real item actions.
 	scene.state.inventory["warrior_blade"] = 1
@@ -838,6 +870,15 @@ func _walk_task_navigation(scene):
 		if step % 20 == 0:
 			await process_frame
 	_check(false, "任务自动寻路必须在合理时间内抵达，不能撞墙卡死（区域%s，位置%s，目标%s）" % [scene.current_region, scene.player_actor.position, scene.move_target])
+
+func _walk_until_sailing_map(scene):
+	for step in range(900):
+		if is_instance_valid(scene.sailing_map):
+			return
+		scene._process(0.08)
+		if step % 20 == 0:
+			await process_frame
+	_check(false, "跨港任务导航必须在抵达本地码头后自动打开航海图")
 
 func _has_actor(scene, actor_id):
 	for entry in scene.actors:
