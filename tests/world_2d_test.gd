@@ -42,6 +42,14 @@ func _run():
 	_check(scene.actors.size() >= 4, "地图必须包含NPC和可见敌人")
 	_check(_has_actor(scene, "guard_captain") and _has_actor(scene, "jeweler") and _has_actor(scene, "venice_shipwright"), "威尼斯必须生成守卫、珠宝商与船匠，不能只存在于数据配置中")
 	_check(_actor_has_art(scene, "guard_captain") and _actor_has_art(scene, "jeweler") and _actor_has_art(scene, "venice_shipwright"), "威尼斯补充NPC也必须使用完整人物精灵，不能回退到通用占位模型")
+	scene._refresh_waypoint()
+	var alisa_position = _actor_position(scene, "alisa")
+	var fixed_waypoint_position = scene.waypoint_label.position
+	_check(scene.waypoint_label.get_parent() == scene.world_layer and fixed_waypoint_position.distance_to(alisa_position + Vector2(-75, -92)) < 1.0, "任务NPC定位框必须挂在地图层并固定在NPC头顶，不能作为屏幕贴边浮窗")
+	scene.player_actor.position += Vector2(180, 120)
+	scene._update_camera(0.35)
+	scene._update_waypoint_screen_position()
+	_check(scene.waypoint_label.position == fixed_waypoint_position, "玩家移动和镜头跟随后，任务NPC定位框的地图坐标不能漂移")
 	var enemy_art_signatures = {}
 	for enemy_id in GameData.ENEMIES:
 		var enemy_model = ActorScript.new()
@@ -86,9 +94,12 @@ func _run():
 	var saved_respawn_marker = scene.enemy_respawn_markers.get(saved_respawn_key)
 	_check(scene.enemy_respawn_markers.has(saved_respawn_key) and _has_label_text(scene, "喝醉的水手刷新中") and _has_label_text(scene, ":"), "怪物刷新期间必须持续显示名称和分秒倒计时")
 	var saved_spawn_position = scene._world_point(scene.ENEMY_SPAWNS["drunk_sailor"].position)
-	var saved_spawn_screen_position = scene.world_layer.position + saved_spawn_position
-	var expected_marker_position = Vector2(clamp(saved_spawn_screen_position.x + scene.RESPAWN_MARKER_OFFSET.x, 12.0, scene.MAP_SIZE.x - scene.RESPAWN_MARKER_SIZE.x - 12.0), clamp(saved_spawn_screen_position.y + scene.RESPAWN_MARKER_OFFSET.y, 198.0, 850.0))
-	_check(is_instance_valid(saved_respawn_marker) and saved_respawn_marker.get_parent() == scene and saved_respawn_marker.position.distance_to(expected_marker_position) < 1.0 and saved_respawn_marker.z_index > 50, "刷新倒计时必须跟随敌人原刷新点并显示在上方，且不能被敌人名字或HUD挡住")
+	var expected_marker_position = saved_spawn_position + scene.RESPAWN_MARKER_OFFSET
+	_check(is_instance_valid(saved_respawn_marker) and saved_respawn_marker.get_parent() == scene.world_layer and saved_respawn_marker.position.distance_to(expected_marker_position) < 1.0 and saved_respawn_marker.z_index > 10, "刷新倒计时必须固定在敌人原刷新点上方的地图层，且不能被敌人名字挡住")
+	var fixed_respawn_position = saved_respawn_marker.position
+	scene.player_actor.position += Vector2(-210, 160)
+	scene._update_camera(0.35)
+	_check(saved_respawn_marker.position == fixed_respawn_position, "玩家移动和镜头跟随后，敌人刷新倒计时框的地图坐标不能漂移")
 	scene.state.enemy_respawns.erase(saved_respawn_key)
 	scene._spawn_world_actors()
 	_check(_has_actor(scene, "drunk_sailor"), "没有刷新冷却时必须正常生成怪物")

@@ -516,29 +516,20 @@ func _show_enemy_respawn_marker(enemy_id, remaining):
 		marker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		marker.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		marker.z_index = 54
+		marker.z_index = 44
 		marker.add_theme_font_size_override("font_size", 14)
 		marker.add_theme_color_override("font_color", Color("d9f7f1"))
 		marker.add_theme_stylebox_override("normal", _style(Color(0.02, 0.09, 0.11, 0.92), 12, Color(TEAL, 0.78), 2, 7))
-		add_child(marker)
+		world_layer.add_child(marker)
 		enemy_respawn_markers[key] = marker
-		_update_enemy_respawn_marker_screen_position(enemy_id)
+		_update_enemy_respawn_marker_world_position(enemy_id)
 	_update_enemy_respawn_marker(enemy_id, float(remaining))
 
-func _update_enemy_respawn_marker_screen_position(enemy_id):
+func _update_enemy_respawn_marker_world_position(enemy_id):
 	var marker = enemy_respawn_markers.get(str(enemy_id))
 	if not is_instance_valid(marker) or not ENEMY_SPAWNS.has(str(enemy_id)) or not is_instance_valid(world_layer):
 		return
-	var spawn_screen_position = world_layer.position + _world_point(ENEMY_SPAWNS[str(enemy_id)].position)
-	var desired_position = spawn_screen_position + RESPAWN_MARKER_OFFSET
-	marker.position = Vector2(
-		clamp(desired_position.x, 12.0, MAP_SIZE.x - RESPAWN_MARKER_SIZE.x - 12.0),
-		clamp(desired_position.y, 198.0, 850.0)
-	)
-
-func _update_enemy_respawn_marker_screen_positions():
-	for enemy_id in Array(enemy_respawn_markers.keys()):
-		_update_enemy_respawn_marker_screen_position(str(enemy_id))
+	marker.position = _world_point(ENEMY_SPAWNS[str(enemy_id)].position) + RESPAWN_MARKER_OFFSET
 
 func _update_enemy_respawn_marker(enemy_id, remaining):
 	var key = _enemy_spawn_key(enemy_id)
@@ -799,7 +790,7 @@ func _build_hud():
 	waypoint_label.z_index = 45
 	waypoint_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	waypoint_label.add_theme_stylebox_override("normal", _style(Color(0.28, 0.20, 0.05, 0.88), 11, Color(GOLD, 0.75), 2, 7))
-	add_child(waypoint_label)
+	world_layer.add_child(waypoint_label)
 
 func _toggle_audio():
 	var is_enabled = AudioDirector.toggle_audio()
@@ -974,7 +965,6 @@ func _update_camera(delta, snap = false):
 		world_layer.position = desired
 	else:
 		world_layer.position = world_layer.position.lerp(desired, min(1.0, delta * CAMERA_SMOOTH_SPEED))
-	_update_enemy_respawn_marker_screen_positions()
 
 func _on_joystick_direction(value):
 	joystick_direction = value
@@ -2872,8 +2862,7 @@ func _refresh_waypoint():
 func _update_waypoint_screen_position():
 	if not is_instance_valid(waypoint_label) or not waypoint_label.visible or waypoint_world_target == Vector2.ZERO:
 		return
-	var screen_position = world_layer.position + waypoint_world_target
-	waypoint_label.position = Vector2(clamp(screen_position.x - 75.0, 8.0, 562.0), clamp(screen_position.y - 92.0, 195.0, 1040.0))
+	waypoint_label.position = waypoint_world_target + Vector2(-75.0, -92.0)
 
 func _navigate_to_quest():
 	if current_region == "sea" and not state.active_voyage.is_empty():
