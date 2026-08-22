@@ -2072,14 +2072,21 @@ func _switch_overlay_to_character():
 func _open_inventory():
 	var content = VBoxContainer.new()
 	content.add_theme_constant_override("separation", 9)
+	var title_panel = PanelContainer.new()
+	title_panel.name = "InventorySkinHeader"
+	title_panel.add_theme_stylebox_override("panel", _style(Color("071c25"), 16, Color(GOLD, 0.72), 2, 10))
 	var title_row = HBoxContainer.new()
-	title_row.add_theme_constant_override("separation", 8)
-	content.add_child(title_row)
+	title_row.add_theme_constant_override("separation", 10)
+	title_panel.add_child(title_row)
+	content.add_child(title_panel)
+	var chest_emblem = _item_visual_2d("mystery", "unknown_equipment", "传说", "", false, 74)
+	chest_emblem.name = "InventoryChestEmblem"
+	title_row.add_child(chest_emblem)
 	var title_stack = VBoxContainer.new()
 	title_stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_row.add_child(title_stack)
 	title_stack.add_child(_label("航海行囊", 26, GOLD))
-	title_stack.add_child(_label("分类收纳 · 点选物品后在详情区操作", 12, MUTED))
+	title_stack.add_child(_label("船长收藏舱 · 装备、补给与货物一览", 12, MUTED))
 	var sort_button = _button("推荐排序" if inventory_sort_mode == "recommended" else "数量排序", "ghost")
 	sort_button.custom_minimum_size = Vector2(118, 52)
 	sort_button.add_theme_font_size_override("font_size", 13)
@@ -2088,7 +2095,7 @@ func _open_inventory():
 	var inventory_counts = _inventory_counts_2d()
 	var bag_panel = PanelContainer.new()
 	bag_panel.name = "InventorySummary"
-	bag_panel.add_theme_stylebox_override("panel", _style(Color(0.025, 0.125, 0.15, 0.97), 14, Color(GOLD, 0.52), 1, 11))
+	bag_panel.add_theme_stylebox_override("panel", _style(Color("092630"), 14, Color("a97b3e"), 2, 11))
 	var bag_summary = HBoxContainer.new()
 	bag_summary.add_theme_constant_override("separation", 10)
 	bag_panel.add_child(bag_summary)
@@ -2292,7 +2299,7 @@ func _inventory_detail_card_2d(item_id):
 	var count = int(state.inventory.get(str(item_id), 0))
 	var rarity_color = _rarity_color_2d(str(item.rarity))
 	card.custom_minimum_size.y = 220
-	var detail_background = Color(0.018, 0.085, 0.105, 0.98).lerp(rarity_color, 0.09)
+	var detail_background = Color("071b24").lerp(rarity_color, 0.075)
 	card.add_theme_stylebox_override("panel", _style(detail_background, 15, Color(rarity_color, 0.88), 2, 13))
 	var row = HBoxContainer.new()
 	row.add_theme_constant_override("separation", 13)
@@ -2415,7 +2422,7 @@ func _inventory_item_tile_2d(item_id, item, count, selected):
 	card.set_meta("selected", bool(selected))
 	card.custom_minimum_size = Vector2(196, 206)
 	var border = GOLD if bool(selected) else _rarity_color_2d(str(item.rarity))
-	var tile_base = Color(0.015, 0.065, 0.085, 0.98).lerp(border, 0.11 if bool(selected) else 0.055)
+	var tile_base = Color("061920").lerp(border, 0.13 if bool(selected) else 0.045)
 	card.add_theme_stylebox_override("panel", _style(tile_base, 13, Color(border, 0.94 if bool(selected) else 0.58), 2 if bool(selected) else 1, 8))
 	var stack = VBoxContainer.new()
 	stack.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -2429,10 +2436,10 @@ func _inventory_item_tile_2d(item_id, item, count, selected):
 	badge_row.add_child(_compact_badge_2d("×%d" % int(count), GOLD))
 	stack.add_child(badge_row)
 	var visual_center = CenterContainer.new()
-	visual_center.custom_minimum_size.y = 82
+	visual_center.custom_minimum_size.y = 96
 	stack.add_child(visual_center)
 	var visual_id = _inventory_cargo_id_2d(str(item_id)) if _inventory_is_cargo_entry_2d(str(item_id)) else str(item_id)
-	visual_center.add_child(_item_visual_2d(str(item.type), visual_id, str(item.rarity), str(item.get("slot", "")), false, 80))
+	visual_center.add_child(_item_visual_2d(str(item.type), visual_id, str(item.rarity), str(item.get("slot", "")), false, 94))
 	var name_label = _label(str(item.name), 13, INK)
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS

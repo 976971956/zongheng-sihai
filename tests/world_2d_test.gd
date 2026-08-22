@@ -140,10 +140,10 @@ func _run():
 	scene.state.cargo = {"venetian_glass": 2, "wool_cloth": 3}
 	scene.state.cargo_costs = {"venetian_glass": 48, "wool_cloth": 75}
 	scene._open_inventory()
-	_check(_has_label_text(scene.overlay, "航海行囊") and _has_label_text(scene.overlay, "全部货架") and _has_named_node(scene.overlay, "InventoryDetail") and _has_named_node(scene.overlay, "InventorySummary"), "新版背包必须提供标题、资产概览、货架和选中详情区")
+	_check(_has_label_text(scene.overlay, "航海行囊") and _has_label_text(scene.overlay, "船长收藏舱") and _has_label_text(scene.overlay, "全部货架") and _has_named_node(scene.overlay, "InventorySkinHeader") and _has_named_node(scene.overlay, "InventoryChestEmblem") and _has_named_node(scene.overlay, "InventoryDetail") and _has_named_node(scene.overlay, "InventorySummary"), "新版背包必须提供收藏舱皮肤、资产概览、货架和选中详情区")
 	_check(_has_button_text(scene.overlay, "推荐排序") and _has_button_text(scene.overlay, "装备") and _has_button_text(scene.overlay, "全部") and _has_button_text(scene.overlay, "补给") and _has_button_text(scene.overlay, "货物 5"), "新版背包必须提供货物在内的分类、排序与集中操作按钮")
 	_check(_count_named_nodes(scene.overlay, "InventoryTile") >= 3, "新版背包必须以三列物品网格展示库存")
-	_check(not _has_label_text(scene.overlay, "当前已装备") and _count_visuals(scene.overlay, "equipment") >= 1 and _count_visuals(scene.overlay, "consumable") >= 1 and _count_visuals(scene.overlay, "trade") >= 2 and _has_visual_set(scene.overlay, "warrior"), "航海行囊必须可视化展示装备、补给与船舱货物，并只保留未装备物品")
+	_check(not _has_label_text(scene.overlay, "当前已装备") and _count_visuals(scene.overlay, "equipment") >= 1 and _count_visuals(scene.overlay, "consumable") >= 1 and _count_visuals(scene.overlay, "trade") >= 2 and _has_visual_set(scene.overlay, "warrior") and _named_node_meta(scene.overlay, "ItemVisual_small_milk", "painted_atlas") == "true", "航海行囊必须用新版绘制图鉴展示装备、补给与船舱货物，并只保留未装备物品")
 	scene._select_inventory_item_2d("small_milk")
 	await process_frame
 	_check(_named_node_meta(scene.overlay, "InventoryDetail", "item_id") == "small_milk" and _has_button_text(scene.overlay, "使用"), "点选补给后详情区必须切换为对应物品并提供使用操作")

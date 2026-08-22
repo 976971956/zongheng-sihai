@@ -3,6 +3,7 @@ extends Control
 const WarriorBlackSailIcons = preload("res://assets/art/equipment/equipment_sets_warrior_black_sail_v2.png")
 const WhiteWhaleSevenSeasIcons = preload("res://assets/art/equipment/equipment_sets_white_whale_seven_seas_v2.png")
 const EarthTidekeeperIcons = preload("res://assets/art/equipment/equipment_sets_earth_tidekeeper_v2.png")
+const PaintedInventoryIcons = preload("res://assets/art/items/inventory_icon_atlas_v3.png")
 
 const SET_ICON_LAYOUT = {
 	"warrior": {"texture": WarriorBlackSailIcons, "row": 0},
@@ -13,6 +14,12 @@ const SET_ICON_LAYOUT = {
 	"tidekeeper": {"texture": EarthTidekeeperIcons, "row": 2}
 }
 const SET_SLOT_INDEX = {"weapon": 0, "head": 1, "body": 2, "waist": 3, "boots": 4, "charm": 5}
+const PAINTED_ICON_INDEX = {
+	"rusty_sabre": Vector2i(0, 0), "linen_cap": Vector2i(1, 0), "traveler_boots": Vector2i(2, 0), "bronze_charm": Vector2i(3, 0), "guard_belt": Vector2i(4, 0), "spider_knife": Vector2i(5, 0),
+	"coral_ring": Vector2i(0, 1), "aquamarine_pendant": Vector2i(1, 1), "unknown_equipment": Vector2i(2, 1), "small_milk": Vector2i(3, 1), "sea_salt_bread": Vector2i(4, 1), "herb_fish_stew": Vector2i(5, 1),
+	"stamina_tonic": Vector2i(0, 2), "universal_medicine": Vector2i(1, 2), "ghost_card": Vector2i(2, 2), "bear_card": Vector2i(3, 2), "tide_card": Vector2i(4, 2), "corsair_card": Vector2i(5, 2),
+	"dragon_spring_water": Vector2i(0, 3), "forging_blueprint": Vector2i(1, 3), "tide_seal": Vector2i(2, 3), "lighthouse_compass": Vector2i(3, 3), "furnace_core": Vector2i(4, 3), "lion_charm": Vector2i(5, 3)
+}
 
 const RARITY_COLORS = {
 	"普通": Color("9ab3b8"), "补给": Color("69c8a8"), "酒馆食物": Color("d5a867"),
@@ -44,6 +51,7 @@ func configure(kind, id, item_rarity = "普通", item_slot = "", is_equipped = f
 	set_meta("visual_id", visual_id)
 	set_meta("equipped", equipped)
 	set_meta("equipment_set_skin", str(GameData.ITEMS.get(visual_id, {}).get("set", "")))
+	set_meta("painted_atlas", PAINTED_ICON_INDEX.has(visual_id))
 	queue_redraw()
 
 func rarity_color():
@@ -75,8 +83,9 @@ func _draw():
 		var angle = -0.9 + float(ray_index) * 0.62
 		var center = frame_rect.get_center()
 		draw_line(center + Vector2.RIGHT.rotated(angle) * extent * 0.18, center + Vector2.RIGHT.rotated(angle) * extent * 0.42, Color(accent, 0.075), max(1.0, extent * 0.022), true)
-	var generated_equipment = (visual_kind == "equipment" or slot != "") and _draw_set_equipment_art()
-	if not generated_equipment:
+	var generated_painted_icon = _draw_painted_inventory_art()
+	var generated_equipment = not generated_painted_icon and (visual_kind == "equipment" or slot != "") and _draw_set_equipment_art()
+	if not generated_painted_icon and not generated_equipment:
 		var model_scale = extent / 76.0
 		var model_origin = frame_rect.position + (frame_rect.size - Vector2(76, 76) * model_scale) * 0.5
 		draw_set_transform(model_origin, 0.0, Vector2(model_scale, model_scale))
@@ -103,6 +112,15 @@ func _draw():
 		draw_circle(equipped_center, 8, Color("48cdb8"))
 		draw_line(equipped_center + Vector2(-4, 0), equipped_center + Vector2(-1, 3), Color("092f33"), 2.5, true)
 		draw_line(equipped_center + Vector2(-1, 3), equipped_center + Vector2(4, -3), Color("092f33"), 2.5, true)
+
+func _draw_painted_inventory_art():
+	if not PAINTED_ICON_INDEX.has(visual_id):
+		return false
+	var cell = Vector2(float(PaintedInventoryIcons.get_width()) / 6.0, float(PaintedInventoryIcons.get_height()) / 4.0)
+	var atlas_position = Vector2(PAINTED_ICON_INDEX[visual_id]) * cell
+	var inset = max(5.0, min(size.x, size.y) * 0.055)
+	draw_texture_rect_region(PaintedInventoryIcons, Rect2(Vector2(inset, inset), size - Vector2(inset * 2.0, inset * 2.0)), Rect2(atlas_position, cell))
+	return true
 
 func _draw_set_equipment_art():
 	var item = Dictionary(GameData.ITEMS.get(visual_id, {}))
