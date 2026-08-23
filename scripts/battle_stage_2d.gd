@@ -11,6 +11,8 @@ var enemy_name = "敌人"
 var enemy_id = "drunk_sailor"
 var sea_battle = false
 var ship_hull_id = "sea_swallow"
+var player_equipment_skin = ""
+var player_weapon_id = ""
 var player_offset = 0.0
 var enemy_offset = 0.0
 var impact_alpha = 0.0
@@ -22,8 +24,8 @@ func _ready():
 	player_model = ActorScript.new()
 	player_model.z_index = 2
 	player_model.scale = Vector2(1.85, 1.85)
-	player_model.configure("player", Color("278e93"), Color("f1c66d"), "player")
 	add_child(player_model)
+	_configure_player_model()
 	enemy_model = ActorScript.new()
 	enemy_model.z_index = 2
 	enemy_model.scale = Vector2(1.85, 1.85)
@@ -44,12 +46,18 @@ func set_battle_values(view):
 	enemy_id = str(view.get("enemy_id", enemy_id))
 	sea_battle = bool(view.get("sea_battle", sea_battle))
 	ship_hull_id = str(view.get("ship_hull_id", ship_hull_id))
+	player_equipment_skin = str(view.get("player_equipment_skin", player_equipment_skin))
+	player_weapon_id = str(view.get("player_weapon_id", player_weapon_id))
 	if is_instance_valid(player_model):
-		# 航海地图用船体表示移动；进入战斗后展示船长本人，避免人物突然变成船。
-		player_model.configure("player", Color("278e93"), Color("f1c66d"), "player")
+		_configure_player_model()
 	if is_instance_valid(enemy_model):
 		_configure_enemy_model()
 	queue_redraw()
+
+func _configure_player_model():
+	# 航海地图用船体表示移动；进入战斗后展示穿着当前装备的船长本人。
+	player_model.configure("player", Color("278e93"), Color("f1c66d"), "player")
+	player_model.set_equipment_visual(player_equipment_skin, player_weapon_id)
 
 func _configure_enemy_model():
 	var colors = {

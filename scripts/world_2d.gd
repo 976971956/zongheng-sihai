@@ -1559,7 +1559,11 @@ func _open_battle(view):
 	_refresh_battle_tactics()
 	battle_stage = BattleStageScript.new()
 	battle_stage.custom_minimum_size = Vector2(640, 410)
-	battle_stage.set_battle_values(view)
+	var battle_stage_view = Dictionary(view).duplicate(true)
+	var dominant_set = state.dominant_equipment_set()
+	battle_stage_view["player_equipment_skin"] = str(dominant_set.get("id", ""))
+	battle_stage_view["player_weapon_id"] = str(state.equipment.get("weapon", ""))
+	battle_stage.set_battle_values(battle_stage_view)
 	content.add_child(battle_stage)
 	battle_log_label = _label("两船抢占上风位，舰炮已经装填。" if bool(view.get("sea_battle", false)) else "双方在港口石路上展开对峙。", 14, MUTED)
 	battle_log_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
