@@ -46,10 +46,10 @@ const SEA_ENCOUNTER_DISTANCE = 82.0
 
 const ENEMY_SPAWNS = {
 	"drunk_sailor": {"region": "city", "name": "喝醉的水手", "position": Vector2(360, 300), "color": Color("99484c"), "accent": Color("4a3e49"), "location": "venice_north_gate"},
-	"sewer_rat": {"region": "field", "name": "灰毛巨鼠", "position": Vector2(465, 945), "color": Color("68736c"), "accent": Color("aab7ad"), "location": "residential_quarter"},
-	"mine_thief": {"region": "field", "name": "偷矿者", "position": Vector2(595, 455), "color": Color("855447"), "accent": Color("3e4146"), "location": "venice_mine"},
-	"giant_bear": {"region": "field", "name": "后山巨熊", "position": Vector2(140, 410), "color": Color("69493e"), "accent": Color("3c302c"), "location": "venice_back_hill"},
-	"wildwood_ghost": {"region": "field", "name": "荒林幽灵", "position": Vector2(575, 750), "color": Color("617a82"), "accent": Color("acd9d6"), "location": "venice_wildwood"},
+	"sewer_rat": {"region": "field", "name": "灰毛巨鼠", "position": Vector2(270, 325), "color": Color("68736c"), "accent": Color("aab7ad"), "location": "residential_quarter"},
+	"mine_thief": {"region": "field", "name": "偷矿者", "position": Vector2(565, 490), "color": Color("855447"), "accent": Color("3e4146"), "location": "venice_mine"},
+	"giant_bear": {"region": "field", "name": "后山巨熊", "position": Vector2(150, 440), "color": Color("69493e"), "accent": Color("3c302c"), "location": "venice_back_hill"},
+	"wildwood_ghost": {"region": "field", "name": "荒林幽灵", "position": Vector2(360, 700), "color": Color("617a82"), "accent": Color("acd9d6"), "location": "venice_wildwood"},
 	"dungeon_guard": {"region": "dungeon", "name": "一层训练卫兵", "position": Vector2(360, 930), "color": Color("687887"), "accent": Color("c8d2d5"), "location": "training_dungeon_1"},
 	"stone_puppet": {"region": "dungeon", "name": "二层石傀儡", "position": Vector2(360, 680), "color": Color("77766e"), "accent": Color("b6a986"), "location": "training_dungeon_2"},
 	"tide_beast": {"region": "dungeon", "name": "三层潮汐兽", "position": Vector2(360, 425), "color": Color("397b83"), "accent": Color("79c2c6"), "location": "training_dungeon_3"},
@@ -81,7 +81,7 @@ const ENEMY_SPAWNS = {
 
 const DISCOVERY_SPAWNS = {
 	"alisa_shell": {"region": "city", "location": "alisa_hut", "position": Vector2(76, 430)},
-	"field_cache": {"region": "field", "location": "residential_quarter", "position": Vector2(305, 860)},
+	"field_cache": {"region": "field", "location": "residential_quarter", "position": Vector2(190, 840)},
 	"trial_relic": {"region": "dungeon", "location": "training_dungeon_2", "position": Vector2(250, 680)},
 	"corsair_manifest": {"region": "black_sail", "location": "black_sail_3", "position": Vector2(485, 455)}
 }
@@ -175,10 +175,10 @@ var region_zones = {
 		"venice_north_gate": {"point": Vector2(360, 285), "radius": 110}
 	},
 	"field": {
-		"residential_quarter": {"point": Vector2(360, 1010), "radius": 130},
-		"venice_mine": {"point": Vector2(595, 455), "radius": 130},
-		"venice_back_hill": {"point": Vector2(140, 410), "radius": 130},
-		"venice_wildwood": {"point": Vector2(575, 750), "radius": 125}
+		"residential_quarter": {"point": Vector2(270, 325), "radius": 130},
+		"venice_mine": {"point": Vector2(565, 490), "radius": 130},
+		"venice_back_hill": {"point": Vector2(150, 440), "radius": 130},
+		"venice_wildwood": {"point": Vector2(360, 700), "radius": 125}
 	},
 	"dungeon": {
 		"training_dungeon_1": {"point": Vector2(360, 970), "radius": 115},
@@ -203,7 +203,7 @@ var region_zones = {
 
 var region_obstacles = {
 	"city": [Rect2(20, 160, 170, 190), Rect2(20, 730, 210, 190), Rect2(530, 160, 170, 230), Rect2(235, 25, 80, 200), Rect2(405, 25, 80, 200)],
-	"field": [Rect2(495, 135, 225, 285), Rect2(20, 835, 235, 195), Rect2(465, 815, 235, 205)],
+	"field": [Rect2(50, 205, 135, 75), Rect2(560, 320, 130, 110)],
 	"dungeon": [Rect2(0, 285, 295, 58), Rect2(425, 285, 295, 58), Rect2(0, 540, 295, 58), Rect2(425, 540, 295, 58), Rect2(0, 795, 295, 58), Rect2(425, 795, 295, 58)],
 	"black_sail": [Rect2(0, 285, 295, 58), Rect2(425, 285, 295, 58), Rect2(0, 540, 295, 58), Rect2(425, 540, 295, 58), Rect2(0, 795, 295, 58), Rect2(425, 795, 295, 58)],
 	"white_whale": [Rect2(0, 285, 295, 58), Rect2(425, 285, 295, 58), Rect2(0, 540, 295, 58), Rect2(425, 540, 295, 58), Rect2(0, 795, 295, 58), Rect2(425, 795, 295, 58)]
@@ -408,8 +408,8 @@ func _spawn_world_actors():
 		_spawn_enemy_if_ready("mine_thief")
 		_spawn_enemy_if_ready("giant_bear")
 		_spawn_enemy_if_ready("wildwood_ghost")
-		_add_actor("travel", "city", "返回威尼斯", Vector2(220, 1070), Color("4e7781"), GOLD, "venice_north_gate")
-		_add_actor("travel", "dungeon", "经验副本入口", Vector2(360, 245), Color("775c54"), RED, "training_dungeon_1")
+		_add_actor("travel", "city", "返回威尼斯", Vector2(330, 225), Color("4e7781"), GOLD, "venice_north_gate")
+		_add_actor("travel", "dungeon", "经验副本入口", Vector2(200, 555), Color("775c54"), RED, "training_dungeon_1")
 	elif current_region == "dungeon":
 		_spawn_next_dungeon_enemy(["dungeon_guard", "stone_puppet", "tide_beast", "vermilion_phantom"])
 		_add_actor("travel", "field", "离开副本", Vector2(215, 1080), Color("4e7781"), GOLD, "residential_quarter")
@@ -680,8 +680,8 @@ func _spawn_for_location(location_id):
 		"venice_dock": Vector2(360, 915), "venice_north_gate": Vector2(360, 365),
 		"ragusa_dock": Vector2(360, 915), "alexandria_dock": Vector2(360, 915), "malta_dock": Vector2(360, 915),
 		"cape_town_dock": Vector2(360, 915), "quanzhou_dock": Vector2(360, 915), "athens_dock": Vector2(360, 915), "yangzhou_dock": Vector2(360, 915), "amsterdam_dock": Vector2(360, 915),
-		"residential_quarter": Vector2(350, 1045), "venice_mine": Vector2(500, 505),
-		"venice_back_hill": Vector2(230, 450), "venice_wildwood": Vector2(500, 820),
+		"residential_quarter": Vector2(330, 280), "venice_mine": Vector2(510, 500),
+		"venice_back_hill": Vector2(215, 450), "venice_wildwood": Vector2(360, 640),
 		"training_dungeon_1": Vector2(360, 1025), "training_dungeon_2": Vector2(360, 775),
 		"training_dungeon_3": Vector2(360, 520), "training_dungeon_4": Vector2(360, 285)
 		,"black_sail_1": Vector2(360, 1025), "black_sail_2": Vector2(360, 775),
@@ -981,6 +981,8 @@ func _is_walkable(position):
 		var city_layout = GameData.PORT_CITY_MAPS.get(_active_city_port_id(), GameData.PORT_CITY_MAPS.venice_dock)
 		var plaza_bounds = _world_rect(Rect2(city_layout.get("plaza_rect", Rect2(45, 220, 630, 790)))).grow(14.0 * WORLD_SCALE)
 		return plaza_bounds.has_point(position)
+	if current_region == "field" and not Geometry2D.is_point_in_polygon(position / WORLD_SCALE, WorldMapScript.FIELD_LAND_BOUNDARY):
+		return false
 	var active_obstacles = [] if current_region == "city" else region_obstacles.get(current_region, [])
 	for rect in active_obstacles:
 		if rect.grow(18.0 * WORLD_SCALE).has_point(position):

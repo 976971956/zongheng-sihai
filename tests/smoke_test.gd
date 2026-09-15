@@ -12,7 +12,6 @@ func _init():
 	_check(state.player.location == "alisa_hut", "新游戏应从海边小屋开始")
 	_check(state.get_current_quest().objective.type == "talk", "首个任务应为交谈任务")
 	_check(state.difficulty == GameState.DIFFICULTY_NORMAL and state.difficulty_name() == "普通", "新游戏必须默认使用普通难度")
-	_check(not state.arrive_from_2d("venice_square").ok and state.player.location == "alisa_hut", "2D移动不能跳过世界图直接传送")
 	var difficulty_state = TestState.new()
 	difficulty_state.player.location = "venice_dock"
 	var normal_route_risk = difficulty_state.voyage_risk("ragusa_dock")

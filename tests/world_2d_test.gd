@@ -315,6 +315,17 @@ func _run():
 	_check(_has_actor(scene, "stone_puppet") and not _has_actor(scene, "dungeon_guard"), "击败一层后必须只生成二层石傀儡")
 	_check(scene._dungeon_floor_lock("training_dungeon_2") == "", "击败一层守卫后二层必须开放")
 	scene._switch_region("field", "residential_quarter")
+	_check(scene._is_walkable(scene.player_actor.position), "新版郊外出生点必须位于可行走陆地")
+	_check(not scene._is_walkable(scene._world_point(Vector2(600, 1000))), "郊外海湾水面不能步行进入")
+	for field_actor in scene.actors:
+		_check(scene._is_walkable(field_actor.node.position), "%s必须位于新地图可到达的陆地上" % str(field_actor.id))
+		var field_path = scene._build_task_navigation_path(scene.player_actor.position, field_actor.node.position)
+		_check(not field_path.is_empty(), "%s必须能够从郊外入口步行到达" % str(field_actor.id))
+		var previous_field_point = scene.player_actor.position
+		for field_point in field_path:
+			for step in range(1, 9):
+				_check(scene._is_walkable(previous_field_point.lerp(field_point, float(step) / 8.0)), "%s的导航路线不得穿过海湾或障碍" % str(field_actor.id))
+			previous_field_point = field_point
 	_check(scene.state.dungeon_cleared.is_empty(), "离开副本后必须重置逐层解锁状态")
 
 	scene.state.quest_index = 12

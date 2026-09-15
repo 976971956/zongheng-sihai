@@ -12,6 +12,8 @@ const CITY_ARTS = {
 	"amsterdam_dock": preload("res://assets/art/maps/amsterdam_plaza_v1.png")
 }
 const FIELD_ART = preload("res://assets/art/maps/venice_field_v3.png")
+# Land silhouette in 720 x 1280 art coordinates; navigation uses the same scale.
+const FIELD_LAND_BOUNDARY = [Vector2(45, 210), Vector2(500, 210), Vector2(675, 360), Vector2(675, 530), Vector2(535, 570), Vector2(520, 700), Vector2(575, 840), Vector2(395, 875), Vector2(250, 1010), Vector2(155, 1085), Vector2(35, 1050)]
 const DUNGEON_ART = preload("res://assets/art/maps/training_dungeon_v2.png")
 const BASE_MAP_SIZE = Vector2(720, 1280)
 const WORLD_SCALE = 1.5
@@ -238,7 +240,7 @@ func _draw_art_overlays():
 		# A faint living mist identifies the haunted grove without obscuring paths.
 		for index in range(5):
 			var drift = sin(wave_time * 0.55 + index) * 14.0
-			draw_circle(Vector2(535 + drift + index * 32, 700 + index * 24), 34, Color(0.42, 0.86, 0.82, 0.035))
+			draw_circle(Vector2(280 + drift + index * 25, 660 + index * 16), 34, Color(0.42, 0.86, 0.82, 0.035))
 	elif region_mode == "dungeon":
 		# Firelight pulse ties the four training chambers together.
 		var pulse = 0.025 + (sin(wave_time * 2.4) + 1.0) * 0.012
