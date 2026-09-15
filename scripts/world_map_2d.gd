@@ -11,7 +11,7 @@ const CITY_ARTS = {
 	"yangzhou_dock": preload("res://assets/art/maps/yangzhou_plaza_v1.png"),
 	"amsterdam_dock": preload("res://assets/art/maps/amsterdam_plaza_v1.png")
 }
-const FIELD_ART = preload("res://assets/art/maps/venice_field_v2.png")
+const FIELD_ART = preload("res://assets/art/maps/venice_field_v3.png")
 const DUNGEON_ART = preload("res://assets/art/maps/training_dungeon_v2.png")
 const BASE_MAP_SIZE = Vector2(720, 1280)
 const WORLD_SCALE = 1.5
