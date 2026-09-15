@@ -227,7 +227,30 @@ func arrive_from_2d(location_id):
 		return {"ok": false, "message": "地点不存在。", "quest_completed": false}
 	if player.location == location_id:
 		return {"ok": true, "message": "", "quest_completed": false}
+	# 2D movement is still governed by the same world graph as the journal UI.
+	# Without this check, an actor marker or stale navigation target could write
+	# any location directly into the save, bypassing level and dungeon locks.
+	var current = GameData.LOCATIONS[player.location]
+	var selected_edge = {}
+	for edge in current.get("exits", []):
+		if str(edge.get("to", "")) == location_id:
+			selected_edge = edge
+			break
+	if selected_edge.is_empty():
+		return {"ok": false, "message": "无法从这里直接前往该地点。", "quest_completed": false}
+	var required_level = int(selected_edge.get("level", 1))
+	if int(player.level) < required_level:
+		return {"ok": false, "message": "需要达到 Lv.%d 才能进入。" % required_level, "quest_completed": false}
+	var exit_lock = get_exit_lock(selected_edge)
+	if exit_lock != "":
+		return {"ok": false, "message": exit_lock, "quest_completed": false}
+	var was_in_dungeon = _is_dungeon_location(player.location)
+	var enters_dungeon = not was_in_dungeon and _is_dungeon_location(location_id)
+	if enters_dungeon:
+		dungeon_cleared = {}
 	player.location = location_id
+	if was_in_dungeon and not _is_dungeon_location(location_id):
+		dungeon_cleared = {}
 	var quest_completed = _advance_quest("visit", location_id)
 	message_history.push_front("步行抵达%s。" % GameData.LOCATIONS[location_id].name)
 	_trim_history()
